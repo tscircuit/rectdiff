@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>3D Rect Difference & Coalescing Visualizer (No Discretization)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; }
+    #app { display: grid; grid-template-columns: 360px 1fr; height: 100%; }
+    #controls { padding: 12px 14px; overflow: auto; border-right: 1px solid #e6e6e6; background: #fafafa; }
+    #controls h1 { font-size: 18px; margin: 8px 0 10px; }
+    #controls h2 { font-size: 14px; margin: 16px 0 8px; color: #333; }
+    #controls label { display:block; font-size: 12px; margin: 6px 0 2px; color:#333; }
+    #controls input[type="number"], #controls select, #controls textarea { width:100%; box-sizing:border-box; font: inherit; padding: 6px 8px; }
+    #controls textarea { height: 180px; resize: vertical; }
+    #controls .row { display:flex; gap:8px; }
+    #controls .row > div { flex:1; }
+    #controls .btns { display:flex; gap:8px; margin: 10px 0 12px; }
+    button { padding: 8px 10px; font: inherit; cursor: pointer; border-radius: 6px; border:1px solid #ccc; background:#fff; }
+    button.primary { background: #2563eb; color: white; border-color: #2563eb; }
+    button:disabled { opacity:.6; cursor: not-allowed; }
+    #stats { font-size:12px; background:#fff; border:1px solid #e5e5e5; border-radius:8px; padding:8px; }
+    #stats b { font-weight:600; }
+    #toggles { display:flex; gap:8px; margin-top:8px; }
+    #view { position: relative; }
+    #view canvas { display:block; width:100%; height:100%; }
+    .small { font-size: 11px; color:#666; }
+    .mono  { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; }
+    .warn  { color:#92400e; background: #fff7ed; border: 1px solid #fed7aa; padding: 6px 8px; border-radius:8px; font-size:12px; }
+    .ok    { color:#065f46; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 6px 8px; border-radius:8px; font-size:12px; }
+  </style>
+  <!-- Three.js from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+<div id="app">
+  <div id="controls">
+    <h1>3D Rect Difference & Coalescing (No Discretization)</h1>
+    <div class="small">Subtract axis-aligned 3D cutouts from a root box (with discrete Z layers), then merge adjacent boxes to produce large non-overlapping prisms. No rasterization/discretization is used—only exact splits along cutout faces and exact coalescing.</div>
+    <h2>Input</h2>
+    <label>Problem JSON (<span class="mono">InputProblem</span>)</label>
+    <textarea id="inputArea" spellcheck="false"></textarea>
+    <div class="row">
+      <div>
+        <label>Z layer thickness</label>
+        <input id="thickness" type="number" step="0.01" value="1" />
+      </div>
+      <div>
+        <label>Score exponent p ( > 1 )</label>
+        <input id="exponent" type="number" step="0.1" value="2" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Axis order</label>
+        <select id="axisOrder">
+          <option value="AUTO" selected>Auto (try all 6)</option>
+          <option value="X,Y,Z">X → Y → Z</option>
+          <option value="X,Z,Y">X → Z → Y</option>
+          <option value="Y,X,Z">Y → X → Z</option>
+          <option value="Y,Z,X">Y → Z → X</option>
+          <option value="Z,X,Y">Z → X → Y</option>
+          <option value="Z,Y,X">Z → Y → X</option>
+        </select>
+      </div>
+      <div>
+        <label>Max merge cycles</label>
+        <input id="maxCycles" type="number" step="1" value="6" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>EPS tolerance</label>
+        <input id="eps" type="number" step="0.000000001" value="1e-9" />
+      </div>
+      <div>
+        <label>Seed (cutout order)</label>
+        <input id="seed" type="number" step="1" value="0" />
+      </div>
+    </div>
+    <div class="btns">
+      <button id="runBtn" class="primary">Run</button>
+      <button id="exampleBtn">Load example</button>
+      <button id="clearBtn">Clear scene</button>
+    </div>
+    <div id="stats">
+      <div id="status" class="ok">Ready.</div>
+      <div style="margin-top:6px;">
+        <div><b>Boxes:</b> <span id="boxCount">–</span></div>
+        <div><b>Total free volume:</b> <span id="freeVol">–</span></div>
+        <div><b>Score (∑vol^p):</b> <span id="scoreVal">–</span></div>
+        <div><b>Axis order:</b> <span id="orderUsed">–</span></div>
+      </div>
+      <div id="notes" class="small" style="margin-top:6px;"></div>
+    </div>
+    <h2>View</h2>
+    <div id="toggles">
+      <label><input id="showRoot" type="checkbox" checked /> Root</label>
+      <label><input id="showCutouts" type="checkbox" checked /> Cutouts</label>
+      <label><input id="showOutput" type="checkbox" checked /> Output</label>
+      <label><input id="wireframeOutput" type="checkbox" /> Wireframe</label>
+    </div>
+    <div class="small" style="margin-top:8px;">
+      Controls: drag to orbit, wheel to zoom, right-drag to pan.
+    </div>
+  </div>
+  <div id="view"></div>
+</div>
+
+<script>
+(() => {
+  // ---------- Geometry & algorithm (no discretization) ----------
+
+  const EPS_DEFAULT = 1e-9;
+
+  function almostEq(a, b, eps) { return Math.abs(a - b) <= eps; }
+  function gt(a,b,eps){ return a > b + eps; }
+  function gte(a,b,eps){ return a > b - eps; }
+  function lt(a,b,eps){ return a < b - eps; }
+  function lte(a,b,eps){ return a < b + eps; }
+
+  function ensureContiguous(layers) {
+    const z = [...layers].sort((a,b)=>a-b);
+    for (let i=1;i<z.length;i++) if (z[i] !== z[i-1] + 1) {
+      throw new Error('zLayers must be contiguous integers: ' + JSON.stringify(layers));
+    }
+    return z;
+  }
+
+  // Box with z stored as integer half-open [z0,z1)
+  function toBoxFromRoot(root) {
+    const z = ensureContiguous(root.zLayers);
+    return {
+      minX: root.minX, minY: root.minY, maxX: root.maxX, maxY: root.maxY,
+      z0: z[0], z1: z[z.length-1] + 1
+    };
+  }
+  function toBoxFromCutout(c, rootZs) {
+    const z = ensureContiguous(c.zLayers).filter(zl => rootZs.has(zl));
+    if (z.length === 0) return null;
+    return {
+      minX: c.minX, minY: c.minY, maxX: c.maxX, maxY: c.maxY,
+      z0: z[0], z1: z[z.length-1] + 1
+    };
+  }
+
+  function nonEmptyBox(b, eps) {
+    return gt(b.maxX, b.minX, eps) && gt(b.maxY, b.minY, eps) && (b.z1 - b.z0) > 0;
+  }
+
+  function intersect1D(a0,a1,b0,b1,eps){
+    const lo = Math.max(a0,b0);
+    const hi = Math.min(a1,b1);
+    return gt(hi, lo, eps) ? [lo, hi] : null;
+  }
+
+  function intersects(a, b, eps){
+    return intersect1D(a.minX,a.maxX,b.minX,b.maxX,eps)
+        && intersect1D(a.minY,a.maxY,b.minY,b.maxY,eps)
+        && (Math.min(a.z1,b.z1) > Math.max(a.z0,b.z0));
+  }
+
+  // Subtract B from A; return up to 6 boxes (A \ B).
+  function subtractBox(A, B, eps) {
+    if (!intersects(A,B,eps)) return [A];
+
+    const Xi = intersect1D(A.minX,A.maxX,B.minX,B.maxX,eps);
+    const Yi = intersect1D(A.minY,A.maxY,B.minY,B.maxY,eps);
+    const Z0 = Math.max(A.z0, B.z0);
+    const Z1 = Math.min(A.z1, B.z1);
+    if (!Xi || !Yi || !(Z1>Z0)) return [A];
+
+    const [X0,X1] = Xi, [Y0,Y1] = Yi;
+    const out = [];
+
+    // Left slab
+    if (gt(X0, A.minX, eps)) out.push({ minX: A.minX, maxX: X0, minY: A.minY, maxY: A.maxY, z0: A.z0, z1: A.z1 });
+    // Right slab
+    if (gt(A.maxX, X1, eps)) out.push({ minX: X1, maxX: A.maxX, minY: A.minY, maxY: A.maxY, z0: A.z0, z1: A.z1 });
+
+    // Middle X range: further split along Y
+    const midX0 = Math.max(A.minX, X0);
+    const midX1 = Math.min(A.maxX, X1);
+
+    // Front (lower Y)
+    if (gt(Y0, A.minY, eps)) out.push({ minX: midX0, maxX: midX1, minY: A.minY, maxY: Y0, z0: A.z0, z1: A.z1 });
+    // Back (upper Y)
+    if (gt(A.maxY, Y1, eps)) out.push({ minX: midX0, maxX: midX1, minY: Y1, maxY: A.maxY, z0: A.z0, z1: A.z1 });
+
+    // Center X,Y range: split along Z
+    const midY0 = Math.max(A.minY, Y0);
+    const midY1 = Math.min(A.maxY, Y1);
+
+    if (Z0 > A.z0) out.push({ minX: midX0, maxX: midX1, minY: midY0, maxY: midY1, z0: A.z0, z1: Z0 });
+    if (A.z1 > Z1) out.push({ minX: midX0, maxX: midX1, minY: midY0, maxY: midY1, z0: Z1, z1: A.z1 });
+
+    return out.filter(b => nonEmptyBox(b, eps));
+  }
+
+  // Subtract a single cutout from a list of boxes
+  function subtractCutoutFromList(boxes, cutout, eps) {
+    const out = [];
+    for (const b of boxes) {
+      if (intersects(b, cutout, eps)) {
+        const parts = subtractBox(b, cutout, eps);
+        for (const p of parts) out.push(p);
+      } else {
+        out.push(b);
+      }
+    }
+    return out;
+  }
+
+  // Deterministic subtraction of all cutouts (sorted for stability)
+  function subtractAll(rootBox, cutoutBoxes, eps, seed=0) {
+    // Deterministic sort: by z0,z1, then minY,minX, then maxX,maxY
+    const rnd = mulberry32(seed);
+    const cuts = [...cutoutBoxes].sort((a,b)=> (a.z0-b.z0) || (a.z1-b.z1) || (a.minY-b.minY) || (a.minX-b.minX) || (a.maxX-b.maxX) || (a.maxY-b.maxY) );
+    // Optional stable shuffle by seed to let user stress-test; keep deterministic
+    if (seed !== 0) {
+      for (let i=cuts.length-1;i>0;i--) {
+        const j = Math.floor(rnd()* (i+1));
+        const tmp = cuts[i]; cuts[i]=cuts[j]; cuts[j]=tmp;
+      }
+    }
+    let free = [rootBox];
+    for (const c of cuts) {
+      free = subtractCutoutFromList(free, c, eps);
+    }
+    return free;
+  }
+
+  // Merge along an axis where the other two extents exactly match (within EPS)
+  function mergeAlongAxis(boxes, axis, eps) {
+    if (boxes.length <= 1) return boxes;
+    const groups = new Map();
+    const R = (v)=> v.toFixed(12); // key rounding
+
+    function keyX(b){ return `y:${R(b.minY)}-${R(b.maxY)}|z:${b.z0}-${b.z1}`; }
+    function keyY(b){ return `x:${R(b.minX)}-${R(b.maxX)}|z:${b.z0}-${b.z1}`; }
+    function keyZ(b){ return `x:${R(b.minX)}-${R(b.maxX)}|y:${R(b.minY)}-${R(b.maxY)}`; }
+
+    const keyFn = axis==='X' ? keyX : axis==='Y' ? keyY : keyZ;
+
+    for (const b of boxes) {
+      const k = keyFn(b);
+      const arr = groups.get(k);
+      if (arr) arr.push(b); else groups.set(k, [b]);
+    }
+
+    const out = [];
+    for (const arr of groups.values()) {
+      if (axis === 'X') {
+        arr.sort((a,b)=> (a.minX-b.minX) || (a.maxX-b.maxX));
+        let cur = arr[0];
+        for (let i=1;i<arr.length;i++) {
+          const n = arr[i];
+          if (almostEq(cur.maxX, n.minX, eps)) {
+            cur = { ...cur, maxX: n.maxX };
+          } else {
+            out.push(cur); cur = n;
+          }
+        }
+        out.push(cur);
+      } else if (axis === 'Y') {
+        arr.sort((a,b)=> (a.minY-b.minY) || (a.maxY-b.maxY));
+        let cur = arr[0];
+        for (let i=1;i<arr.length;i++) {
+          const n = arr[i];
+          if (almostEq(cur.maxY, n.minY, eps)) {
+            cur = { ...cur, maxY: n.maxY };
+          } else {
+            out.push(cur); cur = n;
+          }
+        }
+        out.push(cur);
+      } else { // Z
+        arr.sort((a,b)=> (a.z0-b.z0) || (a.z1-b.z1));
+        let cur = arr[0];
+        for (let i=1;i<arr.length;i++) {
+          const n = arr[i];
+          if (cur.z1 === n.z0) {
+            cur = { ...cur, z1: n.z1 };
+          } else {
+            out.push(cur); cur = n;
+          }
+        }
+        out.push(cur);
+      }
+    }
+    return out;
+  }
+
+  // Apply merges in an axis order; iterate cycles until no change or maxCycles
+  function coalesce(boxes, order, eps, maxCycles=4) {
+    let prevLen = -1;
+    let cur = boxes.slice();
+    for (let cycle=0; cycle<maxCycles; cycle++) {
+      prevLen = cur.length;
+      for (const ax of order) {
+        cur = mergeAlongAxis(cur, ax, eps);
+      }
+      if (cur.length === prevLen) break;
+    }
+    return cur;
+  }
+
+  function permutations(arr) {
+    const res = [];
+    const used = Array(arr.length).fill(false);
+    const curr = [];
+    function backtrack(){
+      if (curr.length===arr.length){ res.push(curr.slice()); return; }
+      for(let i=0;i<arr.length;i++){
+        if (used[i]) continue;
+        used[i]=true; curr.push(arr[i]);
+        backtrack();
+        curr.pop(); used[i]=false;
+      }
+    }
+    backtrack();
+    return res;
+  }
+
+  function scoreBoxes(boxes, thickness, p) {
+    let s = 0;
+    for (const b of boxes) {
+      const dx = b.maxX - b.minX;
+      const dy = b.maxY - b.minY;
+      const dz = (b.z1 - b.z0) * thickness;
+      const vol = dx * dy * dz;
+      s += Math.pow(vol, p);
+    }
+    return s;
+  }
+
+  function totalVolume(boxes, thickness) {
+    let v=0;
+    for (const b of boxes) {
+      v += (b.maxX-b.minX)*(b.maxY-b.minY)*((b.z1-b.z0)*thickness);
+    }
+    return v;
+  }
+
+  function boxToRect3d(b) {
+    const zLayers = [];
+    for (let z=b.z0; z<b.z1; z++) zLayers.push(z);
+    return { minX:b.minX, minY:b.minY, maxX:b.maxX, maxY:b.maxY, zLayers };
+  }
+
+  function solveNoDiscretization(problem, options) {
+    const { Z_LAYER_THICKNESS, p, order, maxCycles, eps, seed } = options;
+    const rootZs = new Set(problem.rootRect.zLayers);
+    const rootBox = toBoxFromRoot(problem.rootRect);
+    const cutouts = problem.cutouts
+      .map(c => toBoxFromCutout(c, rootZs))
+      .filter(Boolean);
+
+    if (!nonEmptyBox(rootBox, eps)) throw new Error('Root box is empty.');
+
+    // Subtract all cutouts (exact; no rasterization)
+    const diffBoxes = subtractAll(rootBox, cutouts, eps, seed);
+
+    const orders = order === 'AUTO' ? permutations(['X','Y','Z']) : [order.split(',')];
+
+    let best = null, bestScore = -Infinity, bestOrder = null;
+    for (const ord of orders) {
+      const merged = coalesce(diffBoxes, ord, eps, maxCycles);
+      const sc = scoreBoxes(merged, Z_LAYER_THICKNESS, p);
+      if (sc > bestScore) { best = merged; bestScore = sc; bestOrder = ord.join(','); }
+    }
+    return {
+      boxes: best,
+      rects: best.map(boxToRect3d),
+      score: bestScore,
+      orderUsed: bestOrder || 'X,Y,Z',
+      totalFreeVolume: totalVolume(best, Z_LAYER_THICKNESS)
+    };
+  }
+
+  // Simple deterministic PRNG for seed-based order stress testing
+  function mulberry32(a) {
+    return function() {
+      var t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+  }
+
+  // ---------- Three.js setup ----------
+
+  let renderer, scene, camera, controls;
+  let rootGroup, cutoutsGroup, outputGroup, axesHelper;
+
+  function initThree(container) {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+
+    renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(w, h);
+    container.innerHTML = '';
+    container.appendChild(renderer.domElement);
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf7f8fa);
+
+    camera = new THREE.PerspectiveCamera(45, w/h, 0.1, 10000);
+    camera.position.set(80, 80, 120);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    rootGroup = new THREE.Group();
+    cutoutsGroup = new THREE.Group();
+    outputGroup = new THREE.Group();
+    scene.add(rootGroup);
+    scene.add(cutoutsGroup);
+    scene.add(outputGroup);
+
+    axesHelper = new THREE.AxesHelper(50);
+    scene.add(axesHelper);
+
+    const amb = new THREE.AmbientLight(0xffffff, 0.9);
+    scene.add(amb);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+    dir.position.set(1,2,3);
+    scene.add(dir);
+
+    window.addEventListener('resize', onResize);
+    function onResize(){
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w/h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w,h);
+    }
+
+    function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+    animate();
+  }
+
+  // Map problem XYZ -> Three.js (X, Y-up, Z-depth).
+  // Our problem Z (layers) maps to Y (up) in Three.
+  function makeMeshForBox(b, thickness, color, wire=false, opacity=0.45) {
+    const dx = b.maxX - b.minX;
+    const dz = b.maxY - b.minY; // map Y -> Three Z
+    const dh = (b.z1 - b.z0) * thickness; // height
+    const cx = (b.minX + b.maxX)/2;
+    const cz = (b.minY + b.maxY)/2;
+    const cy = ((b.z0 + b.z1)/2) * thickness;
+
+    const geom = new THREE.BoxGeometry(dx, dh, dz);
+    let mat;
+    if (wire) {
+      const edges = new THREE.EdgesGeometry(geom);
+      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color }));
+      line.position.set(cx, cy, cz);
+      return line;
+    } else {
+      mat = new THREE.MeshPhongMaterial({ color, opacity, transparent: true });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(cx, cy, cz);
+      return mesh;
+    }
+  }
+
+  function clearGroups() {
+    for (const g of [rootGroup, cutoutsGroup, outputGroup]) {
+      while (g.children.length) g.remove(g.children[0]);
+    }
+  }
+
+  function fitCameraToBox(root, thickness) {
+    const dx = root.maxX - root.minX;
+    const dz = root.maxY - root.minY;
+    const dh = (Math.max(...root.zLayers) - Math.min(...root.zLayers) + 1) * thickness;
+    const size = Math.max(dx, dz, dh);
+    const dist = size * 2.0;
+    camera.position.set(root.maxX + dist*0.6, dh + dist, root.maxY + dist*0.6);
+    camera.near = Math.max(0.1, size/100);
+    camera.far = dist*10 + size*10;
+    camera.updateProjectionMatrix();
+    controls.target.set((root.minX+root.maxX)/2, dh/2, (root.minY+root.maxY)/2);
+    controls.update();
+  }
+
+  // ---------- UI glue ----------
+
+  const elInput = document.getElementById('inputArea');
+  const elThick = document.getElementById('thickness');
+  const elExp = document.getElementById('exponent');
+  const elOrder = document.getElementById('axisOrder');
+  const elMaxCycles = document.getElementById('maxCycles');
+  const elEps = document.getElementById('eps');
+  const elSeed = document.getElementById('seed');
+
+  const elRun = document.getElementById('runBtn');
+  const elExample = document.getElementById('exampleBtn');
+  const elClear = document.getElementById('clearBtn');
+
+  const elStatus = document.getElementById('status');
+  const elBoxCount = document.getElementById('boxCount');
+  const elFreeVol = document.getElementById('freeVol');
+  const elScore = document.getElementById('scoreVal');
+  const elOrderUsed = document.getElementById('orderUsed');
+  const elNotes = document.getElementById('notes');
+
+  const elShowRoot = document.getElementById('showRoot');
+  const elShowCutouts = document.getElementById('showCutouts');
+  const elShowOutput = document.getElementById('showOutput');
+  const elWireOutput = document.getElementById('wireframeOutput');
+
+  function setStatus(text, ok=true) {
+    elStatus.textContent = text;
+    elStatus.className = ok ? 'ok' : 'warn';
+  }
+
+  function loadExample() {
+    const example = {
+      rootRect: { minX: 0, minY: 0, maxX: 100, maxY: 60, zLayers: [0,1,2,3] },
+      cutouts: [
+        { minX: 10, minY: 10, maxX: 40, maxY: 50, zLayers: [0,1] },
+        { minX: 20, minY:  0, maxX: 30, maxY: 20, zLayers: [2,3] },
+        { minX: 55, minY:  5, maxX: 95, maxY: 20, zLayers: [0,1,2,3] },
+        { minX: 45, minY: 25, maxX: 70, maxY: 35, zLayers: [1,2] }
+      ]
+    };
+    elInput.value = JSON.stringify(example, null, 2);
+    setStatus('Loaded example. Click Run.', true);
+  }
+
+  function parseProblemFromTextarea() {
+    let obj;
+    try { obj = JSON.parse(elInput.value); }
+    catch (e) { throw new Error('Invalid JSON: ' + e.message); }
+    if (!obj || !obj.rootRect || !Array.isArray(obj.cutouts)) {
+      throw new Error('Expected object: { rootRect, cutouts }');
+    }
+    const r = obj.rootRect;
+    const checkRect = (t) => {
+      if (typeof t.minX!=='number'||typeof t.maxX!=='number'||typeof t.minY!=='number'||typeof t.maxY!=='number'||!Array.isArray(t.zLayers)) {
+        throw new Error('Rect3d requires minX, minY, maxX, maxY, zLayers:number[]');
+      }
+      if (!(t.minX < t.maxX && t.minY < t.maxY)) throw new Error('Invalid bounds in a rect.');
+    };
+    checkRect(r);
+    obj.cutouts.forEach(checkRect);
+    return obj;
+  }
+
+  function renderResult(problem, result, options) {
+    clearGroups();
+    const thickness = options.Z_LAYER_THICKNESS;
+
+    // Root wireframe
+    if (elShowRoot.checked) {
+      const rootBox = toBoxFromRoot(problem.rootRect);
+      const rootWire = makeMeshForBox(rootBox, thickness, 0x111827, true);
+      rootGroup.add(rootWire);
+    }
+
+    // Cutouts (red translucent)
+    if (elShowCutouts.checked) {
+      const rootZs = new Set(problem.rootRect.zLayers);
+      for (const c of problem.cutouts) {
+        const b = toBoxFromCutout(c, rootZs);
+        if (!b || !nonEmptyBox(b, EPS_DEFAULT)) continue;
+        const mesh = makeMeshForBox(b, thickness, 0xef4444, false, 0.35);
+        cutoutsGroup.add(mesh);
+      }
+    }
+
+    // Output boxes (green/blue)
+    if (elShowOutput.checked) {
+      const wire = elWireOutput.checked;
+      for (const b of result.boxes) {
+        const mesh = makeMeshForBox(b, thickness, wire ? 0x2563eb : 0x10b981, wire, wire ? 1.0 : 0.50);
+        outputGroup.add(mesh);
+      }
+    }
+
+    // Fit camera
+    fitCameraToBox(problem.rootRect, thickness);
+
+    // Update stats
+    elBoxCount.textContent = String(result.boxes.length);
+    elFreeVol.textContent = result.totalFreeVolume.toFixed(3);
+    elScore.textContent = result.score.toFixed(3);
+    elOrderUsed.textContent = result.orderUsed;
+    elNotes.textContent = `Returned ${result.rects.length} Rect3d objects. Toggle “Wireframe” if rendering many boxes.`;
+  }
+
+  function runOnce() {
+    try {
+      const problem = parseProblemFromTextarea();
+      const thickness = parseFloat(elThick.value);
+      const p = parseFloat(elExp.value);
+      const axisVal = elOrder.value;
+      const maxCycles = Math.max(1, parseInt(elMaxCycles.value,10) || 4);
+      const eps = parseFloat(elEps.value) || EPS_DEFAULT;
+      const seed = parseInt(elSeed.value, 10) || 0;
+
+      if (!(thickness>0)) throw new Error('Z layer thickness must be > 0');
+      if (!(p>1)) throw new Error('Exponent p must be > 1');
+
+      const result = solveNoDiscretization(problem, {
+        Z_LAYER_THICKNESS: thickness,
+        p, order: axisVal, maxCycles, eps, seed
+      });
+      renderResult(problem, result, { Z_LAYER_THICKNESS: thickness });
+
+      setStatus('Success. Use the controls to adjust parameters.', true);
+      console.log('Output Rect3d[]:', result.rects);
+      window.__lastResult = result; // for console access
+    } catch (err) {
+      setStatus(String(err.message || err), false);
+      console.error(err);
+    }
+  }
+
+  // Initialize
+  initThree(document.getElementById('view'));
+  elRun.addEventListener('click', runOnce);
+  elExample.addEventListener('click', loadExample);
+  elClear.addEventListener('click', () => { clearGroups(); setStatus('Scene cleared.'); });
+
+  elShowRoot.addEventListener('change', runOnce);
+  elShowCutouts.addEventListener('change', runOnce);
+  elShowOutput.addEventListener('change', runOnce);
+  elWireOutput.addEventListener('change', runOnce);
+
+  // Load example initially
+  loadExample();
+})();
+</script>
+</body>
+</html>
