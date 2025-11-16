@@ -302,7 +302,8 @@ const ThreeBoardView: React.FC<{
         const dy = (b.z1 - b.z0) * layerThickness
         const cx = (b.minX + b.maxX) / 2
         const cz = (b.minY + b.maxY) / 2
-        const cy = ((b.z0 + b.z1) / 2) * layerThickness
+        // Negate Y so z=0 is at top, higher z goes down
+        const cy = -((b.z0 + b.z1) / 2) * layerThickness
 
         const geom = new THREE.BoxGeometry(dx, dy, dz)
         if (wire) {
@@ -469,9 +470,10 @@ const ThreeBoardView: React.FC<{
       const dy = (fitBox.z1 - fitBox.z0) * layerThickness
       const size = Math.max(dx, dz, dy)
       const dist = size * 2.0
+      // Camera looks from above-right-front, with negative Y being "up" (z=0 at top)
       camera.position.set(
         fitBox.maxX + dist * 0.6,
-        dy + dist,
+        -dy / 2 + dist, // negative Y is up, so position above the center
         fitBox.maxY + dist * 0.6,
       )
       camera.near = Math.max(0.1, size / 100)
@@ -479,7 +481,7 @@ const ThreeBoardView: React.FC<{
       camera.updateProjectionMatrix()
       controls.target.set(
         (fitBox.minX + fitBox.maxX) / 2,
-        dy / 2,
+        -dy / 2, // center of the inverted Y range
         (fitBox.minY + fitBox.maxY) / 2,
       )
       controls.update()
