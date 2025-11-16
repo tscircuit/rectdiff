@@ -4,10 +4,7 @@ import { RectDiffSolver } from "../lib/solvers/RectDiffSolver"
 import { useMemo } from "react"
 
 export default () => {
-  const solver = useMemo(
-    () => new RectDiffSolver({ simpleRouteJson: simpleRouteJson }),
-    [],
-  )
+  const solver = useMemo(() => new RectDiffSolver({ simpleRouteJson }), [])
 
   return <GenericSolverDebugger solver={solver} />
 }

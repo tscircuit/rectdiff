@@ -7,7 +7,7 @@ export class RectDiffSolver extends BaseSolver {
     super()
   }
 
-  _step() {
+  override _step(): void {
     // TODO
   }
 
