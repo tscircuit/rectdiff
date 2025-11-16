@@ -450,10 +450,16 @@ export class RectDiffSolver extends BaseSolver {
   private topLayerIndex = 0
   private result: SolveResult | null = null
   private meshNodes: CapacityMeshNode[] = []
+  private minLengthForMultipleLayers = 0.4
 
-  constructor(params: { simpleRouteJson: SimpleRouteJson }) {
+  constructor(params: {
+    simpleRouteJson: SimpleRouteJson
+    minLengthForMultipleLayers?: number
+  }) {
     super()
     this.srj = params.simpleRouteJson
+    this.minLengthForMultipleLayers =
+      params.minLengthForMultipleLayers ?? this.minLengthForMultipleLayers
 
     // Discover & index layers deterministically
     const found = new Set<string>()
