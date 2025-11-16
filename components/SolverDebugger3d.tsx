@@ -80,9 +80,9 @@ function buildPrismsFromNodes(
   const xyKey = (n: CapacityMeshNode) =>
     `${n.center.x.toFixed(8)}|${n.center.y.toFixed(8)}|${n.width.toFixed(8)}|${n.height.toFixed(8)}`
   const azKey = (n: CapacityMeshNode) => {
-    const zs = (n.availableZ && n.availableZ.length ? [...new Set(n.availableZ)] : [0]).sort(
-      (a, b) => a - b,
-    )
+    const zs = (
+      n.availableZ && n.availableZ.length ? [...new Set(n.availableZ)] : [0]
+    ).sort((a, b) => a - b)
     return `zset:${zs.join(",")}`
   }
   const key = (n: CapacityMeshNode) => `${xyKey(n)}|${azKey(n)}`
@@ -573,18 +573,42 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   const [boxShrinkAmount, setBoxShrinkAmount] = useState(0.1)
   const [showBorders, setShowBorders] = useState(false)
 
-  // Keep mesh nodes in sync with solver
-  const meshNodes = useMemo(() => {
+  // Mesh nodes state - updated when solver completes or during stepping
+  const [meshNodes, setMeshNodes] = useState<CapacityMeshNode[]>([])
+
+  // Update mesh nodes from solver output
+  const updateMeshNodes = useCallback(() => {
     try {
-      if (
-        (solver as any).solved !== true &&
-        typeof solver.solve === "function"
-      ) {
-        solver.solve()
-      }
-    } catch {}
-    return solver.getOutput().meshNodes ?? []
+      const output = solver.getOutput()
+      const nodes = output.meshNodes ?? []
+      setMeshNodes(nodes)
+    } catch {
+      setMeshNodes([])
+    }
   }, [solver])
+
+  // Initialize mesh nodes on mount (in case solver is already solved)
+  useEffect(() => {
+    updateMeshNodes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Handle solver completion
+  const handleSolverCompleted = useCallback(() => {
+    updateMeshNodes()
+  }, [updateMeshNodes])
+
+  // Poll for updates during stepping (GenericSolverDebugger doesn't have onStep)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Only update if solver has output available
+      if ((solver as any).solved || (solver as any).stats?.placed > 0) {
+        updateMeshNodes()
+      }
+    }, 100) // Poll every 100ms during active solving
+
+    return () => clearInterval(interval)
+  }, [updateMeshNodes, solver])
 
   const toggle3d = useCallback(() => setShow3d((s) => !s), [])
   const rebuild = useCallback(() => setRebuildKey((k) => k + 1), [])
@@ -592,7 +616,10 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   return (
     <>
       <div style={{ display: "grid", gap: 12, ...style }}>
-        <GenericSolverDebugger solver={solver as any} />
+        <GenericSolverDebugger
+          solver={solver as any}
+          onSolverCompleted={handleSolverCompleted}
+        />
 
         <div
           style={{
