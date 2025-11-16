@@ -19,9 +19,20 @@ export type GridFill3DOptions = {
   minMulti: { width: number; height: number; minLayers: number }
   preferMultiLayer?: boolean
   maxMultiLayerSpan?: number
+  /** Hard cap for the width/height of a single-layer node. Use Infinity to disable. */
+  maxSingleLayerNodeSize?: number
 }
 
-export type Candidate3D = { x: number; y: number; z: number; distance: number }
+export type Candidate3D = {
+  x: number
+  y: number
+  z: number
+  distance: number
+  /** Larger values mean more multi-layer potential at this seed. */
+  zSpanLen?: number
+  /** Marked when the seed came from the edge analysis pass. */
+  isEdgeSeed?: boolean
+}
 export type Placed3D = { rect: XYRect; zLayers: number[] }
 
 export type Phase = "GRID" | "EXPANSION" | "DONE"
@@ -32,7 +43,11 @@ export type RectDiffState = {
   layerNames: string[]
   layerCount: number
   bounds: XYRect
-  options: Required<Omit<GridFill3DOptions, "gridSizes">> & { gridSizes: number[] }
+  options: Required<Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan" | "maxSingleLayerNodeSize">> & {
+    gridSizes: number[]
+    maxMultiLayerSpan: number | undefined
+    maxSingleLayerNodeSize: number
+  }
   obstaclesByLayer: XYRect[][]
 
   // evolving
@@ -42,6 +57,8 @@ export type RectDiffState = {
   placed: Placed3D[]
   placedByLayer: XYRect[][]
   expansionIndex: number
+  /** Whether we've already run the edge-analysis seeding pass. */
+  edgeAnalysisDone: boolean
 
   // progress bookkeeping
   totalSeedsThisGrid: number
