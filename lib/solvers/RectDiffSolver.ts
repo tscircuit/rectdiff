@@ -16,7 +16,6 @@ type Rect3d = {
   zLayers: number[] // integer z indices (contiguous)
 }
 
-
 /** ---------------------------------------------------------------------
  *  NEW: Grid-based 3D filler (rect-fill-2d.tsx generalized to 3D)
  *  ------------------------------------------------------------------ */
@@ -52,7 +51,8 @@ const EPS = 1e-9
 const gt = (a: number, b: number) => a > b + EPS
 const gte = (a: number, b: number) => a > b - EPS
 const lt = (a: number, b: number) => a < b - EPS
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, v))
 
 /** Geometry helpers (XY) */
 function overlaps(a: XYRect, b: XYRect) {
@@ -64,7 +64,12 @@ function overlaps(a: XYRect, b: XYRect) {
   )
 }
 function containsPoint(r: XYRect, x: number, y: number) {
-  return x >= r.x - EPS && x <= r.x + r.width + EPS && y >= r.y - EPS && y <= r.y + r.height + EPS
+  return (
+    x >= r.x - EPS &&
+    x <= r.x + r.width + EPS &&
+    y >= r.y - EPS &&
+    y <= r.y + r.height + EPS
+  )
 }
 function distancePointToRectEdges(px: number, py: number, r: XYRect) {
   // Distance to the 4 edges (segments). For ranking seed points.
@@ -95,7 +100,12 @@ function distancePointToRectEdges(px: number, py: number, r: XYRect) {
 }
 
 /** Axis-aligned blockers set => get maximum expansion amounts in each direction */
-function maxExpandRight(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined) {
+function maxExpandRight(
+  rect: XYRect,
+  bounds: XYRect,
+  blockers: XYRect[],
+  maxAspect: number | null | undefined,
+) {
   // limit by board
   let maxWidth = bounds.x + bounds.width - rect.x
   // limit by blockers to the right that vertically overlap rect
@@ -126,7 +136,12 @@ function maxExpandRight(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAsp
   return Math.max(0, expansion)
 }
 
-function maxExpandDown(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined) {
+function maxExpandDown(
+  rect: XYRect,
+  bounds: XYRect,
+  blockers: XYRect[],
+  maxAspect: number | null | undefined,
+) {
   let maxHeight = bounds.y + bounds.height - rect.y
   for (const b of blockers) {
     if (
@@ -154,7 +169,12 @@ function maxExpandDown(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspe
   return Math.max(0, expansion)
 }
 
-function maxExpandLeft(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined) {
+function maxExpandLeft(
+  rect: XYRect,
+  bounds: XYRect,
+  blockers: XYRect[],
+  maxAspect: number | null | undefined,
+) {
   let minX = bounds.x
   for (const b of blockers) {
     if (
@@ -182,7 +202,12 @@ function maxExpandLeft(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspe
   return Math.max(0, expansion)
 }
 
-function maxExpandUp(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined) {
+function maxExpandUp(
+  rect: XYRect,
+  bounds: XYRect,
+  blockers: XYRect[],
+  maxAspect: number | null | undefined,
+) {
   let minY = bounds.y
   for (const b of blockers) {
     if (
@@ -242,7 +267,12 @@ function expandRectFromSeed(
 
   for (const s of strategies) {
     // start rect
-    let r: XYRect = { x: startX + s.ox, y: startY + s.oy, width: initialW, height: initialH }
+    let r: XYRect = {
+      x: startX + s.ox,
+      y: startY + s.oy,
+      width: initialW,
+      height: initialH,
+    }
 
     // keep initial inside bounds, otherwise skip
     if (
@@ -325,8 +355,14 @@ function buildZIndexMap(srj: SimpleRouteJson) {
   const names = canonicalizeLayerOrder(
     (srj.obstacles ?? []).flatMap((o) => o.layers ?? []),
   )
-  const fallback = Array.from({ length: Math.max(1, srj.layerCount || 1) }, (_, i) =>
-    i === 0 ? "top" : i === (srj.layerCount || 1) - 1 ? "bottom" : `inner${i}`,
+  const fallback = Array.from(
+    { length: Math.max(1, srj.layerCount || 1) },
+    (_, i) =>
+      i === 0
+        ? "top"
+        : i === (srj.layerCount || 1) - 1
+          ? "bottom"
+          : `inner${i}`,
   )
   const layerNames = names.length ? names : fallback
   const map = new Map<string, number>()
@@ -377,7 +413,10 @@ function computeCandidates3D(
   const out: Cand[] = []
 
   for (let z = 0; z < layerCount; z++) {
-    const blockers = [...(obstaclesByLayer[z] ?? []), ...(placedByLayer[z] ?? [])]
+    const blockers = [
+      ...(obstaclesByLayer[z] ?? []),
+      ...(placedByLayer[z] ?? []),
+    ]
 
     for (let x = bounds.x; x < bounds.x + bounds.width; x += gridSize) {
       for (let y = bounds.y; y < bounds.y + bounds.height; y += gridSize) {
@@ -411,7 +450,9 @@ function computeCandidates3D(
         // Distance to nearest blocker or the board edges (on this layer)
         const d = Math.min(
           distancePointToRectEdges(x, y, bounds),
-          ...(blockers.length ? blockers.map((b) => distancePointToRectEdges(x, y, b)) : [Infinity]),
+          ...(blockers.length
+            ? blockers.map((b) => distancePointToRectEdges(x, y, b))
+            : [Infinity]),
         )
 
         out.push({ x, y, z, distance: d })
@@ -440,7 +481,10 @@ function longestFreeSpanAroundZ(
 ): number[] {
   // Grow around z as [z0..z1] while the seed point is free in every layer.
   const isFreeAt = (layer: number) => {
-    const blockers = [...(obstaclesByLayer[layer] ?? []), ...(placedByLayer[layer] ?? [])]
+    const blockers = [
+      ...(obstaclesByLayer[layer] ?? []),
+      ...(placedByLayer[layer] ?? []),
+    ]
     return !blockers.some((b) => containsPoint(b, x, y))
   }
 
@@ -484,7 +528,10 @@ function gridFill3D(srj: SimpleRouteJson, opts: GridFill3DOptions): Rect3d[] {
   }
 
   // Build blockers per layer from SRJ obstacles
-  const obstaclesByLayer: XYRect[][] = Array.from({ length: layerCount }, () => [])
+  const obstaclesByLayer: XYRect[][] = Array.from(
+    { length: layerCount },
+    () => [],
+  )
   for (const ob of srj.obstacles ?? []) {
     const r = obstacleToXYRect(ob)
     if (!r) continue
@@ -510,7 +557,13 @@ function gridFill3D(srj: SimpleRouteJson, opts: GridFill3DOptions): Rect3d[] {
 
   // Phase 1: process all grid sizes (coarse -> fine)
   for (const grid of gridSizes) {
-    let candidates = computeCandidates3D(bounds, grid, layerCount, obstaclesByLayer, placedByLayer)
+    let candidates = computeCandidates3D(
+      bounds,
+      grid,
+      layerCount,
+      obstaclesByLayer,
+      placedByLayer,
+    )
 
     while (candidates.length > 0) {
       const cand = candidates[0]
@@ -537,11 +590,19 @@ function gridFill3D(srj: SimpleRouteJson, opts: GridFill3DOptions): Rect3d[] {
         placedByLayer,
       )
       if (span.length >= minMulti.minLayers) {
-        attempts.push({ kind: "multi", layers: span, minReq: { width: minMulti.width, height: minMulti.height } })
+        attempts.push({
+          kind: "multi",
+          layers: span,
+          minReq: { width: minMulti.width, height: minMulti.height },
+        })
       }
 
       // Single-layer attempt
-      attempts.push({ kind: "single", layers: [cand.z], minReq: { width: minSingle.width, height: minSingle.height } })
+      attempts.push({
+        kind: "single",
+        layers: [cand.z],
+        minReq: { width: minSingle.width, height: minSingle.height },
+      })
 
       const ordered = tryMultiFirst ? attempts : attempts.reverse()
 
@@ -578,7 +639,8 @@ function gridFill3D(srj: SimpleRouteJson, opts: GridFill3DOptions): Rect3d[] {
 
         // Remove future candidates that fell inside this rect on any of the used layers
         candidates = candidates.filter(
-          (c) => !attempt.layers.includes(c.z) || !containsPoint(rect, c.x, c.y),
+          (c) =>
+            !attempt.layers.includes(c.z) || !containsPoint(rect, c.x, c.y),
         )
 
         accepted = true
@@ -661,7 +723,11 @@ export class RectDiffSolver extends BaseSolver {
   private gridOptions: GridFill3DOptions
   private _meshNodes: CapacityMeshNode[] = []
 
-  constructor(opts: { simpleRouteJson: SimpleRouteJson; mode?: "grid" | "exact"; gridOptions?: Partial<GridFill3DOptions> }) {
+  constructor(opts: {
+    simpleRouteJson: SimpleRouteJson
+    mode?: "grid" | "exact"
+    gridOptions?: Partial<GridFill3DOptions>
+  }) {
     super()
     this.srj = opts.simpleRouteJson
     this.mode = opts.mode ?? "grid"
@@ -672,12 +738,22 @@ export class RectDiffSolver extends BaseSolver {
       initialCellRatio: 0.2,
       maxAspectRatio: 3,
       minSingle: { width: 2 * trace, height: 2 * trace },
-      minMulti: { width: 4 * trace, height: 4 * trace, minLayers: Math.min(2, Math.max(1, this.srj.layerCount || 1)) },
+      minMulti: {
+        width: 4 * trace,
+        height: 4 * trace,
+        minLayers: Math.min(2, Math.max(1, this.srj.layerCount || 1)),
+      },
       preferMultiLayer: true,
       ...opts.gridOptions,
     }
   }
 
+  // override _step() {
+  //   // TODO implement one iteration of the algorithm, process one candidate,
+  //   // expand one dimension of a rect etc. Do a very small thing
+  // }
+
+  // BAD!!!!! DO NOT OVERRIDE SOLVE! PERFORM ONE ITERATION PER STEP!
   override solve() {
     if (this.mode === "grid") {
       const rects = gridFill3D(this.srj, this.gridOptions)
