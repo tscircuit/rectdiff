@@ -27,7 +27,7 @@
         "noExplicitAny": "off"
       },
       "complexity": {
-        "noForEach": "error",
+        "noForEach": "off",
         "useLiteralKeys": "off"
       },
       "a11y": {
