@@ -311,7 +311,9 @@ const ThreeBoardView: React.FC<{
           color,
           opacity: clampedOpacity,
           transparent: clampedOpacity < 1,
+          alphaHash: clampedOpacity < 1,
         })
+
         const mesh = new THREE.Mesh(geom, mat)
         mesh.position.set(cx, cy, cz)
 
@@ -382,14 +384,28 @@ const ThreeBoardView: React.FC<{
           let box = p
           if (shrinkBoxes && boxShrinkAmount > 0) {
             const s = boxShrinkAmount
-            const minX = p.minX + s
-            const maxX = p.maxX - s
-            const minY = p.minY + s
-            const maxY = p.maxY - s
+
+            const widthX = p.maxX - p.minX
+            const widthY = p.maxY - p.minY
+
+            // Never shrink more on a side than allowed by the configured shrink amount
+            // while ensuring we don't shrink past a minimum dimension of "s"
+            const maxShrinkEachSideX = Math.max(0, (widthX - s) / 2)
+            const maxShrinkEachSideY = Math.max(0, (widthY - s) / 2)
+
+            const shrinkX = Math.min(s, maxShrinkEachSideX)
+            const shrinkY = Math.min(s, maxShrinkEachSideY)
+
+            const minX = p.minX + shrinkX
+            const maxX = p.maxX - shrinkX
+            const minY = p.minY + shrinkY
+            const maxY = p.maxY - shrinkY
+
+            // Guard against any degenerate box
             if (minX >= maxX || minY >= maxY) {
-              // Degenerate, skip
               continue
             }
+
             box = { ...p, minX, maxX, minY, maxY }
           }
 
@@ -564,117 +580,167 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   const rebuild = useCallback(() => setRebuildKey((k) => k + 1), [])
 
   return (
-    <div style={{ display: "grid", gap: 12, ...style }}>
-      <GenericSolverDebugger solver={solver as any} />
+    <>
+      <div style={{ display: "grid", gap: 12, ...style }}>
+        <GenericSolverDebugger solver={solver as any} />
 
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <button
-          onClick={toggle3d}
+        <div
           style={{
-            padding: "8px 10px",
-            borderRadius: 6,
-            border: "1px solid #cbd5e1",
-            background: show3d ? "#1e293b" : "#2563eb",
-            color: "white",
-            cursor: "pointer",
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
           }}
         >
-          {show3d ? "Hide 3D" : "Show 3D"}
-        </button>
-        {show3d && (
           <button
-            onClick={rebuild}
+            onClick={toggle3d}
             style={{
               padding: "8px 10px",
               borderRadius: 6,
               border: "1px solid #cbd5e1",
-              background: "#0f766e",
+              background: show3d ? "#1e293b" : "#2563eb",
               color: "white",
               cursor: "pointer",
             }}
-            title="Rebuild 3D scene (use after changing solver params)"
           >
-            Rebuild 3D
+            {show3d ? "Hide 3D" : "Show 3D"}
           </button>
-        )}
+          {show3d && (
+            <button
+              onClick={rebuild}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 6,
+                border: "1px solid #cbd5e1",
+                background: "#0f766e",
+                color: "white",
+                cursor: "pointer",
+              }}
+              title="Rebuild 3D scene (use after changing solver params)"
+            >
+              Rebuild 3D
+            </button>
+          )}
 
-        {/* experiment-like toggles */}
-        <label
-          style={{
-            display: "inline-flex",
-            gap: 6,
-            alignItems: "center",
-            marginLeft: 8,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={showRoot}
-            onChange={(e) => setShowRoot(e.target.checked)}
-          />
-          Root
-        </label>
-        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={showObstacles}
-            onChange={(e) => setShowObstacles(e.target.checked)}
-          />
-          Obstacles
-        </label>
-        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={showOutput}
-            onChange={(e) => setShowOutput(e.target.checked)}
-          />
-          Output
-        </label>
-        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={wireframeOutput}
-            onChange={(e) => setWireframeOutput(e.target.checked)}
-          />
-          Wireframe Output
-        </label>
-
-        {/* Mesh opacity slider */}
-        {show3d && (
+          {/* experiment-like toggles */}
           <label
             style={{
               display: "inline-flex",
-              alignItems: "center",
               gap: 6,
+              alignItems: "center",
               marginLeft: 8,
-              fontSize: 12,
             }}
           >
-            Opacity
             <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={meshOpacity}
-              onChange={(e) => setMeshOpacity(parseFloat(e.target.value))}
+              type="checkbox"
+              checked={showRoot}
+              onChange={(e) => setShowRoot(e.target.checked)}
             />
-            <span style={{ width: 32, textAlign: "right" }}>
-              {meshOpacity.toFixed(2)}
-            </span>
+            Root
           </label>
-        )}
+          <label
+            style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+          >
+            <input
+              type="checkbox"
+              checked={showObstacles}
+              onChange={(e) => setShowObstacles(e.target.checked)}
+            />
+            Obstacles
+          </label>
+          <label
+            style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+          >
+            <input
+              type="checkbox"
+              checked={showOutput}
+              onChange={(e) => setShowOutput(e.target.checked)}
+            />
+            Output
+          </label>
+          <label
+            style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+          >
+            <input
+              type="checkbox"
+              checked={wireframeOutput}
+              onChange={(e) => setWireframeOutput(e.target.checked)}
+            />
+            Wireframe Output
+          </label>
 
-        {/* Shrink boxes option */}
-        {show3d && (
-          <>
+          {/* Mesh opacity slider */}
+          {show3d && (
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                marginLeft: 8,
+                fontSize: 12,
+              }}
+            >
+              Opacity
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={meshOpacity}
+                onChange={(e) => setMeshOpacity(parseFloat(e.target.value))}
+              />
+              <span style={{ width: 32, textAlign: "right" }}>
+                {meshOpacity.toFixed(2)}
+              </span>
+            </label>
+          )}
+
+          {/* Shrink boxes option */}
+          {show3d && (
+            <>
+              <label
+                style={{
+                  display: "inline-flex",
+                  gap: 6,
+                  alignItems: "center",
+                  fontSize: 12,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={shrinkBoxes}
+                  onChange={(e) => setShrinkBoxes(e.target.checked)}
+                />
+                Shrink boxes
+              </label>
+              {shrinkBoxes && (
+                <label
+                  style={{
+                    display: "inline-flex",
+                    gap: 4,
+                    alignItems: "center",
+                    fontSize: 12,
+                  }}
+                >
+                  amt
+                  <input
+                    type="number"
+                    value={boxShrinkAmount}
+                    step={0.05}
+                    style={{ width: 60 }}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value)
+                      if (Number.isNaN(v)) return
+                      setBoxShrinkAmount(Math.max(0, v))
+                    }}
+                  />
+                </label>
+              )}
+            </>
+          )}
+
+          {/* Show borders option */}
+          {show3d && (
             <label
               style={{
                 display: "inline-flex",
@@ -685,85 +751,46 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
             >
               <input
                 type="checkbox"
-                checked={shrinkBoxes}
-                onChange={(e) => setShrinkBoxes(e.target.checked)}
+                checked={showBorders}
+                disabled={wireframeOutput}
+                onChange={(e) => setShowBorders(e.target.checked)}
               />
-              Shrink boxes
-            </label>
-            {shrinkBoxes && (
-              <label
+              <span
                 style={{
-                  display: "inline-flex",
-                  gap: 4,
-                  alignItems: "center",
-                  fontSize: 12,
+                  opacity: wireframeOutput ? 0.5 : 1,
                 }}
               >
-                amt
-                <input
-                  type="number"
-                  value={boxShrinkAmount}
-                  step={0.05}
-                  style={{ width: 60 }}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value)
-                    if (Number.isNaN(v)) return
-                    setBoxShrinkAmount(Math.max(0, v))
-                  }}
-                />
-              </label>
-            )}
-          </>
-        )}
+                Show borders
+              </span>
+            </label>
+          )}
 
-        {/* Show borders option */}
-        {show3d && (
-          <label
-            style={{
-              display: "inline-flex",
-              gap: 6,
-              alignItems: "center",
-              fontSize: 12,
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showBorders}
-              disabled={wireframeOutput}
-              onChange={(e) => setShowBorders(e.target.checked)}
-            />
-            <span
-              style={{
-                opacity: wireframeOutput ? 0.5 : 1,
-              }}
-            >
-              Show borders
-            </span>
-          </label>
-        )}
-
-        <div style={{ fontSize: 12, color: "#334155", marginLeft: 6 }}>
-          Drag to orbit · Wheel to zoom · Right-drag to pan
+          <div style={{ fontSize: 12, color: "#334155", marginLeft: 6 }}>
+            Drag to orbit · Wheel to zoom · Right-drag to pan
+          </div>
         </div>
+
+        {show3d && (
+          <ThreeBoardView
+            key={rebuildKey}
+            nodes={meshNodes}
+            srj={simpleRouteJson}
+            layerThickness={layerThickness}
+            height={height}
+            showRoot={showRoot}
+            showObstacles={showObstacles}
+            showOutput={showOutput}
+            wireframeOutput={wireframeOutput}
+            meshOpacity={meshOpacity}
+            shrinkBoxes={shrinkBoxes}
+            boxShrinkAmount={boxShrinkAmount}
+            showBorders={showBorders}
+          />
+        )}
       </div>
 
-      {show3d && (
-        <ThreeBoardView
-          key={rebuildKey}
-          nodes={meshNodes}
-          srj={simpleRouteJson}
-          layerThickness={layerThickness}
-          height={height}
-          showRoot={showRoot}
-          showObstacles={showObstacles}
-          showOutput={showOutput}
-          wireframeOutput={wireframeOutput}
-          meshOpacity={meshOpacity}
-          shrinkBoxes={shrinkBoxes}
-          boxShrinkAmount={boxShrinkAmount}
-          showBorders={showBorders}
-        />
-      )}
-    </div>
+      {/* White margin at bottom of the page */}
+      <div style={{ height: 200, background: "#ffffff" }} />
+    </>
   )
 }
