@@ -1,648 +1,700 @@
+// lib/solvers/RectDiffSolver.ts
 import { BaseSolver } from "@tscircuit/solver-utils"
-import type { SimpleRouteJson } from "../types/srj-types"
+import type { SimpleRouteJson, Obstacle } from "../types/srj-types"
 import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode } from "../types/capacity-mesh-types"
 
-/**
- * Internal 3D rect types used by the exact difference solver.
- */
+/** ---------------------------------------------------------------------
+ *  Types carried over from the existing file
+ *  (Rect3d + solver output types)
+ *  ------------------------------------------------------------------ */
 type Rect3d = {
   minX: number
   minY: number
   maxX: number
   maxY: number
-  zLayers: number[] // integer z indices (half-open handled in Box below)
+  zLayers: number[] // integer z indices (contiguous)
 }
 
-type Box = {
-  minX: number
-  minY: number
-  maxX: number
-  maxY: number
-  z0: number // inclusive
-  z1: number // exclusive
+
+/** ---------------------------------------------------------------------
+ *  NEW: Grid-based 3D filler (rect-fill-2d.tsx generalized to 3D)
+ *  ------------------------------------------------------------------ */
+
+/** Simple 2D rect (XY only) */
+type XYRect = { x: number; y: number; width: number; height: number }
+
+/** Options controlling the grid-filler behavior */
+export type GridFill3DOptions = {
+  /** Grid sizes (largest -> smallest). Units: same as SRJ bounds (typically mm). */
+  gridSizes?: number[]
+  /** For the very first seed rect at a grid point, we start with (gridSize * initialCellRatio) square. */
+  initialCellRatio?: number // default 0.2 like the 2D experiment
+
+  /** Aspect-ratio cap (w/h or h/w). If undefined or null, no cap (final expansion ignores it anyway). */
+  maxAspectRatio?: number | null
+
+  /** Single-layer minimum rectangle requirements. */
+  minSingle: { width: number; height: number }
+
+  /** Multi-layer minimum requirements + minimum contiguous layer span */
+  minMulti: { width: number; height: number; minLayers: number }
+
+  /** Prefer multi-layer candidate before single-layer? (Required by request) */
+  preferMultiLayer?: boolean
+
+  /** Optional cap for multi-layer span when expanding vertically across Z. Default: no cap. */
+  maxMultiLayerSpan?: number
 }
 
-type SolveResult = {
-  boxes: Box[]
-  rects: Rect3d[]
-  score: number
-  orderUsed: string
-  totalFreeVolume: number
-}
+/** Internal numeric helpers */
+const EPS = 1e-9
+const gt = (a: number, b: number) => a > b + EPS
+const gte = (a: number, b: number) => a > b - EPS
+const lt = (a: number, b: number) => a < b - EPS
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 
-const EPS_DEFAULT = 1e-9
-
-function almostEq(a: number, b: number, eps: number) {
-  return Math.abs(a - b) <= eps
-}
-function gt(a: number, b: number, eps: number) {
-  return a > b + eps
-}
-function intersect1D(
-  a0: number,
-  a1: number,
-  b0: number,
-  b1: number,
-  eps: number,
-): [number, number] | null {
-  const lo = Math.max(a0, b0)
-  const hi = Math.min(a1, b1)
-  return gt(hi, lo, eps) ? [lo, hi] : null
-}
-function nonEmptyBox(b: Box, eps: number) {
-  return gt(b.maxX, b.minX, eps) && gt(b.maxY, b.minY, eps) && b.z1 - b.z0 > 0
-}
-function ensureContiguous(z: number[]) {
-  const zs = [...new Set(z)].sort((a, b) => a - b)
-  for (let i = 1; i < zs.length; i++) {
-    if (zs[i] !== zs[i - 1] + 1) {
-      throw new Error(
-        `zLayers must be contiguous integers: ${JSON.stringify(z)}`,
-      )
-    }
-  }
-  return zs
-}
-function toBoxFromRoot(root: Rect3d): Box {
-  const z = ensureContiguous(root.zLayers)
-  return {
-    minX: root.minX,
-    minY: root.minY,
-    maxX: root.maxX,
-    maxY: root.maxY,
-    z0: z[0],
-    z1: z[z.length - 1] + 1,
-  }
-}
-function toBoxFromCutout(c: Rect3d, rootZs: Set<number>): Box | null {
-  const filtered = [...new Set(c.zLayers)]
-    .filter((z) => rootZs.has(z))
-    .sort((a, b) => a - b)
-  if (filtered.length === 0) return null
-  const zs = ensureContiguous(filtered)
-  return {
-    minX: c.minX,
-    minY: c.minY,
-    maxX: c.maxX,
-    maxY: c.maxY,
-    z0: zs[0],
-    z1: zs[zs.length - 1] + 1,
-  }
-}
-function intersects(a: Box, b: Box, eps: number) {
-  return (
-    intersect1D(a.minX, a.maxX, b.minX, b.maxX, eps) &&
-    intersect1D(a.minY, a.maxY, b.minY, b.maxY, eps) &&
-    Math.min(a.z1, b.z1) > Math.max(a.z0, b.z0)
+/** Geometry helpers (XY) */
+function overlaps(a: XYRect, b: XYRect) {
+  return !(
+    a.x + a.width <= b.x + EPS ||
+    b.x + b.width <= a.x + EPS ||
+    a.y + a.height <= b.y + EPS ||
+    b.y + b.height <= a.y + EPS
   )
 }
-function subtractBox(A: Box, B: Box, eps: number): Box[] {
-  if (!intersects(A, B, eps)) return [A]
-  const Xi = intersect1D(A.minX, A.maxX, B.minX, B.maxX, eps)
-  const Yi = intersect1D(A.minY, A.maxY, B.minY, B.maxY, eps)
-  const Z0 = Math.max(A.z0, B.z0)
-  const Z1 = Math.min(A.z1, B.z1)
-  if (!Xi || !Yi || !(Z1 > Z0)) return [A]
-
-  const [X0, X1] = Xi
-  const [Y0, Y1] = Yi
-  const out: Box[] = []
-
-  // Left slab
-  if (gt(X0, A.minX, eps))
-    out.push({
-      minX: A.minX,
-      maxX: X0,
-      minY: A.minY,
-      maxY: A.maxY,
-      z0: A.z0,
-      z1: A.z1,
-    })
-  // Right slab
-  if (gt(A.maxX, X1, eps))
-    out.push({
-      minX: X1,
-      maxX: A.maxX,
-      minY: A.minY,
-      maxY: A.maxY,
-      z0: A.z0,
-      z1: A.z1,
-    })
-
-  // Middle X range -> split along Y
-  const midX0 = Math.max(A.minX, X0)
-  const midX1 = Math.min(A.maxX, X1)
-
-  // Front (lower Y)
-  if (gt(Y0, A.minY, eps))
-    out.push({
-      minX: midX0,
-      maxX: midX1,
-      minY: A.minY,
-      maxY: Y0,
-      z0: A.z0,
-      z1: A.z1,
-    })
-  // Back (upper Y)
-  if (gt(A.maxY, Y1, eps))
-    out.push({
-      minX: midX0,
-      maxX: midX1,
-      minY: Y1,
-      maxY: A.maxY,
-      z0: A.z0,
-      z1: A.z1,
-    })
-
-  // Center X,Y -> split along Z
-  const midY0 = Math.max(A.minY, Y0)
-  const midY1 = Math.min(A.maxY, Y1)
-
-  if (Z0 > A.z0)
-    out.push({
-      minX: midX0,
-      maxX: midX1,
-      minY: midY0,
-      maxY: midY1,
-      z0: A.z0,
-      z1: Z0,
-    })
-  if (A.z1 > Z1)
-    out.push({
-      minX: midX0,
-      maxX: midX1,
-      minY: midY0,
-      maxY: midY1,
-      z0: Z1,
-      z1: A.z1,
-    })
-
-  return out.filter((b) => nonEmptyBox(b, eps))
+function containsPoint(r: XYRect, x: number, y: number) {
+  return x >= r.x - EPS && x <= r.x + r.width + EPS && y >= r.y - EPS && y <= r.y + r.height + EPS
 }
-function subtractCutoutFromList(boxes: Box[], cutout: Box, eps: number) {
-  const out: Box[] = []
-  for (const b of boxes) {
-    if (intersects(b, cutout, eps)) {
-      const parts = subtractBox(b, cutout, eps)
-      for (const p of parts) out.push(p)
+function distancePointToRectEdges(px: number, py: number, r: XYRect) {
+  // Distance to the 4 edges (segments). For ranking seed points.
+  const edges: [number, number, number, number][] = [
+    [r.x, r.y, r.x + r.width, r.y], // top
+    [r.x + r.width, r.y, r.x + r.width, r.y + r.height], // right
+    [r.x + r.width, r.y + r.height, r.x, r.y + r.height], // bottom
+    [r.x, r.y + r.height, r.x, r.y], // left
+  ]
+  let best = Infinity
+  for (const [x1, y1, x2, y2] of edges) {
+    const A = px - x1
+    const B = py - y1
+    const C = x2 - x1
+    const D = y2 - y1
+    const dot = A * C + B * D
+    const lenSq = C * C + D * D
+    let param = lenSq !== 0 ? dot / lenSq : -1
+    if (param < 0) param = 0
+    else if (param > 1) param = 1
+    const xx = x1 + param * C
+    const yy = y1 + param * D
+    const dx = px - xx
+    const dy = py - yy
+    best = Math.min(best, Math.hypot(dx, dy))
+  }
+  return best
+}
+
+/** Axis-aligned blockers set => get maximum expansion amounts in each direction */
+function maxExpandRight(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined) {
+  // limit by board
+  let maxWidth = bounds.x + bounds.width - rect.x
+  // limit by blockers to the right that vertically overlap rect
+  for (const b of blockers) {
+    if (
+      rect.y + rect.height > b.y + EPS &&
+      b.y + b.height > rect.y + EPS &&
+      gte(b.x, rect.x + rect.width) // blocker entirely to the right
+    ) {
+      maxWidth = Math.min(maxWidth, b.x - rect.x)
+    }
+  }
+  let expansion = Math.max(0, maxWidth - rect.width)
+  if (expansion <= 0) return 0
+
+  if (maxAspect != null) {
+    const w = rect.width
+    const h = rect.height
+    if (w >= h) {
+      // ratio = (w + e) / h  <= maxAspect
+      expansion = Math.min(expansion, maxAspect * h - w)
     } else {
-      out.push(b)
+      // ratio = h / (w + e) — increasing w only helps
+      // no further cap
     }
   }
-  return out
+
+  return Math.max(0, expansion)
 }
-function mulberry32(a: number) {
-  return function () {
-    let t = (a += 0x6d2b79f5)
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-function subtractAll(rootBox: Box, cutoutBoxes: Box[], eps: number, seed = 0) {
-  const rnd = mulberry32(seed)
-  const cuts = [...cutoutBoxes].sort(
-    (a, b) =>
-      a.z0 - b.z0 ||
-      a.z1 - b.z1 ||
-      a.minY - b.minY ||
-      a.minX - b.minX ||
-      a.maxX - b.maxX ||
-      a.maxY - b.maxY,
-  )
-  if (seed !== 0) {
-    for (let i = cuts.length - 1; i > 0; i--) {
-      const j = Math.floor(rnd() * (i + 1))
-      const tmp = cuts[i]
-      cuts[i] = cuts[j]
-      cuts[j] = tmp
+
+function maxExpandDown(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined) {
+  let maxHeight = bounds.y + bounds.height - rect.y
+  for (const b of blockers) {
+    if (
+      rect.x + rect.width > b.x + EPS &&
+      b.x + b.width > rect.x + EPS &&
+      gte(b.y, rect.y + rect.height)
+    ) {
+      maxHeight = Math.min(maxHeight, b.y - rect.y)
     }
   }
-  let free = [rootBox]
-  for (const c of cuts) free = subtractCutoutFromList(free, c, eps)
-  return free
-}
-function mergeAlongAxis(boxes: Box[], axis: "X" | "Y" | "Z", eps: number) {
-  return mergeAlongAxisWithMinXY(boxes, axis, eps, undefined)
-}
+  let expansion = Math.max(0, maxHeight - rect.height)
+  if (expansion <= 0) return 0
 
-function mergeAlongAxisWithMinXY(
-  boxes: Box[],
-  axis: "X" | "Y" | "Z",
-  eps: number,
-  minLenForMultiLayerXY: number | undefined,
-) {
-  if (boxes.length <= 1) return boxes
-  const groups = new Map<string, Box[]>()
-  const R = (v: number) => v.toFixed(12)
-
-  const keyX = (b: Box) => `y:${R(b.minY)}-${R(b.maxY)}|z:${b.z0}-${b.z1}`
-  const keyY = (b: Box) => `x:${R(b.minX)}-${R(b.maxX)}|z:${b.z0}-${b.z1}`
-  const keyZ = (b: Box) =>
-    `x:${R(b.minX)}-${R(b.maxX)}|y:${R(b.minY)}-${R(b.maxY)}`
-  const keyFn = axis === "X" ? keyX : axis === "Y" ? keyY : keyZ
-
-  for (const b of boxes) {
-    const k = keyFn(b)
-    const arr = groups.get(k)
-    if (arr) arr.push(b)
-    else groups.set(k, [b])
-  }
-
-  const out: Box[] = []
-  for (const arr of groups.values()) {
-    if (axis === "X") {
-      arr.sort((a, b) => a.minX - b.minX || a.maxX - b.maxX)
-      let cur = arr[0]
-      for (let i = 1; i < arr.length; i++) {
-        const n = arr[i]
-        if (almostEq(cur.maxX, n.minX, eps)) {
-          cur = { ...cur, maxX: n.maxX }
-        } else {
-          out.push(cur)
-          cur = n
-        }
-      }
-      out.push(cur)
-    } else if (axis === "Y") {
-      arr.sort((a, b) => a.minY - b.minY || a.maxY - b.maxY)
-      let cur = arr[0]
-      for (let i = 1; i < arr.length; i++) {
-        const n = arr[i]
-        if (almostEq(cur.maxY, n.minY, eps)) {
-          cur = { ...cur, maxY: n.maxY }
-        } else {
-          out.push(cur)
-          cur = n
-        }
-      }
-      out.push(cur)
+  if (maxAspect != null) {
+    const w = rect.width
+    const h = rect.height
+    if (h >= w) {
+      // ratio = (h + e) / w <= maxAspect
+      expansion = Math.min(expansion, maxAspect * w - h)
     } else {
-      arr.sort((a, b) => a.z0 - b.z0 || a.z1 - b.z1)
-      let cur = arr[0]
-      for (let i = 1; i < arr.length; i++) {
-        const n = arr[i]
-        if (cur.z1 === n.z0) {
-          // Only merge across Z if XY footprint is large enough (if a threshold is provided)
-          const allowMerge =
-            minLenForMultiLayerXY == null ||
-            ((cur.maxX - cur.minX) >= (minLenForMultiLayerXY - eps) &&
-             (cur.maxY - cur.minY) >= (minLenForMultiLayerXY - eps))
-          if (allowMerge) {
-            cur = { ...cur, z1: n.z1 }
-          } else {
-            out.push(cur)
-            cur = n
-          }
-        } else {
-          out.push(cur)
-          cur = n
-        }
-      }
-      out.push(cur)
+      // ratio = w / (h + e) — increasing h only helps
     }
   }
-  return out
+
+  return Math.max(0, expansion)
 }
-function coalesce(
-  boxes: Box[],
-  order: Array<"X" | "Y" | "Z">,
-  eps: number,
-  maxCycles = 4,
-  minLenForMultiLayerXY?: number,
-) {
-  let cur = boxes.slice()
-  for (let cycle = 0; cycle < maxCycles; cycle++) {
-    const prevLen = cur.length
-    for (const ax of order)
-      cur = mergeAlongAxisWithMinXY(cur, ax, eps, minLenForMultiLayerXY)
-    if (cur.length === prevLen) break
-  }
-  return cur
-}
-function permutations<T>(arr: T[]) {
-  const res: T[][] = []
-  const used = Array(arr.length).fill(false)
-  const curr: T[] = []
-  const backtrack = () => {
-    if (curr.length === arr.length) {
-      res.push(curr.slice())
-      return
-    }
-    for (let i = 0; i < arr.length; i++) {
-      if (used[i]) continue
-      used[i] = true
-      curr.push(arr[i])
-      backtrack()
-      curr.pop()
-      used[i] = false
+
+function maxExpandLeft(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined) {
+  let minX = bounds.x
+  for (const b of blockers) {
+    if (
+      rect.y + rect.height > b.y + EPS &&
+      b.y + b.height > rect.y + EPS &&
+      lte(b.x + b.width, rect.x) // blocker entirely to the left
+    ) {
+      minX = Math.max(minX, b.x + b.width)
     }
   }
-  backtrack()
-  return res
-}
-function scoreBoxes(boxes: Box[], thickness: number, p: number) {
-  let s = 0
-  for (const b of boxes) {
-    const dx = b.maxX - b.minX
-    const dy = b.maxY - b.minY
-    const dz = (b.z1 - b.z0) * thickness
-    const vol = dx * dy * dz
-    s += Math.pow(vol, p)
+  let expansion = Math.max(0, rect.x - minX)
+  if (expansion <= 0) return 0
+
+  if (maxAspect != null) {
+    const w = rect.width
+    const h = rect.height
+    // Expanding left increases width as well
+    if (w >= h) {
+      expansion = Math.min(expansion, maxAspect * h - w)
+    } else {
+      // increasing w when w<h reduces ratio automatically
+    }
   }
-  return s
+
+  return Math.max(0, expansion)
 }
-function totalVolume(boxes: Box[], thickness: number) {
-  let v = 0
-  for (const b of boxes) {
-    v += (b.maxX - b.minX) * (b.maxY - b.minY) * (b.z1 - b.z0) * thickness
+
+function maxExpandUp(rect: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined) {
+  let minY = bounds.y
+  for (const b of blockers) {
+    if (
+      rect.x + rect.width > b.x + EPS &&
+      b.x + b.width > rect.x + EPS &&
+      lte(b.y + b.height, rect.y) // blocker entirely above
+    ) {
+      minY = Math.max(minY, b.y + b.height)
+    }
   }
-  return v
+  let expansion = Math.max(0, rect.y - minY)
+  if (expansion <= 0) return 0
+
+  if (maxAspect != null) {
+    const w = rect.width
+    const h = rect.height
+    // Expanding up increases height as well
+    if (h >= w) {
+      expansion = Math.min(expansion, maxAspect * w - h)
+    } else {
+      // increasing h when h<w reduces ratio automatically
+    }
+  }
+
+  return Math.max(0, expansion)
 }
-function boxToRect3d(b: Box): Rect3d {
-  const zLayers: number[] = []
-  for (let z = b.z0; z < b.z1; z++) zLayers.push(z)
-  return { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY, zLayers }
+
+function lte(a: number, b: number) {
+  return a < b + EPS
 }
-/**
- * After coalescing, enforce: if a box spans multiple layers, it must be at least
- * `minLenForMultiLayerXY` in BOTH X and Y. Otherwise, split it into per-layer slabs.
- */
-function enforceMultiLayerMinXY(
-  boxes: Box[],
-  minLenForMultiLayerXY: number,
-  eps: number,
-): Box[] {
-  if (!(minLenForMultiLayerXY > 0)) return boxes.slice()
-  const out: Box[] = []
-  for (const b of boxes) {
-    const layers = b.z1 - b.z0
-    if (layers <= 1) {
-      out.push(b)
+
+/** Try to build the best axis-aligned rect around (startX, startY) by expanding in place. */
+function expandRectFromSeed(
+  startX: number,
+  startY: number,
+  gridSize: number,
+  bounds: XYRect,
+  blockers: XYRect[],
+  initialCellRatio: number,
+  maxAspectRatio: number | null | undefined,
+  minReq: { width: number; height: number },
+): XYRect | null {
+  const minSide = Math.max(1e-9, gridSize * initialCellRatio)
+  const initialW = Math.max(minSide, minReq.width)
+  const initialH = Math.max(minSide, minReq.height)
+
+  const strategies = [
+    { ox: 0, oy: 0 }, // seed at top-left
+    { ox: -initialW, oy: 0 }, // top-right
+    { ox: 0, oy: -initialH }, // bottom-left
+    { ox: -initialW, oy: -initialH }, // bottom-right
+    { ox: -initialW / 2, oy: -initialH / 2 }, // centered
+  ]
+
+  let best: XYRect | null = null
+  let bestArea = 0
+
+  for (const s of strategies) {
+    // start rect
+    let r: XYRect = { x: startX + s.ox, y: startY + s.oy, width: initialW, height: initialH }
+
+    // keep initial inside bounds, otherwise skip
+    if (
+      lt(r.x, bounds.x) ||
+      lt(r.y, bounds.y) ||
+      gt(r.x + r.width, bounds.x + bounds.width) ||
+      gt(r.y + r.height, bounds.y + bounds.height)
+    ) {
       continue
     }
-    const dx = b.maxX - b.minX
-    const dy = b.maxY - b.minY
-    const canSpan =
-      dx >= (minLenForMultiLayerXY - eps) && dy >= (minLenForMultiLayerXY - eps)
-    if (canSpan) {
-      out.push(b)
-    } else {
-      // Split across Z into single-layer boxes to fully fill the space
-      for (let z = b.z0; z < b.z1; z++) {
-        out.push({ ...b, z0: z, z1: z + 1 })
+
+    // initial must not overlap any blocker
+    if (blockers.some((b) => overlaps(r, b))) continue
+
+    let improved = true
+    while (improved) {
+      improved = false
+
+      // expand in each direction up to the next blocker or boundary
+      const eR = maxExpandRight(r, bounds, blockers, maxAspectRatio)
+      if (eR > 0) {
+        r = { ...r, width: r.width + eR }
+        improved = true
+      }
+
+      const eD = maxExpandDown(r, bounds, blockers, maxAspectRatio)
+      if (eD > 0) {
+        r = { ...r, height: r.height + eD }
+        improved = true
+      }
+
+      const eL = maxExpandLeft(r, bounds, blockers, maxAspectRatio)
+      if (eL > 0) {
+        r = { x: r.x - eL, y: r.y, width: r.width + eL, height: r.height }
+        improved = true
+      }
+
+      const eU = maxExpandUp(r, bounds, blockers, maxAspectRatio)
+      if (eU > 0) {
+        r = { x: r.x, y: r.y - eU, width: r.width, height: r.height + eU }
+        improved = true
+      }
+    }
+
+    // check minimums one last time
+    if (r.width + EPS >= minReq.width && r.height + EPS >= minReq.height) {
+      const area = r.width * r.height
+      if (area > bestArea) {
+        best = r
+        bestArea = area
       }
     }
   }
-  return out
-}
-function solveNoDiscretization(
-  problem: { rootRect: Rect3d; cutouts: Rect3d[] },
-  options: {
-    Z_LAYER_THICKNESS: number
-    p: number
-    order: "AUTO" | "X,Y,Z" | "X,Z,Y" | "Y,X,Z" | "Y,Z,X" | "Z,X,Y" | "Z,Y,X"
-    maxCycles: number
-    eps: number
-    seed: number
-    /** Minimum XY length required to allow multi-layer spans */
-    minLenForMultiLayerXY?: number
-  },
-): SolveResult {
-  const {
-    Z_LAYER_THICKNESS,
-    p,
-    order,
-    maxCycles,
-    eps,
-    seed,
-    minLenForMultiLayerXY,
-  } = options
-  const rootZs = new Set(problem.rootRect.zLayers)
-  const rootBox = toBoxFromRoot(problem.rootRect)
-  const cutoutBoxes = problem.cutouts
-    .map((c) => toBoxFromCutout(c, rootZs))
-    .filter((b): b is Box => !!b)
 
-  if (!nonEmptyBox(rootBox, eps)) {
-    throw new Error("Root box is empty.")
-  }
-
-  const diffBoxes = subtractAll(rootBox, cutoutBoxes, eps, seed)
-  const orders =
-    order === "AUTO"
-      ? permutations<"X" | "Y" | "Z">(["X", "Y", "Z"])
-      : [order.split(",") as Array<"X" | "Y" | "Z">]
-
-  let best: Box[] | null = null
-  let bestScore = -Infinity
-  let bestOrder: string | null = null
-  for (const ord of orders) {
-    const merged = coalesce(
-      diffBoxes,
-      ord,
-      eps,
-      maxCycles,
-      minLenForMultiLayerXY,
-    )
-    const sc = scoreBoxes(merged, Z_LAYER_THICKNESS, p)
-    if (sc > bestScore) {
-      best = merged
-      bestScore = sc
-      bestOrder = ord.join(",")
-    }
-  }
-  // Enforce the XY-size constraint post-pass as well, to split any residual
-  // multi-layer boxes that are too small in X or Y.
-  const preBoxes = best ?? diffBoxes
-  const boxes =
-    minLenForMultiLayerXY != null
-      ? enforceMultiLayerMinXY(preBoxes, minLenForMultiLayerXY, eps)
-      : preBoxes
-  return {
-    boxes,
-    rects: boxes.map(boxToRect3d),
-    // Keep score consistent with final boxes
-    score: scoreBoxes(boxes, Z_LAYER_THICKNESS, p),
-    orderUsed: bestOrder ?? "X,Y,Z",
-    totalFreeVolume: totalVolume(boxes, Z_LAYER_THICKNESS),
-  }
+  return best
 }
 
-/**
- * Utility: canonical layer ordering for deterministic z indexing.
- *  top -> innerN (ascending) -> bottom -> other (lexicographic)
- */
-function layerSortKey(name: string) {
-  if (name.toLowerCase() === "top") return -1_000_000
-  if (name.toLowerCase() === "bottom") return 1_000_000
-  const m = /^inner(\d+)$/i.exec(name)
+/** ---------------------------------------------------------------------
+ *  Obstacles-to-layers mapping
+ *  ------------------------------------------------------------------ */
+
+function layerSortKey(n: string) {
+  const L = n.toLowerCase()
+  if (L === "top") return -1_000_000
+  if (L === "bottom") return 1_000_000
+  const m = /^inner(\d+)$/i.exec(L)
   if (m) return parseInt(m[1]!, 10) || 0
-  return 100 + name.toLowerCase().charCodeAt(0)
+  return 100 + L.charCodeAt(0)
 }
 function canonicalizeLayerOrder(names: string[]) {
-  return [...new Set(names)].sort((a, b) => {
+  return Array.from(new Set(names)).sort((a, b) => {
     const ka = layerSortKey(a)
     const kb = layerSortKey(b)
     if (ka !== kb) return ka - kb
     return a.localeCompare(b)
   })
 }
-function contiguousRuns(nums: number[]) {
-  const zs = [...new Set(nums)].sort((a, b) => a - b)
-  if (zs.length === 0) return [] as number[][]
-  const groups: number[][] = []
-  let run: number[] = [zs[0]]
-  for (let i = 1; i < zs.length; i++) {
-    if (zs[i] === zs[i - 1] + 1) run.push(zs[i])
-    else {
-      groups.push(run)
-      run = [zs[i]]
+function buildZIndexMap(srj: SimpleRouteJson) {
+  // Prefer names from SRJ obstacles (covers nearly all boards)
+  const names = canonicalizeLayerOrder(
+    (srj.obstacles ?? []).flatMap((o) => o.layers ?? []),
+  )
+  const fallback = Array.from({ length: Math.max(1, srj.layerCount || 1) }, (_, i) =>
+    i === 0 ? "top" : i === (srj.layerCount || 1) - 1 ? "bottom" : `inner${i}`,
+  )
+  const layerNames = names.length ? names : fallback
+  const map = new Map<string, number>()
+  for (let i = 0; i < layerNames.length; i++) {
+    map.set(layerNames[i]!, i)
+  }
+  return { layerNames, zIndexByName: map }
+}
+
+function obstacleZs(ob: Obstacle, zIndexByName: Map<string, number>) {
+  if (ob.zLayers?.length) {
+    // Provided numerically
+    return Array.from(new Set(ob.zLayers)).sort((a, b) => a - b)
+  }
+  const fromNames = (ob.layers ?? [])
+    .map((n) => zIndexByName.get(n))
+    .filter((v): v is number => typeof v === "number")
+  return Array.from(new Set(fromNames)).sort((a, b) => a - b)
+}
+
+function obstacleToXYRect(ob: Obstacle): XYRect | null {
+  // For "rect" use as-is; for "oval" approximate by its bounding rect (width/height are provided)
+  const w = ob.width as any
+  const h = ob.height as any
+  // Some SRJ test data contains type:"oval" which includes width/height; use bounding box
+  if (typeof w !== "number" || typeof h !== "number") return null
+  return {
+    x: ob.center.x - w / 2,
+    y: ob.center.y - h / 2,
+    width: w,
+    height: h,
+  }
+}
+
+/** ---------------------------------------------------------------------
+ *  Seed candidates (3D grid)
+ *  ------------------------------------------------------------------ */
+
+function computeCandidates3D(
+  bounds: XYRect,
+  gridSize: number,
+  layerCount: number,
+  obstaclesByLayer: XYRect[][],
+  placedByLayer: XYRect[][],
+) {
+  // For scoring, distance is computed on the layer the point is on.
+  type Cand = { x: number; y: number; z: number; distance: number }
+  const out: Cand[] = []
+
+  for (let z = 0; z < layerCount; z++) {
+    const blockers = [...(obstaclesByLayer[z] ?? []), ...(placedByLayer[z] ?? [])]
+
+    for (let x = bounds.x; x < bounds.x + bounds.width; x += gridSize) {
+      for (let y = bounds.y; y < bounds.y + bounds.height; y += gridSize) {
+        // skip the last row/col touching the outer frame to avoid edge-only seeds
+        if (
+          Math.abs(x - bounds.x) < EPS ||
+          Math.abs(y - bounds.y) < EPS ||
+          x > bounds.x + bounds.width - gridSize - EPS ||
+          y > bounds.y + bounds.height - gridSize - EPS
+        ) {
+          continue
+        }
+
+        let inside = false
+        for (const b of blockers) {
+          if (containsPoint(b, x, y)) {
+            inside = true
+            // Fast skip down rows for large blockers: jump to near the bottom of the blocker
+            const bottom = b.y + b.height
+            const remaining = bottom - y
+            const skipSteps = Math.max(0, Math.floor(remaining / gridSize))
+            if (skipSteps > 0) {
+              // inner loop will add another +gridSize
+              y += (skipSteps - 1) * gridSize
+            }
+            break
+          }
+        }
+        if (inside) continue
+
+        // Distance to nearest blocker or the board edges (on this layer)
+        const d = Math.min(
+          distancePointToRectEdges(x, y, bounds),
+          ...(blockers.length ? blockers.map((b) => distancePointToRectEdges(x, y, b)) : [Infinity]),
+        )
+
+        out.push({ x, y, z, distance: d })
+      }
     }
   }
-  groups.push(run)
-  return groups
+
+  // Prioritize emptier areas first
+  out.sort((a, b) => b.distance - a.distance)
+  return out
 }
-function toXYBoundsRect(
-  center: { x: number; y: number },
-  width: number,
-  height: number,
-) {
-  const hw = width / 2
-  const hh = height / 2
-  return {
-    minX: center.x - hw,
-    maxX: center.x + hw,
-    minY: center.y - hh,
-    maxY: center.y + hh,
+
+/** ---------------------------------------------------------------------
+ *  Multi-layer span around a seed
+ *  ------------------------------------------------------------------ */
+
+function longestFreeSpanAroundZ(
+  x: number,
+  y: number,
+  z: number,
+  layerCount: number,
+  minSpan: number,
+  maxSpan: number | undefined,
+  obstaclesByLayer: XYRect[][],
+  placedByLayer: XYRect[][],
+): number[] {
+  // Grow around z as [z0..z1] while the seed point is free in every layer.
+  const isFreeAt = (layer: number) => {
+    const blockers = [...(obstaclesByLayer[layer] ?? []), ...(placedByLayer[layer] ?? [])]
+    return !blockers.some((b) => containsPoint(b, x, y))
   }
+
+  let lo = z
+  let hi = z
+  while (lo - 1 >= 0 && isFreeAt(lo - 1)) lo--
+  while (hi + 1 < layerCount && isFreeAt(hi + 1)) hi++
+
+  const span = { lo, hi }
+  if (typeof maxSpan === "number") {
+    // tighten to respect maxSpan while keeping z inside
+    const target = clamp(maxSpan, 1, layerCount)
+    let width = hi - lo + 1
+    while (width > target) {
+      // trim alternately
+      if (z - lo > hi - z) lo++
+      else hi--
+      width = hi - lo + 1
+    }
+  }
+
+  const res: number[] = []
+  for (let i = span.lo; i <= span.hi; i++) res.push(i)
+  if (res.length < minSpan) return []
+  return res
 }
+
+/** ---------------------------------------------------------------------
+ *  Main grid fill
+ *  ------------------------------------------------------------------ */
+
+function gridFill3D(srj: SimpleRouteJson, opts: GridFill3DOptions): Rect3d[] {
+  const { layerNames, zIndexByName } = buildZIndexMap(srj)
+  const layerCount = Math.max(1, layerNames.length, srj.layerCount || 1)
+
+  const bounds: XYRect = {
+    x: srj.bounds.minX,
+    y: srj.bounds.minY,
+    width: srj.bounds.maxX - srj.bounds.minX,
+    height: srj.bounds.maxY - srj.bounds.minY,
+  }
+
+  // Build blockers per layer from SRJ obstacles
+  const obstaclesByLayer: XYRect[][] = Array.from({ length: layerCount }, () => [])
+  for (const ob of srj.obstacles ?? []) {
+    const r = obstacleToXYRect(ob)
+    if (!r) continue
+    const zs = obstacleZs(ob, zIndexByName)
+    for (const z of zs) {
+      const layer = obstaclesByLayer[z]
+      if (z >= 0 && z < layerCount && layer) layer.push(r)
+    }
+  }
+
+  const {
+    gridSizes = computeDefaultGridSizes(bounds),
+    initialCellRatio = 0.2,
+    maxAspectRatio = 2, // tolerable initial ratio; final pass ignores it
+    minSingle,
+    minMulti,
+    preferMultiLayer = true,
+    maxMultiLayerSpan,
+  } = opts
+
+  const placed: { rect: XYRect; zLayers: number[] }[] = []
+  const placedByLayer: XYRect[][] = Array.from({ length: layerCount }, () => [])
+
+  // Phase 1: process all grid sizes (coarse -> fine)
+  for (const grid of gridSizes) {
+    let candidates = computeCandidates3D(bounds, grid, layerCount, obstaclesByLayer, placedByLayer)
+
+    while (candidates.length > 0) {
+      const cand = candidates[0]
+      if (!cand) break
+      candidates = candidates.slice(1)
+
+      // Assemble blockers for current layer or span
+      const tryMultiFirst = preferMultiLayer
+      const attempts: Array<{
+        kind: "multi" | "single"
+        layers: number[]
+        minReq: { width: number; height: number }
+      }> = []
+
+      // Multi-layer attempt (use the longest free contiguous span that contains cand.z)
+      const span = longestFreeSpanAroundZ(
+        cand.x,
+        cand.y,
+        cand.z,
+        layerCount,
+        minMulti.minLayers,
+        maxMultiLayerSpan,
+        obstaclesByLayer,
+        placedByLayer,
+      )
+      if (span.length >= minMulti.minLayers) {
+        attempts.push({ kind: "multi", layers: span, minReq: { width: minMulti.width, height: minMulti.height } })
+      }
+
+      // Single-layer attempt
+      attempts.push({ kind: "single", layers: [cand.z], minReq: { width: minSingle.width, height: minSingle.height } })
+
+      const ordered = tryMultiFirst ? attempts : attempts.reverse()
+
+      let accepted = false
+      for (const attempt of ordered) {
+        // Union blockers across all target layers
+        const blockers: XYRect[] = []
+        for (const z of attempt.layers) {
+          const obs = obstaclesByLayer[z]
+          const pl = placedByLayer[z]
+          if (obs) blockers.push(...obs)
+          if (pl) blockers.push(...pl)
+        }
+
+        const rect = expandRectFromSeed(
+          cand.x,
+          cand.y,
+          grid,
+          bounds,
+          blockers,
+          initialCellRatio,
+          maxAspectRatio,
+          attempt.minReq,
+        )
+
+        if (!rect) continue
+
+        // Place it
+        placed.push({ rect, zLayers: attempt.layers.slice() })
+        for (const z of attempt.layers) {
+          const pl = placedByLayer[z]
+          if (pl) pl.push(rect)
+        }
+
+        // Remove future candidates that fell inside this rect on any of the used layers
+        candidates = candidates.filter(
+          (c) => !attempt.layers.includes(c.z) || !containsPoint(rect, c.x, c.y),
+        )
+
+        accepted = true
+        break
+      }
+
+      // If nothing accepted from this seed, move on to the next candidate
+      if (!accepted) continue
+    }
+  }
+
+  // Phase 2: global expansion pass (remove aspect constraint, expand against placed set)
+  for (let i = 0; i < placed.length; i++) {
+    const p = placed[i]
+    if (!p) continue
+
+    // Build blockers as: all obstacles on used layers + all other placed rects on those layers
+    const blockers: XYRect[] = []
+    for (const z of p.zLayers) {
+      const obs = obstaclesByLayer[z]
+      if (obs) blockers.push(...obs)
+    }
+    for (let j = 0; j < placed.length; j++) {
+      if (i === j) continue
+      const other = placed[j]
+      if (!other) continue
+      // only block on intersecting layers
+      if (other.zLayers.some((z) => p.zLayers.includes(z))) {
+        blockers.push(other.rect)
+      }
+    }
+
+    const lastGrid = gridSizes[gridSizes.length - 1]
+    if (!lastGrid) continue
+
+    const expanded = expandRectFromSeed(
+      p.rect.x + p.rect.width / 2,
+      p.rect.y + p.rect.height / 2,
+      lastGrid,
+      bounds,
+      blockers,
+      /* initialCellRatio */ 0, // we already have a rect; we don't want to bias the anchor
+      /* maxAspectRatio   */ null,
+      /* minReq */ { width: p.rect.width, height: p.rect.height },
+    )
+    if (expanded) {
+      placed[i] = { rect: expanded, zLayers: p.zLayers }
+    }
+  }
+
+  // Produce Rect3d[]
+  const rects: Rect3d[] = placed.map((p) => ({
+    minX: p.rect.x,
+    minY: p.rect.y,
+    maxX: p.rect.x + p.rect.width,
+    maxY: p.rect.y + p.rect.height,
+    zLayers: p.zLayers.slice().sort((a, b) => a - b),
+  }))
+
+  return rects
+}
+
+function computeDefaultGridSizes(bounds: XYRect): number[] {
+  // Heuristic: start coarsely, end fine; scale with board size
+  const ref = Math.max(bounds.width, bounds.height)
+  // 8 → 16 → 32 slices across the larger dimension
+  const g1 = ref / 8
+  const g2 = ref / 16
+  const g3 = ref / 32
+  return [g1, g2, g3]
+}
+
+/** ---------------------------------------------------------------------
+ *  Solver class
+ *  ------------------------------------------------------------------ */
 
 export class RectDiffSolver extends BaseSolver {
   private srj: SimpleRouteJson
-  private layerNames: string[] = []
-  private layerIndexByName = new Map<string, number>()
-  private topLayerIndex = 0
-  private result: SolveResult | null = null
-  private meshNodes: CapacityMeshNode[] = []
-  private minLengthForMultipleLayers = 0.4
+  private mode: "grid" | "exact"
+  private gridOptions: GridFill3DOptions
+  private _meshNodes: CapacityMeshNode[] = []
 
-  constructor(params: {
-    simpleRouteJson: SimpleRouteJson
-    minLengthForMultipleLayers?: number
-  }) {
+  constructor(opts: { simpleRouteJson: SimpleRouteJson; mode?: "grid" | "exact"; gridOptions?: Partial<GridFill3DOptions> }) {
     super()
-    this.srj = params.simpleRouteJson
-    this.minLengthForMultipleLayers =
-      params.minLengthForMultipleLayers ?? this.minLengthForMultipleLayers
+    this.srj = opts.simpleRouteJson
+    this.mode = opts.mode ?? "grid"
 
-    // Discover & index layers deterministically
-    const found = new Set<string>()
-    for (const ob of this.srj.obstacles ?? []) {
-      for (const l of ob.layers ?? []) found.add(l)
+    // sensible defaults; note min* are intentionally easy to read/tune from SRJ
+    const trace = Math.max(0.01, this.srj.minTraceWidth || 0.15)
+    this.gridOptions = {
+      initialCellRatio: 0.2,
+      maxAspectRatio: 3,
+      minSingle: { width: 2 * trace, height: 2 * trace },
+      minMulti: { width: 4 * trace, height: 4 * trace, minLayers: Math.min(2, Math.max(1, this.srj.layerCount || 1)) },
+      preferMultiLayer: true,
+      ...opts.gridOptions,
     }
-    for (const conn of this.srj.connections ?? []) {
-      for (const pt of conn.pointsToConnect ?? []) {
-        if (pt.layer) found.add(pt.layer)
-      }
-    }
-    if (found.size === 0) found.add("top")
-    this.layerNames = canonicalizeLayerOrder([...found])
-    this.layerNames.forEach((n, i) => this.layerIndexByName.set(n, i))
-    this.topLayerIndex =
-      this.layerIndexByName.get("top") ?? (this.layerNames.length ? 0 : 0)
   }
 
-  /** Perform the whole solve in a single step for now (keeps snapshots deterministic). */
-  override _step(): void {
-    try {
-      // Build Problem: root + cutouts (split into contiguous z runs)
-      const rootRect: Rect3d = {
-        minX: this.srj.bounds.minX,
-        minY: this.srj.bounds.minY,
-        maxX: this.srj.bounds.maxX,
-        maxY: this.srj.bounds.maxY,
-        zLayers: Array.from({ length: this.layerNames.length }, (_, i) => i),
-      }
-
-      const cutouts: Rect3d[] = []
-      for (const ob of this.srj.obstacles ?? []) {
-        // Only rectangles and ovals are supported; ovals -> bounding rect
-        if (ob.type !== "rect" && ob.type !== "oval") continue
-        const xy = toXYBoundsRect(ob.center, ob.width, ob.height)
-
-        // Map obstacle's layer strings to z indices and split across contiguous runs
-        const zIdxs = (ob.layers ?? [])
-          .map((ln) => this.layerIndexByName.get(ln))
-          .filter((v): v is number => typeof v === "number")
-
-        for (const run of contiguousRuns(zIdxs)) {
-          cutouts.push({
-            ...xy,
-            zLayers: run.slice(),
-          })
-        }
-      }
-
-      // Solve with defaults (thickness=1 unit, exponent p=2)
-      const res = solveNoDiscretization(
-        { rootRect, cutouts },
-        {
-          Z_LAYER_THICKNESS: 1,
-          p: 2,
-          order: "AUTO",
-          maxCycles: 6,
-          eps: EPS_DEFAULT,
-          seed: 0,
-          minLenForMultiLayerXY: this.minLengthForMultipleLayers,
-        },
-      )
-
-      this.result = res
-
-      // Produce CapacityMeshNodes: one per layer slice of each merged box
-      const nodes: CapacityMeshNode[] = []
-      let nid = 0
-      for (const b of res.boxes) {
-        const dx = b.maxX - b.minX
-        const dy = b.maxY - b.minY
-        const cx = (b.minX + b.maxX) / 2
-        const cy = (b.minY + b.maxY) / 2
-        const availableZ: number[] = []
-        for (let z = b.z0; z < b.z1; z++) availableZ.push(z)
-
-        for (let z = b.z0; z < b.z1; z++) {
-          const lname = this.layerNames[z] ?? `layer_${z}`
-          nodes.push({
-            capacityMeshNodeId: `node_${nid++}`,
-            center: { x: cx, y: cy },
-            width: dx,
-            height: dy,
-            layer: lname,
-            availableZ: availableZ.slice(),
-          })
-        }
-      }
-      this.meshNodes = nodes
-
-      ;(this as any).solved = true
-    } catch (err: any) {
-      ;(this as any).failed = true
-      ;(this as any).errorMessage = String(err?.message ?? err)
+  override solve() {
+    if (this.mode === "grid") {
+      const rects = gridFill3D(this.srj, this.gridOptions)
+      this._meshNodes = rectsToMeshNodes(rects)
+    } else {
+      // If you want to keep the exact-diff/coalescing path around:
+      // const rects = exactDiff3D(this.srj, { ... })
+      // this._meshNodes = rectsToMeshNodes(rects)
+      const rects = gridFill3D(this.srj, this.gridOptions) // fallback to grid
+      this._meshNodes = rectsToMeshNodes(rects)
     }
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    return { meshNodes: this.meshNodes }
+    return { meshNodes: this._meshNodes }
   }
 
-  /**
-   * 2D visualization (SVG) showing capacity nodes across all layers:
-   *  - Board outline
-   *  - Obstacles on all layers (red)
-   *  - Capacity mesh nodes on all layers (green) with layer info
-   */
   override visualize(): GraphicsObject {
     const rects: NonNullable<GraphicsObject["rects"]> = []
 
@@ -675,9 +727,9 @@ export class RectDiffSolver extends BaseSolver {
     }
 
     // Capacity nodes on all layers — green translucent
-    if (this.meshNodes.length > 0) {
+    if (this._meshNodes.length > 0) {
       // Sort for deterministic ordering
-      const sortedNodes = [...this.meshNodes].sort(
+      const sortedNodes = [...this._meshNodes].sort(
         (a, b) =>
           a.center.x - b.center.x ||
           a.center.y - b.center.y ||
@@ -707,4 +759,28 @@ export class RectDiffSolver extends BaseSolver {
       rects,
     }
   }
+}
+
+/** Convert Rect3d[] to CapacityMeshNode[] for 3D viewer */
+function rectsToMeshNodes(rects: Rect3d[]): CapacityMeshNode[] {
+  let id = 0
+  const nodes: CapacityMeshNode[] = []
+  for (const r of rects) {
+    const cx = (r.minX + r.maxX) / 2
+    const cy = (r.minY + r.maxY) / 2
+    const w = Math.max(0, r.maxX - r.minX)
+    const h = Math.max(0, r.maxY - r.minY)
+    if (w <= 0 || h <= 0 || r.zLayers.length === 0) continue
+
+    nodes.push({
+      capacityMeshNodeId: `cmn_${id++}`,
+      center: { x: cx, y: cy },
+      width: w,
+      height: h,
+      // layer name is not used by the 3D view to merge prisms; availableZ drives Z spans.
+      layer: "top",
+      availableZ: r.zLayers.slice(),
+    })
+  }
+  return nodes
 }
