@@ -10,6 +10,12 @@ export class RectDiffSolver extends BaseSolver {
 
   override _step(): void {
     // TODO
+    // Notes:
+    // - Only perform one operation per step, this makes it easier to debug
+    // - Often, unrolling a for loop is a good way to make a step function
+    // - When finished, mark this.solved = true
+    // - If failed, mark this.failed = true, and set this this.errorMessage = "..."
+    // - this.iterations automatically increments (managed by the base class)
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
