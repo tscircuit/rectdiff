@@ -224,6 +224,15 @@ function subtractAll(rootBox: Box, cutoutBoxes: Box[], eps: number, seed = 0) {
   return free
 }
 function mergeAlongAxis(boxes: Box[], axis: "X" | "Y" | "Z", eps: number) {
+  return mergeAlongAxisWithMinXY(boxes, axis, eps, undefined)
+}
+
+function mergeAlongAxisWithMinXY(
+  boxes: Box[],
+  axis: "X" | "Y" | "Z",
+  eps: number,
+  minLenForMultiLayerXY: number | undefined,
+) {
   if (boxes.length <= 1) return boxes
   const groups = new Map<string, Box[]>()
   const R = (v: number) => v.toFixed(12)
@@ -275,7 +284,17 @@ function mergeAlongAxis(boxes: Box[], axis: "X" | "Y" | "Z", eps: number) {
       for (let i = 1; i < arr.length; i++) {
         const n = arr[i]
         if (cur.z1 === n.z0) {
-          cur = { ...cur, z1: n.z1 }
+          // Only merge across Z if XY footprint is large enough (if a threshold is provided)
+          const allowMerge =
+            minLenForMultiLayerXY == null ||
+            ((cur.maxX - cur.minX) >= (minLenForMultiLayerXY - eps) &&
+             (cur.maxY - cur.minY) >= (minLenForMultiLayerXY - eps))
+          if (allowMerge) {
+            cur = { ...cur, z1: n.z1 }
+          } else {
+            out.push(cur)
+            cur = n
+          }
         } else {
           out.push(cur)
           cur = n
@@ -291,11 +310,13 @@ function coalesce(
   order: Array<"X" | "Y" | "Z">,
   eps: number,
   maxCycles = 4,
+  minLenForMultiLayerXY?: number,
 ) {
   let cur = boxes.slice()
   for (let cycle = 0; cycle < maxCycles; cycle++) {
     const prevLen = cur.length
-    for (const ax of order) cur = mergeAlongAxis(cur, ax, eps)
+    for (const ax of order)
+      cur = mergeAlongAxisWithMinXY(cur, ax, eps, minLenForMultiLayerXY)
     if (cur.length === prevLen) break
   }
   return cur
@@ -344,6 +365,38 @@ function boxToRect3d(b: Box): Rect3d {
   for (let z = b.z0; z < b.z1; z++) zLayers.push(z)
   return { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY, zLayers }
 }
+/**
+ * After coalescing, enforce: if a box spans multiple layers, it must be at least
+ * `minLenForMultiLayerXY` in BOTH X and Y. Otherwise, split it into per-layer slabs.
+ */
+function enforceMultiLayerMinXY(
+  boxes: Box[],
+  minLenForMultiLayerXY: number,
+  eps: number,
+): Box[] {
+  if (!(minLenForMultiLayerXY > 0)) return boxes.slice()
+  const out: Box[] = []
+  for (const b of boxes) {
+    const layers = b.z1 - b.z0
+    if (layers <= 1) {
+      out.push(b)
+      continue
+    }
+    const dx = b.maxX - b.minX
+    const dy = b.maxY - b.minY
+    const canSpan =
+      dx >= (minLenForMultiLayerXY - eps) && dy >= (minLenForMultiLayerXY - eps)
+    if (canSpan) {
+      out.push(b)
+    } else {
+      // Split across Z into single-layer boxes to fully fill the space
+      for (let z = b.z0; z < b.z1; z++) {
+        out.push({ ...b, z0: z, z1: z + 1 })
+      }
+    }
+  }
+  return out
+}
 function solveNoDiscretization(
   problem: { rootRect: Rect3d; cutouts: Rect3d[] },
   options: {
@@ -353,9 +406,19 @@ function solveNoDiscretization(
     maxCycles: number
     eps: number
     seed: number
+    /** Minimum XY length required to allow multi-layer spans */
+    minLenForMultiLayerXY?: number
   },
 ): SolveResult {
-  const { Z_LAYER_THICKNESS, p, order, maxCycles, eps, seed } = options
+  const {
+    Z_LAYER_THICKNESS,
+    p,
+    order,
+    maxCycles,
+    eps,
+    seed,
+    minLenForMultiLayerXY,
+  } = options
   const rootZs = new Set(problem.rootRect.zLayers)
   const rootBox = toBoxFromRoot(problem.rootRect)
   const cutoutBoxes = problem.cutouts
@@ -376,7 +439,13 @@ function solveNoDiscretization(
   let bestScore = -Infinity
   let bestOrder: string | null = null
   for (const ord of orders) {
-    const merged = coalesce(diffBoxes, ord, eps, maxCycles)
+    const merged = coalesce(
+      diffBoxes,
+      ord,
+      eps,
+      maxCycles,
+      minLenForMultiLayerXY,
+    )
     const sc = scoreBoxes(merged, Z_LAYER_THICKNESS, p)
     if (sc > bestScore) {
       best = merged
@@ -384,11 +453,18 @@ function solveNoDiscretization(
       bestOrder = ord.join(",")
     }
   }
-  const boxes = best ?? diffBoxes
+  // Enforce the XY-size constraint post-pass as well, to split any residual
+  // multi-layer boxes that are too small in X or Y.
+  const preBoxes = best ?? diffBoxes
+  const boxes =
+    minLenForMultiLayerXY != null
+      ? enforceMultiLayerMinXY(preBoxes, minLenForMultiLayerXY, eps)
+      : preBoxes
   return {
     boxes,
     rects: boxes.map(boxToRect3d),
-    score: bestScore,
+    // Keep score consistent with final boxes
+    score: scoreBoxes(boxes, Z_LAYER_THICKNESS, p),
     orderUsed: bestOrder ?? "X,Y,Z",
     totalFreeVolume: totalVolume(boxes, Z_LAYER_THICKNESS),
   }
@@ -519,6 +595,7 @@ export class RectDiffSolver extends BaseSolver {
           maxCycles: 6,
           eps: EPS_DEFAULT,
           seed: 0,
+          minLenForMultiLayerXY: this.minLengthForMultipleLayers,
         },
       )
 

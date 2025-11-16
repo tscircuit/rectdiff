@@ -77,8 +77,16 @@ function buildPrismsFromNodes(
   z0: number
   z1: number
 }> {
-  const key = (n: CapacityMeshNode) =>
+  const xyKey = (n: CapacityMeshNode) =>
     `${n.center.x.toFixed(8)}|${n.center.y.toFixed(8)}|${n.width.toFixed(8)}|${n.height.toFixed(8)}`
+  const azKey = (n: CapacityMeshNode) => {
+    const zs = (n.availableZ && n.availableZ.length ? [...new Set(n.availableZ)] : [0]).sort(
+      (a, b) => a - b,
+    )
+    return `zset:${zs.join(",")}`
+  }
+  const key = (n: CapacityMeshNode) => `${xyKey(n)}|${azKey(n)}`
+
   const groups = new Map<
     string,
     { cx: number; cy: number; w: number; h: number; zs: number[] }
