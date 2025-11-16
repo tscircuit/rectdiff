@@ -3,8 +3,9 @@ import { Play, Square, SkipForward } from "lucide-react"
 
 const RectFillVisualizer = () => {
   const canvasRef = useRef(null)
+
   const GRID_PROGRESSION = [100, 50, 20]
-  const MIN_RECT_SIZE_IN_CELL_RATIO = 0.2 // Start with rectangles 1/5 the grid size
+  const MIN_RECT_SIZE_IN_CELL_RATIO = 0.2
 
   const [maxRatio, setMaxRatio] = useState(2)
   const [isRunning, setIsRunning] = useState(false)
@@ -13,6 +14,8 @@ const RectFillVisualizer = () => {
   const [candidatePoints, setCandidatePoints] = useState([])
   const [expansionPhase, setExpansionPhase] = useState(false)
   const [expansionIndex, setExpansionIndex] = useState(0)
+  const [gapFillingPhase, setGapFillingPhase] = useState(false)
+  const [gapCandidates, setGapCandidates] = useState([])
   const [currentGridIndex, setCurrentGridIndex] = useState(0)
   const [currentGridSize, setCurrentGridSize] = useState(GRID_PROGRESSION[0])
 
@@ -57,10 +60,10 @@ const RectFillVisualizer = () => {
 
   const distanceToRect = (px, py, rect) => {
     const edges = [
-      [rect.x, rect.y, rect.x + rect.width, rect.y], // top
-      [rect.x + rect.width, rect.y, rect.x + rect.width, rect.y + rect.height], // right
-      [rect.x + rect.width, rect.y + rect.height, rect.x, rect.y + rect.height], // bottom
-      [rect.x, rect.y + rect.height, rect.x, rect.y], // left
+      [rect.x, rect.y, rect.x + rect.width, rect.y],
+      [rect.x + rect.width, rect.y, rect.x + rect.width, rect.y + rect.height],
+      [rect.x + rect.width, rect.y + rect.height, rect.x, rect.y + rect.height],
+      [rect.x, rect.y + rect.height, rect.x, rect.y],
     ]
 
     return Math.min(
@@ -88,6 +91,295 @@ const RectFillVisualizer = () => {
     )
   }
 
+  const computeCandidatePoints = (gridSize, existingRects = []) => {
+    const points = []
+    const allBlockers = [...obstacles, ...existingRects]
+
+    for (
+      let x = outerBorder.x;
+      x < outerBorder.x + outerBorder.width;
+      x += gridSize
+    ) {
+      for (
+        let y = outerBorder.y;
+        y < outerBorder.y + outerBorder.height;
+        y += gridSize
+      ) {
+        // Skip points along the border edges
+        if (
+          x === outerBorder.x ||
+          y === outerBorder.y ||
+          x >= outerBorder.x + outerBorder.width - gridSize ||
+          y >= outerBorder.y + outerBorder.height - gridSize
+        ) {
+          continue
+        }
+
+        // Check if point is inside any blocker
+        let insideBlocker = false
+
+        for (const blocker of allBlockers) {
+          if (isPointInRect(x, y, blocker)) {
+            insideBlocker = true
+            const remainingHeight = blocker.y + blocker.height - y
+            const skipAmount = Math.max(
+              0,
+              Math.floor(remainingHeight / gridSize),
+            )
+            if (skipAmount > 0) {
+              y += (skipAmount - 1) * gridSize
+            }
+            break
+          }
+        }
+
+        if (insideBlocker) {
+          continue
+        }
+
+        let minDist = distanceToRect(x, y, outerBorder)
+
+        for (const obs of obstacles) {
+          const dist = distanceToRect(x, y, obs)
+          minDist = Math.min(minDist, dist)
+        }
+
+        points.push({ x, y, distance: minDist })
+      }
+    }
+
+    return points.sort((a, b) => b.distance - a.distance)
+  }
+
+  const findGapCandidates = (rects) => {
+    const allBlockers = [...obstacles, ...rects]
+    const gapPoints = []
+    const sampleStep = 10
+
+    rects.forEach((rect, rectIdx) => {
+      const edges = [
+        {
+          name: "right",
+          points: () => {
+            const pts = []
+            for (let y = rect.y; y <= rect.y + rect.height; y += sampleStep) {
+              pts.push({
+                x: rect.x + rect.width + 1,
+                y: Math.min(y, rect.y + rect.height),
+              })
+            }
+            return pts
+          },
+        },
+        {
+          name: "bottom",
+          points: () => {
+            const pts = []
+            for (let x = rect.x; x <= rect.x + rect.width; x += sampleStep) {
+              pts.push({
+                x: Math.min(x, rect.x + rect.width),
+                y: rect.y + rect.height + 1,
+              })
+            }
+            return pts
+          },
+        },
+        {
+          name: "left",
+          points: () => {
+            const pts = []
+            for (let y = rect.y; y <= rect.y + rect.height; y += sampleStep) {
+              pts.push({ x: rect.x - 1, y: Math.min(y, rect.y + rect.height) })
+            }
+            return pts
+          },
+        },
+        {
+          name: "top",
+          points: () => {
+            const pts = []
+            for (let x = rect.x; x <= rect.x + rect.width; x += sampleStep) {
+              pts.push({ x: Math.min(x, rect.x + rect.width), y: rect.y - 1 })
+            }
+            return pts
+          },
+        },
+      ]
+
+      edges.forEach((edge) => {
+        const edgePoints = edge.points()
+
+        edgePoints.forEach((point) => {
+          if (
+            point.x < outerBorder.x ||
+            point.x > outerBorder.x + outerBorder.width ||
+            point.y < outerBorder.y ||
+            point.y > outerBorder.y + outerBorder.height
+          ) {
+            return
+          }
+
+          let isOccupied = false
+          for (const blocker of allBlockers) {
+            if (blocker === rect) continue
+            if (isPointInRect(point.x, point.y, blocker)) {
+              isOccupied = true
+              break
+            }
+          }
+
+          if (!isOccupied) {
+            gapPoints.push({ x: point.x, y: point.y, sourceRect: rectIdx })
+          }
+        })
+      })
+    })
+
+    return gapPoints
+  }
+
+  const expandExistingRect = (existingRect, existingRects = []) => {
+    let rect = { ...existingRect }
+    const allBlockers = [...obstacles, ...existingRects]
+
+    let improved = true
+
+    while (improved) {
+      improved = false
+
+      const maxRight = outerBorder.x + outerBorder.width - (rect.x + rect.width)
+      if (maxRight > 0) {
+        let bestExpansion = 0
+
+        for (let expand = 1; expand <= maxRight; expand++) {
+          let testRect = { ...rect, width: rect.width + expand }
+
+          let hasCollision = false
+          for (const blocker of allBlockers) {
+            if (rectOverlaps(testRect, blocker)) {
+              const maxWidth = blocker.x - rect.x
+              if (maxWidth > rect.width) {
+                bestExpansion = maxWidth - rect.width
+              }
+              hasCollision = true
+              break
+            }
+          }
+
+          if (hasCollision) break
+          bestExpansion = expand
+        }
+
+        if (bestExpansion > 0) {
+          rect.width += bestExpansion
+          improved = true
+        }
+      }
+
+      const maxDown =
+        outerBorder.y + outerBorder.height - (rect.y + rect.height)
+      if (maxDown > 0) {
+        let bestExpansion = 0
+
+        for (let expand = 1; expand <= maxDown; expand++) {
+          let testRect = { ...rect, height: rect.height + expand }
+
+          let hasCollision = false
+          for (const blocker of allBlockers) {
+            if (rectOverlaps(testRect, blocker)) {
+              const maxHeight = blocker.y - rect.y
+              if (maxHeight > rect.height) {
+                bestExpansion = maxHeight - rect.height
+              }
+              hasCollision = true
+              break
+            }
+          }
+
+          if (hasCollision) break
+          bestExpansion = expand
+        }
+
+        if (bestExpansion > 0) {
+          rect.height += bestExpansion
+          improved = true
+        }
+      }
+
+      const maxLeft = rect.x - outerBorder.x
+      if (maxLeft > 0) {
+        let bestExpansion = 0
+
+        for (let expand = 1; expand <= maxLeft; expand++) {
+          let testRect = {
+            x: rect.x - expand,
+            y: rect.y,
+            width: rect.width + expand,
+            height: rect.height,
+          }
+
+          let hasCollision = false
+          for (const blocker of allBlockers) {
+            if (rectOverlaps(testRect, blocker)) {
+              const newLeft = blocker.x + blocker.width
+              if (newLeft < rect.x) {
+                bestExpansion = rect.x - newLeft
+              }
+              hasCollision = true
+              break
+            }
+          }
+
+          if (hasCollision) break
+          bestExpansion = expand
+        }
+
+        if (bestExpansion > 0) {
+          rect.x -= bestExpansion
+          rect.width += bestExpansion
+          improved = true
+        }
+      }
+
+      const maxUp = rect.y - outerBorder.y
+      if (maxUp > 0) {
+        let bestExpansion = 0
+
+        for (let expand = 1; expand <= maxUp; expand++) {
+          let testRect = {
+            x: rect.x,
+            y: rect.y - expand,
+            width: rect.width,
+            height: rect.height + expand,
+          }
+
+          let hasCollision = false
+          for (const blocker of allBlockers) {
+            if (rectOverlaps(testRect, blocker)) {
+              const newTop = blocker.y + blocker.height
+              if (newTop < rect.y) {
+                bestExpansion = rect.y - newTop
+              }
+              hasCollision = true
+              break
+            }
+          }
+
+          if (hasCollision) break
+          bestExpansion = expand
+        }
+
+        if (bestExpansion > 0) {
+          rect.y -= bestExpansion
+          rect.height += bestExpansion
+          improved = true
+        }
+      }
+    }
+
+    return rect
+  }
+
   const expandRect = (
     startX,
     startY,
@@ -97,13 +389,12 @@ const RectFillVisualizer = () => {
   ) => {
     const minSize = Math.max(1, gridSize * MIN_RECT_SIZE_IN_CELL_RATIO)
 
-    // Try different anchor positions for the start point
     const strategies = [
-      { startOffsetX: 0, startOffsetY: 0 }, // top-left
-      { startOffsetX: -minSize, startOffsetY: 0 }, // top-right
-      { startOffsetX: 0, startOffsetY: -minSize }, // bottom-left
-      { startOffsetX: -minSize, startOffsetY: -minSize }, // bottom-right
-      { startOffsetX: -minSize / 2, startOffsetY: -minSize / 2 }, // centered
+      { startOffsetX: 0, startOffsetY: 0 },
+      { startOffsetX: -minSize, startOffsetY: 0 },
+      { startOffsetX: 0, startOffsetY: -minSize },
+      { startOffsetX: -minSize, startOffsetY: -minSize },
+      { startOffsetX: -minSize / 2, startOffsetY: -minSize / 2 },
     ]
 
     let bestRect = null
@@ -117,7 +408,6 @@ const RectFillVisualizer = () => {
         height: minSize,
       }
 
-      // Check if initial rectangle is valid
       if (
         rect.x < outerBorder.x ||
         rect.y < outerBorder.y ||
@@ -127,7 +417,6 @@ const RectFillVisualizer = () => {
         continue
       }
 
-      // Check initial overlap
       let hasOverlap =
         obstacles.some((obs) => rectOverlaps(rect, obs)) ||
         existingRects.some((fr) => rectOverlaps(rect, fr))
@@ -136,13 +425,11 @@ const RectFillVisualizer = () => {
 
       const allBlockers = [...obstacles, ...existingRects]
 
-      // Expand in each direction to maximum - never shrink any dimension
       let improved = true
 
       while (improved) {
         improved = false
 
-        // Try expanding RIGHT (increase width only)
         const maxRight =
           outerBorder.x + outerBorder.width - (rect.x + rect.width)
         if (maxRight > 0) {
@@ -151,7 +438,6 @@ const RectFillVisualizer = () => {
           for (let expand = 1; expand <= maxRight; expand++) {
             let testRect = { ...rect, width: rect.width + expand }
 
-            // Check ratio
             if (maxRatio !== null && maxRatio !== undefined) {
               const ratio = Math.max(
                 testRect.width / testRect.height,
@@ -160,11 +446,9 @@ const RectFillVisualizer = () => {
               if (ratio > maxRatio) break
             }
 
-            // Check overlaps and snap to exact edge if collision
             let hasCollision = false
             for (const blocker of allBlockers) {
               if (rectOverlaps(testRect, blocker)) {
-                // Found collision - use the blocker's left edge as the limit
                 const maxWidth = blocker.x - rect.x
                 if (maxWidth > rect.width) {
                   bestExpansion = maxWidth - rect.width
@@ -184,7 +468,6 @@ const RectFillVisualizer = () => {
           }
         }
 
-        // Try expanding DOWN (increase height only)
         const maxDown =
           outerBorder.y + outerBorder.height - (rect.y + rect.height)
         if (maxDown > 0) {
@@ -193,7 +476,6 @@ const RectFillVisualizer = () => {
           for (let expand = 1; expand <= maxDown; expand++) {
             let testRect = { ...rect, height: rect.height + expand }
 
-            // Check ratio
             if (maxRatio !== null && maxRatio !== undefined) {
               const ratio = Math.max(
                 testRect.width / testRect.height,
@@ -202,11 +484,9 @@ const RectFillVisualizer = () => {
               if (ratio > maxRatio) break
             }
 
-            // Check overlaps and snap to exact edge if collision
             let hasCollision = false
             for (const blocker of allBlockers) {
               if (rectOverlaps(testRect, blocker)) {
-                // Found collision - use the blocker's top edge as the limit
                 const maxHeight = blocker.y - rect.y
                 if (maxHeight > rect.height) {
                   bestExpansion = maxHeight - rect.height
@@ -226,7 +506,6 @@ const RectFillVisualizer = () => {
           }
         }
 
-        // Try expanding LEFT (decrease x, increase width)
         const maxLeft = rect.x - outerBorder.x
         if (maxLeft > 0) {
           let bestExpansion = 0
@@ -239,7 +518,6 @@ const RectFillVisualizer = () => {
               height: rect.height,
             }
 
-            // Check ratio
             if (maxRatio !== null && maxRatio !== undefined) {
               const ratio = Math.max(
                 testRect.width / testRect.height,
@@ -248,11 +526,9 @@ const RectFillVisualizer = () => {
               if (ratio > maxRatio) break
             }
 
-            // Check overlaps and snap to exact edge if collision
             let hasCollision = false
             for (const blocker of allBlockers) {
               if (rectOverlaps(testRect, blocker)) {
-                // Found collision - use the blocker's right edge as the limit
                 const newLeft = blocker.x + blocker.width
                 if (newLeft < rect.x) {
                   bestExpansion = rect.x - newLeft
@@ -273,7 +549,6 @@ const RectFillVisualizer = () => {
           }
         }
 
-        // Try expanding UP (decrease y, increase height)
         const maxUp = rect.y - outerBorder.y
         if (maxUp > 0) {
           let bestExpansion = 0
@@ -286,7 +561,6 @@ const RectFillVisualizer = () => {
               height: rect.height + expand,
             }
 
-            // Check ratio
             if (maxRatio !== null && maxRatio !== undefined) {
               const ratio = Math.max(
                 testRect.width / testRect.height,
@@ -295,11 +569,9 @@ const RectFillVisualizer = () => {
               if (ratio > maxRatio) break
             }
 
-            // Check overlaps and snap to exact edge if collision
             let hasCollision = false
             for (const blocker of allBlockers) {
               if (rectOverlaps(testRect, blocker)) {
-                // Found collision - use the blocker's bottom edge as the limit
                 const newTop = blocker.y + blocker.height
                 if (newTop < rect.y) {
                   bestExpansion = rect.y - newTop
@@ -331,89 +603,8 @@ const RectFillVisualizer = () => {
     return bestRect
   }
 
-  const computeCandidatePoints = (gridSize, existingRects = []) => {
-    const points = []
-    const allBlockers = [...obstacles, ...existingRects]
-
-    for (
-      let x = outerBorder.x;
-      x < outerBorder.x + outerBorder.width;
-      x += gridSize
-    ) {
-      for (
-        let y = outerBorder.y;
-        y < outerBorder.y + outerBorder.height;
-        y += gridSize
-      ) {
-        // Skip points along the border edges
-        if (
-          x === outerBorder.x ||
-          y === outerBorder.y ||
-          x >= outerBorder.x + outerBorder.width - gridSize ||
-          y >= outerBorder.y + outerBorder.height - gridSize
-        ) {
-          continue
-        }
-
-        // Check if point is inside any blocker (obstacle or existing rect)
-        let insideBlocker = false
-
-        for (const blocker of allBlockers) {
-          if (isPointInRect(x, y, blocker)) {
-            insideBlocker = true
-            // Calculate how many grid points we can skip based on blocker height
-            const remainingHeight = blocker.y + blocker.height - y
-            const skipAmount = Math.max(
-              0,
-              Math.floor(remainingHeight / gridSize),
-            )
-            if (skipAmount > 0) {
-              y += (skipAmount - 1) * gridSize // Skip ahead (loop will add gridSize)
-            }
-            break
-          }
-        }
-
-        if (insideBlocker) {
-          continue
-        }
-
-        // Calculate distance to nearest obstacle or border
-        let minDist = distanceToRect(x, y, outerBorder)
-
-        for (const obs of obstacles) {
-          const dist = distanceToRect(x, y, obs)
-          minDist = Math.min(minDist, dist)
-        }
-
-        points.push({ x, y, distance: minDist })
-      }
-    }
-
-    // Sort by distance descending (furthest from obstacles first)
-    return points.sort((a, b) => b.distance - a.distance)
-  }
-
-  const reset = () => {
-    setIsRunning(false)
-    setCurrentStep(0)
-    setFillRects([])
-    setExpansionPhase(false)
-    setExpansionIndex(0)
-    setCurrentGridIndex(0)
-    const firstGridSize = GRID_PROGRESSION[0]
-    setCurrentGridSize(firstGridSize)
-    const points = computeCandidatePoints(firstGridSize, [])
-    setCandidatePoints(points)
-  }
-
-  useEffect(() => {
-    reset()
-  }, [maxRatio])
-
   const step = () => {
-    if (!expansionPhase && candidatePoints.length === 0) {
-      // Check if we can move to next grid size
+    if (!expansionPhase && !gapFillingPhase && candidatePoints.length === 0) {
       if (currentGridIndex < GRID_PROGRESSION.length - 1) {
         const nextGridIndex = currentGridIndex + 1
         const nextGridSize = GRID_PROGRESSION[nextGridIndex]
@@ -423,27 +614,44 @@ const RectFillVisualizer = () => {
         setCandidatePoints(newCandidates)
         return
       } else {
-        // All grids processed, enter expansion phase
         setExpansionPhase(true)
         setExpansionIndex(0)
         return
       }
     }
 
-    if (expansionPhase) {
-      // Expansion phase: try to expand existing rectangles without ratio constraint
-      if (expansionIndex >= fillRects.length) return
+    if (gapFillingPhase) {
+      if (gapCandidates.length === 0) return
+
+      const point = gapCandidates[0]
+      const newRect = expandRect(point.x, point.y, 5, null, fillRects)
+
+      if (newRect) {
+        const newFillRects = [...fillRects, newRect]
+        setFillRects(newFillRects)
+
+        const remainingGaps = gapCandidates.filter(
+          (p) => !isPointInRect(p.x, p.y, newRect),
+        )
+        setGapCandidates(remainingGaps)
+      } else {
+        setGapCandidates(gapCandidates.slice(1))
+      }
+
+      setCurrentStep(currentStep + 1)
+    } else if (expansionPhase) {
+      if (expansionIndex >= fillRects.length) {
+        const gaps = findGapCandidates(fillRects)
+        setGapCandidates(gaps)
+        setGapFillingPhase(true)
+        setExpansionPhase(false)
+        return
+      }
 
       const rectToExpand = fillRects[expansionIndex]
       const otherRects = fillRects.filter((_, i) => i !== expansionIndex)
 
-      const expandedRect = expandRect(
-        rectToExpand.x,
-        rectToExpand.y,
-        currentGridSize,
-        null,
-        otherRects,
-      )
+      const expandedRect = expandExistingRect(rectToExpand, otherRects)
 
       if (expandedRect) {
         const newFillRects = [...fillRects]
@@ -453,7 +661,6 @@ const RectFillVisualizer = () => {
 
       setExpansionIndex(expansionIndex + 1)
     } else {
-      // Candidate phase: process next candidate point
       const point = candidatePoints[0]
       const newRect = expandRect(
         point.x,
@@ -463,19 +670,15 @@ const RectFillVisualizer = () => {
         fillRects,
       )
 
-      // Only add if we successfully created a rectangle
       if (newRect) {
-        // Add the new rectangle
         const newFillRects = [...fillRects, newRect]
         setFillRects(newFillRects)
 
-        // Filter out all candidate points that are now inside this rectangle
         const remainingCandidates = candidatePoints.filter(
           (p) => !isPointInRect(p.x, p.y, newRect),
         )
         setCandidatePoints(remainingCandidates)
       } else {
-        // Couldn't create a rect from this point, just remove it
         setCandidatePoints(candidatePoints.slice(1))
       }
 
@@ -488,7 +691,6 @@ const RectFillVisualizer = () => {
     let rects = [...fillRects]
     let steps = currentStep
 
-    // Phase 1: Process all grid sizes progressively
     for (
       let gridIdx = currentGridIndex;
       gridIdx < GRID_PROGRESSION.length;
@@ -504,12 +706,10 @@ const RectFillVisualizer = () => {
         if (newRect) {
           rects.push(newRect)
 
-          // Filter out all candidates inside the new rectangle
           remainingCandidates = remainingCandidates.filter(
             (p) => !isPointInRect(p.x, p.y, newRect),
           )
         } else {
-          // Couldn't create a rect, just remove this candidate
           remainingCandidates = remainingCandidates.slice(1)
         }
 
@@ -517,32 +717,62 @@ const RectFillVisualizer = () => {
       }
     }
 
-    // Phase 2: Expansion phase - expand all rects without ratio constraint
-    const finalGridSize = GRID_PROGRESSION[GRID_PROGRESSION.length - 1]
     for (let i = 0; i < rects.length; i++) {
       const rectToExpand = rects[i]
       const otherRects = rects.filter((_, idx) => idx !== i)
-      const expandedRect = expandRect(
-        rectToExpand.x,
-        rectToExpand.y,
-        finalGridSize,
-        null,
-        otherRects,
-      )
+      const expandedRect = expandExistingRect(rectToExpand, otherRects)
       if (expandedRect) {
         rects[i] = expandedRect
       }
     }
 
+    let gaps = findGapCandidates(rects)
+    while (gaps.length > 0) {
+      const point = gaps[0]
+      const newRect = expandRect(point.x, point.y, 5, null, rects)
+
+      if (newRect) {
+        rects.push(newRect)
+        gaps = gaps.filter((p) => !isPointInRect(p.x, p.y, newRect))
+      } else {
+        gaps = gaps.slice(1)
+      }
+
+      steps++
+
+      if (steps > currentStep + 1000) break
+    }
+
     setFillRects(rects)
     setCandidatePoints([])
+    setGapCandidates([])
     setCurrentStep(steps)
     setCurrentGridIndex(GRID_PROGRESSION.length - 1)
-    setCurrentGridSize(finalGridSize)
-    setExpansionPhase(true)
+    setCurrentGridSize(GRID_PROGRESSION[GRID_PROGRESSION.length - 1])
+    setExpansionPhase(false)
+    setGapFillingPhase(true)
     setExpansionIndex(rects.length)
     setIsRunning(false)
   }
+
+  const reset = () => {
+    setIsRunning(false)
+    setCurrentStep(0)
+    setFillRects([])
+    setExpansionPhase(false)
+    setGapFillingPhase(false)
+    setExpansionIndex(0)
+    setGapCandidates([])
+    setCurrentGridIndex(0)
+    const firstGridSize = GRID_PROGRESSION[0]
+    setCurrentGridSize(firstGridSize)
+    const points = computeCandidatePoints(firstGridSize, [])
+    setCandidatePoints(points)
+  }
+
+  useEffect(() => {
+    reset()
+  }, [maxRatio])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -551,7 +781,6 @@ const RectFillVisualizer = () => {
     const ctx = canvas.getContext("2d")
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Draw outer border (green)
     ctx.strokeStyle = "#22c55e"
     ctx.lineWidth = 3
     ctx.strokeRect(
@@ -561,23 +790,19 @@ const RectFillVisualizer = () => {
       outerBorder.height,
     )
 
-    // Draw obstacles (red)
     ctx.fillStyle = "#ef4444"
     obstacles.forEach((obs) => {
       ctx.fillRect(obs.x, obs.y, obs.width, obs.height)
     })
 
-    // Draw candidate grid points (only in candidate phase, with transparency)
-    if (!expansionPhase && candidatePoints.length > 0) {
+    if (!expansionPhase && !gapFillingPhase && candidatePoints.length > 0) {
       ctx.fillStyle = "rgba(156, 163, 175, 0.3)"
       candidatePoints.forEach((point) => {
         ctx.fillRect(point.x - 1, point.y - 1, 2, 2)
       })
     }
 
-    // Draw fill rects (blue)
     fillRects.forEach((rect, idx) => {
-      // Highlight the rect being expanded in expansion phase
       if (expansionPhase && idx === expansionIndex - 1) {
         ctx.fillStyle = "rgba(251, 191, 36, 0.5)"
         ctx.strokeStyle = "#fbbf24"
@@ -591,8 +816,16 @@ const RectFillVisualizer = () => {
       ctx.strokeRect(rect.x, rect.y, rect.width, rect.height)
     })
 
-    // Draw next candidate point (only in candidate phase)
-    if (!expansionPhase && candidatePoints.length > 0) {
+    if (gapFillingPhase && gapCandidates.length > 0) {
+      ctx.fillStyle = "#ec4899"
+      gapCandidates.forEach((point) => {
+        ctx.beginPath()
+        ctx.arc(point.x, point.y, 3, 0, 2 * Math.PI)
+        ctx.fill()
+      })
+    }
+
+    if (!expansionPhase && !gapFillingPhase && candidatePoints.length > 0) {
       const point = candidatePoints[0]
       ctx.fillStyle = "#fbbf24"
       ctx.beginPath()
@@ -606,6 +839,8 @@ const RectFillVisualizer = () => {
     expansionPhase,
     expansionIndex,
     currentGridSize,
+    gapFillingPhase,
+    gapCandidates,
   ])
 
   return (
@@ -618,7 +853,8 @@ const RectFillVisualizer = () => {
           Fills space with rectangles while avoiding obstacles using progressive
           grid refinement (100px → 50px → 20px). Points furthest from obstacles
           are prioritized. After all grids are processed, rectangles expand
-          without ratio constraints to eliminate seams.
+          without ratio constraints. Finally, edge gaps are identified and
+          filled with additional rectangles.
         </p>
 
         <div className="bg-gray-800 rounded-lg p-6 mb-4">
@@ -650,7 +886,7 @@ const RectFillVisualizer = () => {
         <div className="flex gap-3">
           <button
             onClick={step}
-            disabled={expansionPhase && expansionIndex >= fillRects.length}
+            disabled={gapFillingPhase && gapCandidates.length === 0}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition"
           >
             <SkipForward size={20} />
@@ -659,12 +895,7 @@ const RectFillVisualizer = () => {
 
           <button
             onClick={runAll}
-            disabled={
-              (candidatePoints.length === 0 &&
-                expansionPhase &&
-                expansionIndex >= fillRects.length) ||
-              isRunning
-            }
+            disabled={isRunning}
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded-lg transition"
           >
             <Play size={20} />
@@ -682,10 +913,12 @@ const RectFillVisualizer = () => {
           <div className="ml-auto bg-gray-800 px-4 py-2 rounded-lg">
             <span className="text-gray-400">Grid:</span> {currentGridSize}px
             <span className="ml-4 text-gray-400">Phase:</span>{" "}
-            {expansionPhase
-              ? "Expansion"
-              : `Candidates (${currentGridIndex + 1}/${GRID_PROGRESSION.length})`}
-            {!expansionPhase && (
+            {gapFillingPhase
+              ? "Gap Filling"
+              : expansionPhase
+                ? "Expansion"
+                : `Candidates (${currentGridIndex + 1}/${GRID_PROGRESSION.length})`}
+            {!expansionPhase && !gapFillingPhase && (
               <>
                 <span className="ml-4 text-gray-400">Remaining:</span>{" "}
                 {candidatePoints.length}
@@ -695,6 +928,12 @@ const RectFillVisualizer = () => {
               <>
                 <span className="ml-4 text-gray-400">Expanding:</span>{" "}
                 {expansionIndex}/{fillRects.length}
+              </>
+            )}
+            {gapFillingPhase && (
+              <>
+                <span className="ml-4 text-gray-400">Gaps:</span>{" "}
+                {gapCandidates.length}
               </>
             )}
             <span className="ml-4 text-gray-400">Rectangles:</span>{" "}
@@ -728,6 +967,10 @@ const RectFillVisualizer = () => {
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-yellow-400 opacity-50 border border-yellow-400"></div>
               <span>Expanding Rectangle</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-pink-500 rounded-full"></div>
+              <span>Gap Candidates</span>
             </div>
           </div>
         </div>
