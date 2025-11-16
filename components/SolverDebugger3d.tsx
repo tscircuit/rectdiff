@@ -137,6 +137,20 @@ function buildPrismsFromNodes(
   return prisms
 }
 
+function clamp01(x: number) {
+  return Math.max(0, Math.min(1, x))
+}
+
+function darkenColor(hex: number, factor = 0.6): number {
+  const r = ((hex >> 16) & 0xff) * factor
+  const g = ((hex >> 8) & 0xff) * factor
+  const b = (hex & 0xff) * factor
+  const cr = Math.max(0, Math.min(255, Math.round(r)))
+  const cg = Math.max(0, Math.min(255, Math.round(g)))
+  const cb = Math.max(0, Math.min(255, Math.round(b)))
+  return (cr << 16) | (cg << 8) | cb
+}
+
 /* ---------------------------- 3D Canvas ---------------------------- */
 
 const ThreeBoardView: React.FC<{
@@ -148,6 +162,10 @@ const ThreeBoardView: React.FC<{
   showObstacles: boolean
   showOutput: boolean
   wireframeOutput: boolean
+  meshOpacity: number
+  shrinkBoxes: boolean
+  boxShrinkAmount: number
+  showBorders: boolean
 }> = ({
   nodes,
   srj,
@@ -157,6 +175,10 @@ const ThreeBoardView: React.FC<{
   showObstacles,
   showOutput,
   wireframeOutput,
+  meshOpacity,
+  shrinkBoxes,
+  boxShrinkAmount,
+  showBorders,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const destroyRef = useRef<() => void>(() => {})
@@ -228,8 +250,30 @@ const ThreeBoardView: React.FC<{
 
       const colorRoot = 0x111827
       const colorOb = 0xef4444
-      const colorOutFill = 0x10b981
-      const colorOutWire = 0x2563eb
+
+      // Palette for layer-span-based coloring
+      const spanPalette = [
+        0x0ea5e9, // cyan-ish
+        0x22c55e, // green
+        0xf97316, // orange
+        0xa855f7, // purple
+        0xfacc15, // yellow
+        0x38bdf8, // light blue
+        0xec4899, // pink
+        0x14b8a6, // teal
+      ]
+      const spanColorMap = new Map<string, number>()
+      let spanColorIndex = 0
+      const getSpanColor = (z0: number, z1: number) => {
+        const key = `${z0}-${z1}`
+        let c = spanColorMap.get(key)
+        if (c == null) {
+          c = spanPalette[spanColorIndex % spanPalette.length]
+          spanColorMap.set(key, c)
+          spanColorIndex++
+        }
+        return c
+      }
 
       function makeBoxMesh(
         b: {
@@ -243,6 +287,7 @@ const ThreeBoardView: React.FC<{
         color: number,
         wire: boolean,
         opacity = 0.45,
+        borders = false,
       ) {
         const dx = b.maxX - b.minX
         const dz = b.maxY - b.minY // map board Y -> three Z
@@ -261,14 +306,29 @@ const ThreeBoardView: React.FC<{
           line.position.set(cx, cy, cz)
           return line
         }
+        const clampedOpacity = clamp01(opacity)
         const mat = new THREE.MeshPhongMaterial({
           color,
-          opacity,
-          transparent: true,
+          opacity: clampedOpacity,
+          transparent: clampedOpacity < 1,
         })
         const mesh = new THREE.Mesh(geom, mat)
         mesh.position.set(cx, cy, cz)
-        return mesh
+
+        if (!borders) return mesh
+
+        const edges = new THREE.EdgesGeometry(geom)
+        const borderColor = darkenColor(color, 0.6)
+        const line = new THREE.LineSegments(
+          edges,
+          new THREE.LineBasicMaterial({ color: borderColor }),
+        )
+        line.position.set(cx, cy, cz)
+
+        const group = new THREE.Group()
+        group.add(mesh)
+        group.add(line)
+        return group
       }
 
       // Root wireframe from SRJ bounds
@@ -309,6 +369,7 @@ const ThreeBoardView: React.FC<{
                 colorOb,
                 false,
                 0.35,
+                false,
               ),
             )
           }
@@ -318,12 +379,28 @@ const ThreeBoardView: React.FC<{
       // Output prisms from nodes (wireframe toggle like the experiment)
       if (showOutput) {
         for (const p of prisms) {
+          let box = p
+          if (shrinkBoxes && boxShrinkAmount > 0) {
+            const s = boxShrinkAmount
+            const minX = p.minX + s
+            const maxX = p.maxX - s
+            const minY = p.minY + s
+            const maxY = p.maxY - s
+            if (minX >= maxX || minY >= maxY) {
+              // Degenerate, skip
+              continue
+            }
+            box = { ...p, minX, maxX, minY, maxY }
+          }
+
+          const color = getSpanColor(p.z0, p.z1)
           outputGroup.add(
             makeBoxMesh(
-              p,
-              wireframeOutput ? colorOutWire : colorOutFill,
+              box,
+              color,
               wireframeOutput,
-              0.5,
+              meshOpacity,
+              showBorders && !wireframeOutput,
             ),
           )
         }
@@ -423,6 +500,10 @@ const ThreeBoardView: React.FC<{
     showOutput,
     wireframeOutput,
     zIndexByLayerName,
+    meshOpacity,
+    shrinkBoxes,
+    boxShrinkAmount,
+    showBorders,
   ])
 
   return (
@@ -448,7 +529,7 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   layerThickness = 1,
   height = 460,
   defaultShowRoot = true,
-  defaultShowObstacles = true,
+  defaultShowObstacles = false, // don't show obstacles by default
   defaultShowOutput = true,
   defaultWireframeOutput = false,
   style,
@@ -460,6 +541,11 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   const [showObstacles, setShowObstacles] = useState(defaultShowObstacles)
   const [showOutput, setShowOutput] = useState(defaultShowOutput)
   const [wireframeOutput, setWireframeOutput] = useState(defaultWireframeOutput)
+
+  const [meshOpacity, setMeshOpacity] = useState(1) // fully opaque by default
+  const [shrinkBoxes, setShrinkBoxes] = useState(false)
+  const [boxShrinkAmount, setBoxShrinkAmount] = useState(0.1)
+  const [showBorders, setShowBorders] = useState(false)
 
   // Keep mesh nodes in sync with solver
   const meshNodes = useMemo(() => {
@@ -560,8 +646,104 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
           Wireframe Output
         </label>
 
+        {/* Mesh opacity slider */}
+        {show3d && (
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              marginLeft: 8,
+              fontSize: 12,
+            }}
+          >
+            Opacity
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={meshOpacity}
+              onChange={(e) => setMeshOpacity(parseFloat(e.target.value))}
+            />
+            <span style={{ width: 32, textAlign: "right" }}>
+              {meshOpacity.toFixed(2)}
+            </span>
+          </label>
+        )}
+
+        {/* Shrink boxes option */}
+        {show3d && (
+          <>
+            <label
+              style={{
+                display: "inline-flex",
+                gap: 6,
+                alignItems: "center",
+                fontSize: 12,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={shrinkBoxes}
+                onChange={(e) => setShrinkBoxes(e.target.checked)}
+              />
+              Shrink boxes
+            </label>
+            {shrinkBoxes && (
+              <label
+                style={{
+                  display: "inline-flex",
+                  gap: 4,
+                  alignItems: "center",
+                  fontSize: 12,
+                }}
+              >
+                amt
+                <input
+                  type="number"
+                  value={boxShrinkAmount}
+                  step={0.05}
+                  style={{ width: 60 }}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value)
+                    if (Number.isNaN(v)) return
+                    setBoxShrinkAmount(Math.max(0, v))
+                  }}
+                />
+              </label>
+            )}
+          </>
+        )}
+
+        {/* Show borders option */}
+        {show3d && (
+          <label
+            style={{
+              display: "inline-flex",
+              gap: 6,
+              alignItems: "center",
+              fontSize: 12,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showBorders}
+              disabled={wireframeOutput}
+              onChange={(e) => setShowBorders(e.target.checked)}
+            />
+            <span
+              style={{
+                opacity: wireframeOutput ? 0.5 : 1,
+              }}
+            >
+              Show borders
+            </span>
+          </label>
+        )}
+
         <div style={{ fontSize: 12, color: "#334155", marginLeft: 6 }}>
-          Drag to orbit · Wheel to zoom · Right‑drag to pan
+          Drag to orbit · Wheel to zoom · Right-drag to pan
         </div>
       </div>
 
@@ -576,6 +758,10 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
           showObstacles={showObstacles}
           showOutput={showOutput}
           wireframeOutput={wireframeOutput}
+          meshOpacity={meshOpacity}
+          shrinkBoxes={shrinkBoxes}
+          boxShrinkAmount={boxShrinkAmount}
+          showBorders={showBorders}
         />
       )}
     </div>
