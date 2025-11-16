@@ -555,14 +555,13 @@ export class RectDiffSolver extends BaseSolver {
   }
 
   /**
-   * 2D visualization (SVG) of the top layer:
+   * 2D visualization (SVG) showing capacity nodes across all layers:
    *  - Board outline
-   *  - Obstacles on the top layer (red)
-   *  - Free rectangles on the top layer (green) derived from 3D result
+   *  - Obstacles on all layers (red)
+   *  - Capacity mesh nodes on all layers (green) with layer info
    */
   override visualize(): GraphicsObject {
     const rects: NonNullable<GraphicsObject["rects"]> = []
-    const topZ = this.topLayerIndex
 
     // Board outline
     rects.push({
@@ -577,60 +576,50 @@ export class RectDiffSolver extends BaseSolver {
       label: "board",
     })
 
-    // Obstacles (top layer only) — red translucent
+    // Obstacles on all layers — red translucent
     for (const ob of this.srj.obstacles ?? []) {
-      if (
-        (ob.type === "rect" || ob.type === "oval") &&
-        (ob.layers ?? []).includes(this.layerNames[topZ])
-      ) {
+      if (ob.type === "rect" || ob.type === "oval") {
         rects.push({
           center: { x: ob.center.x, y: ob.center.y },
           width: ob.width,
           height: ob.height,
           fill: "#fee2e2",
           stroke: "#ef4444",
-          layer: this.layerNames[topZ],
+          layer: "obstacle",
           label: ["obstacle", ob.zLayers?.join(",")].join("\n"),
         })
       }
     }
 
-    // Free rectangles on the top layer — green translucent
-    if (this.result) {
-      const freeTop: {
-        x: number
-        y: number
-        w: number
-        h: number
-      }[] = []
-      for (const b of this.result.boxes) {
-        if (b.z0 <= topZ && topZ < b.z1) {
-          freeTop.push({
-            x: (b.minX + b.maxX) / 2,
-            y: (b.minY + b.maxY) / 2,
-            w: b.maxX - b.minX,
-            h: b.maxY - b.minY,
-          })
-        }
+    // Capacity nodes on all layers — green translucent
+    if (this.meshNodes.length > 0) {
+      // Sort for deterministic ordering
+      const sortedNodes = [...this.meshNodes].sort(
+        (a, b) =>
+          a.center.x - b.center.x ||
+          a.center.y - b.center.y ||
+          a.width - b.width ||
+          a.height - b.height ||
+          a.layer.localeCompare(b.layer),
+      )
+
+      for (const node of sortedNodes) {
+        // Format zLayers as a comma-separated string
+        const zLayersStr = node.availableZ.join(",")
+        rects.push({
+          center: { x: node.center.x, y: node.center.y },
+          width: node.width,
+          height: node.height,
+          fill: "#d1fae5",
+          stroke: "#10b981",
+          layer: node.layer,
+          label: `free\nz:${zLayersStr}`,
+        })
       }
-      // deterministic ordering
-      freeTop
-        .sort((a, b) => a.x - b.x || a.y - b.y || a.w - b.w || a.h - b.h)
-        .forEach((r) =>
-          rects.push({
-            center: { x: r.x, y: r.y },
-            width: r.w,
-            height: r.h,
-            fill: "#d1fae5",
-            stroke: "#10b981",
-            layer: this.layerNames[topZ],
-            label: "free",
-          }),
-        )
     }
 
     return {
-      title: `RectDiff (layer: ${this.layerNames[topZ] ?? "top"})`,
+      title: "RectDiff (all layers)",
       coordinateSystem: "cartesian",
       rects,
     }

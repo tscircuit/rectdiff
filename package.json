@@ -10,12 +10,14 @@
     "@react-hook/resize-observer": "^2.0.2",
     "@tscircuit/solver-utils": "^0.0.3",
     "@types/bun": "latest",
+    "@types/three": "^0.181.0",
     "bun-match-svg": "^0.0.14",
     "graphics-debug": "^0.0.70",
     "react": "^19.2.0",
     "react-cosmos": "^7.0.0",
     "react-cosmos-plugin-vite": "^7.0.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "three": "^0.181.1"
   },
   "peerDependencies": {
     "typescript": "^5"
