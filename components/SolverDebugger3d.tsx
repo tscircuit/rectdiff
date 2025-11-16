@@ -226,7 +226,7 @@ const ThreeBoardView: React.FC<{
       const w = el.clientWidth || 800
       const h = el.clientHeight || height
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true })
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
       renderer.setSize(w, h)
       el.innerHTML = ""
@@ -300,7 +300,7 @@ const ThreeBoardView: React.FC<{
         const dx = b.maxX - b.minX
         const dz = b.maxY - b.minY // map board Y -> three Z
         const dy = (b.z1 - b.z0) * layerThickness
-        const cx = (b.minX + b.maxX) / 2
+        const cx = -((b.minX + b.maxX) / 2) // negate X to match expected orientation
         const cz = (b.minY + b.maxY) / 2
         // Negate Y so z=0 is at top, higher z goes down
         const cy = -((b.z0 + b.z1) / 2) * layerThickness
@@ -321,6 +321,7 @@ const ThreeBoardView: React.FC<{
           opacity: clampedOpacity,
           transparent: clampedOpacity < 1,
           alphaHash: clampedOpacity < 1,
+          alphaToCoverage: true,
         })
 
         const mesh = new THREE.Mesh(geom, mat)
@@ -472,7 +473,7 @@ const ThreeBoardView: React.FC<{
       const dist = size * 2.0
       // Camera looks from above-right-front, with negative Y being "up" (z=0 at top)
       camera.position.set(
-        fitBox.maxX + dist * 0.6,
+        -(fitBox.maxX + dist * 0.6), // negate X to account for flipped axis
         -dy / 2 + dist, // negative Y is up, so position above the center
         fitBox.maxY + dist * 0.6,
       )
@@ -480,7 +481,7 @@ const ThreeBoardView: React.FC<{
       camera.far = dist * 10 + size * 10
       camera.updateProjectionMatrix()
       controls.target.set(
-        (fitBox.minX + fitBox.maxX) / 2,
+        -((fitBox.minX + fitBox.maxX) / 2), // negate X to account for flipped axis
         -dy / 2, // center of the inverted Y range
         (fitBox.minY + fitBox.maxY) / 2,
       )
