@@ -226,8 +226,13 @@ const ThreeBoardView: React.FC<{
       const w = el.clientWidth || 800
       const h = el.clientHeight || height
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        premultipliedAlpha: false,
+      })
+      // Increase pixel ratio for better alphaHash quality
+      renderer.setPixelRatio(window.devicePixelRatio)
       renderer.setSize(w, h)
       el.innerHTML = ""
       el.appendChild(renderer.domElement)
@@ -554,7 +559,7 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   solver,
   simpleRouteJson,
   layerThickness = 1,
-  height = 460,
+  height = 600,
   defaultShowRoot = true,
   defaultShowObstacles = false, // don't show obstacles by default
   defaultShowOutput = true,
@@ -569,10 +574,10 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   const [showOutput, setShowOutput] = useState(defaultShowOutput)
   const [wireframeOutput, setWireframeOutput] = useState(defaultWireframeOutput)
 
-  const [meshOpacity, setMeshOpacity] = useState(1) // fully opaque by default
-  const [shrinkBoxes, setShrinkBoxes] = useState(false)
+  const [meshOpacity, setMeshOpacity] = useState(0.6)
+  const [shrinkBoxes, setShrinkBoxes] = useState(true)
   const [boxShrinkAmount, setBoxShrinkAmount] = useState(0.1)
-  const [showBorders, setShowBorders] = useState(false)
+  const [showBorders, setShowBorders] = useState(true)
 
   // Mesh nodes state - updated when solver completes or during stepping
   const [meshNodes, setMeshNodes] = useState<CapacityMeshNode[]>([])
