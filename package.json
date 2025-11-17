@@ -1,9 +1,11 @@
 {
-  "name": "rectdiff",
-  "module": "index.ts",
+  "name": "@tscircuit/rectdiff",
+  "version": "0.0.1",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "cosmos"
+    "start": "cosmos",
+    "build": "tsup-node ./lib/index.ts --format esm --dts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.5",
@@ -18,7 +20,8 @@
     "react-cosmos": "^7.0.0",
     "react-cosmos-plugin-vite": "^7.0.0",
     "react-dom": "^19.2.0",
-    "three": "^0.181.1"
+    "three": "^0.181.1",
+    "tsup": "^8.5.1"
   },
   "peerDependencies": {
     "typescript": "^5"
