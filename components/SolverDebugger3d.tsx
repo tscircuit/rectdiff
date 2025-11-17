@@ -4,16 +4,10 @@ import type { SimpleRouteJson } from "../lib/types/srj-types"
 import type { CapacityMeshNode } from "../lib/types/capacity-mesh-types"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
-
-/** Minimal solver surface compatible with GenericSolverDebugger + meshNodes output */
-type BaseSolverLike = {
-  solve: () => void
-  visualize: () => any
-  getOutput: () => { meshNodes: CapacityMeshNode[] }
-}
+import type { BaseSolver } from "@tscircuit/solver-utils"
 
 type SolverDebugger3dProps = {
-  solver: BaseSolverLike
+  solver: BaseSolver
   /** Optional SRJ to show board bounds & rectangular obstacles */
   simpleRouteJson?: SimpleRouteJson
   /** Visual Z thickness per layer (world units) */
@@ -35,12 +29,12 @@ function contiguousRuns(nums: number[]) {
   const zs = [...new Set(nums)].sort((a, b) => a - b)
   if (zs.length === 0) return [] as number[][]
   const groups: number[][] = []
-  let run: number[] = [zs[0]]
+  let run: number[] = [zs[0]!]
   for (let i = 1; i < zs.length; i++) {
-    if (zs[i] === zs[i - 1] + 1) run.push(zs[i])
+    if (zs[i] === zs[i - 1]! + 1) run.push(zs[i]!)
     else {
       groups.push(run)
-      run = [zs[i]]
+      run = [zs[i]!]
     }
   }
   groups.push(run)
@@ -136,8 +130,8 @@ function buildPrismsFromNodes(
           maxX,
           minY,
           maxY,
-          z0: r[0],
-          z1: r[r.length - 1] + 1,
+          z0: r[0]!,
+          z1: r[r.length - 1]! + 1,
         })
       }
     }
@@ -281,7 +275,7 @@ const ThreeBoardView: React.FC<{
         const key = `${z0}-${z1}`
         let c = spanColorMap.get(key)
         if (c == null) {
-          c = spanPalette[spanColorIndex % spanPalette.length]
+          c = spanPalette[spanColorIndex % spanPalette.length]!
           spanColorMap.set(key, c)
           spanColorIndex++
         }
@@ -608,7 +602,7 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   useEffect(() => {
     const interval = setInterval(() => {
       // Only update if solver has output available
-      if ((solver as any).solved || (solver as any).stats?.placed > 0) {
+      if (solver.solved || (solver as any).stats?.placed > 0) {
         updateMeshNodes()
       }
     }, 100) // Poll every 100ms during active solving

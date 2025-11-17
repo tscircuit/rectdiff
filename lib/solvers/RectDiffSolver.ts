@@ -81,7 +81,7 @@ export class RectDiffSolver extends BaseSolver {
       { fill: "#fed7aa", stroke: "#f97316" }, // orange (z=4)
       { fill: "#fecaca", stroke: "#ef4444" }, // red (z=5)
     ]
-    return colors[minZ % colors.length]
+    return colors[minZ % colors.length]!
   }
 
   // Streaming visualization: board + obstacles + current placements.
@@ -123,11 +123,10 @@ export class RectDiffSolver extends BaseSolver {
         points.push({
           x: cand.x,
           y: cand.y,
-          radius: 2,
           fill: "#9333ea",
           stroke: "#6b21a8",
           label: `z:${cand.z}`,
-        })
+        } as any)
       }
     }
 
