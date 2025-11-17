@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import simpleRouteJson from "../../test-assets/example-simple-route.json"
+import simpleRouteJson from "../../test-assets/example01.json"
 import { RectDiffSolver } from "../../lib/solvers/RectDiffSolver"
 import { getSvgFromGraphicsObject } from "graphics-debug"
 

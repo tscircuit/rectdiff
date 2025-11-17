@@ -3,6 +3,8 @@
 This is a 3D rectangle diffing algorithm made to quickly break apart a circuit board
 into capacity nodes for the purpose of global routing.
 
+[Online Demo](https://rectdiff.tscircuit.com/?fixture=%7B%22path%22%3A%22pages%2Fexample01.page.tsx%22%7D)
+
 ## Usage
 
 ### Basic Usage

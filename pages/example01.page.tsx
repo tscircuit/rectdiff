@@ -1,5 +1,5 @@
 import { GenericSolverDebugger } from "@tscircuit/solver-utils/react"
-import simpleRouteJson from "../test-assets/example-simple-route.json"
+import simpleRouteJson from "../test-assets/example01.json"
 import { RectDiffSolver } from "../lib/solvers/RectDiffSolver"
 import { useMemo } from "react"
 import { SolverDebugger3d } from "../components/SolverDebugger3d"

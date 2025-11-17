@@ -36,3 +36,5 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .vscode
 repomix-output.xml
 *.diff.png
+cosmos-export
+.vercel

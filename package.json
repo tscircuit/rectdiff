@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "start": "cosmos",
-    "build": "tsup-node ./lib/index.ts --format esm --dts"
+    "build": "tsup-node ./lib/index.ts --format esm --dts",
+    "build:site": "cosmos-export"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.5",
