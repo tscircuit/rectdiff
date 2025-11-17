@@ -80,9 +80,9 @@ function buildPrismsFromNodes(
   const xyKey = (n: CapacityMeshNode) =>
     `${n.center.x.toFixed(8)}|${n.center.y.toFixed(8)}|${n.width.toFixed(8)}|${n.height.toFixed(8)}`
   const azKey = (n: CapacityMeshNode) => {
-    const zs = (n.availableZ && n.availableZ.length ? [...new Set(n.availableZ)] : [0]).sort(
-      (a, b) => a - b,
-    )
+    const zs = (
+      n.availableZ && n.availableZ.length ? [...new Set(n.availableZ)] : [0]
+    ).sort((a, b) => a - b)
     return `zset:${zs.join(",")}`
   }
   const key = (n: CapacityMeshNode) => `${xyKey(n)}|${azKey(n)}`
@@ -226,8 +226,13 @@ const ThreeBoardView: React.FC<{
       const w = el.clientWidth || 800
       const h = el.clientHeight || height
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true })
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        premultipliedAlpha: false,
+      })
+      // Increase pixel ratio for better alphaHash quality
+      renderer.setPixelRatio(window.devicePixelRatio)
       renderer.setSize(w, h)
       el.innerHTML = ""
       el.appendChild(renderer.domElement)
@@ -300,7 +305,7 @@ const ThreeBoardView: React.FC<{
         const dx = b.maxX - b.minX
         const dz = b.maxY - b.minY // map board Y -> three Z
         const dy = (b.z1 - b.z0) * layerThickness
-        const cx = (b.minX + b.maxX) / 2
+        const cx = -((b.minX + b.maxX) / 2) // negate X to match expected orientation
         const cz = (b.minY + b.maxY) / 2
         // Negate Y so z=0 is at top, higher z goes down
         const cy = -((b.z0 + b.z1) / 2) * layerThickness
@@ -321,6 +326,7 @@ const ThreeBoardView: React.FC<{
           opacity: clampedOpacity,
           transparent: clampedOpacity < 1,
           alphaHash: clampedOpacity < 1,
+          alphaToCoverage: true,
         })
 
         const mesh = new THREE.Mesh(geom, mat)
@@ -472,7 +478,7 @@ const ThreeBoardView: React.FC<{
       const dist = size * 2.0
       // Camera looks from above-right-front, with negative Y being "up" (z=0 at top)
       camera.position.set(
-        fitBox.maxX + dist * 0.6,
+        -(fitBox.maxX + dist * 0.6), // negate X to account for flipped axis
         -dy / 2 + dist, // negative Y is up, so position above the center
         fitBox.maxY + dist * 0.6,
       )
@@ -480,7 +486,7 @@ const ThreeBoardView: React.FC<{
       camera.far = dist * 10 + size * 10
       camera.updateProjectionMatrix()
       controls.target.set(
-        (fitBox.minX + fitBox.maxX) / 2,
+        -((fitBox.minX + fitBox.maxX) / 2), // negate X to account for flipped axis
         -dy / 2, // center of the inverted Y range
         (fitBox.minY + fitBox.maxY) / 2,
       )
@@ -553,7 +559,7 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   solver,
   simpleRouteJson,
   layerThickness = 1,
-  height = 460,
+  height = 600,
   defaultShowRoot = true,
   defaultShowObstacles = false, // don't show obstacles by default
   defaultShowOutput = true,
@@ -568,23 +574,47 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   const [showOutput, setShowOutput] = useState(defaultShowOutput)
   const [wireframeOutput, setWireframeOutput] = useState(defaultWireframeOutput)
 
-  const [meshOpacity, setMeshOpacity] = useState(1) // fully opaque by default
-  const [shrinkBoxes, setShrinkBoxes] = useState(false)
+  const [meshOpacity, setMeshOpacity] = useState(0.6)
+  const [shrinkBoxes, setShrinkBoxes] = useState(true)
   const [boxShrinkAmount, setBoxShrinkAmount] = useState(0.1)
-  const [showBorders, setShowBorders] = useState(false)
+  const [showBorders, setShowBorders] = useState(true)
 
-  // Keep mesh nodes in sync with solver
-  const meshNodes = useMemo(() => {
+  // Mesh nodes state - updated when solver completes or during stepping
+  const [meshNodes, setMeshNodes] = useState<CapacityMeshNode[]>([])
+
+  // Update mesh nodes from solver output
+  const updateMeshNodes = useCallback(() => {
     try {
-      if (
-        (solver as any).solved !== true &&
-        typeof solver.solve === "function"
-      ) {
-        solver.solve()
-      }
-    } catch {}
-    return solver.getOutput().meshNodes ?? []
+      const output = solver.getOutput()
+      const nodes = output.meshNodes ?? []
+      setMeshNodes(nodes)
+    } catch {
+      setMeshNodes([])
+    }
   }, [solver])
+
+  // Initialize mesh nodes on mount (in case solver is already solved)
+  useEffect(() => {
+    updateMeshNodes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Handle solver completion
+  const handleSolverCompleted = useCallback(() => {
+    updateMeshNodes()
+  }, [updateMeshNodes])
+
+  // Poll for updates during stepping (GenericSolverDebugger doesn't have onStep)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Only update if solver has output available
+      if ((solver as any).solved || (solver as any).stats?.placed > 0) {
+        updateMeshNodes()
+      }
+    }, 100) // Poll every 100ms during active solving
+
+    return () => clearInterval(interval)
+  }, [updateMeshNodes, solver])
 
   const toggle3d = useCallback(() => setShow3d((s) => !s), [])
   const rebuild = useCallback(() => setRebuildKey((k) => k + 1), [])
@@ -592,7 +622,10 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   return (
     <>
       <div style={{ display: "grid", gap: 12, ...style }}>
-        <GenericSolverDebugger solver={solver as any} />
+        <GenericSolverDebugger
+          solver={solver as any}
+          onSolverCompleted={handleSolverCompleted}
+        />
 
         <div
           style={{
