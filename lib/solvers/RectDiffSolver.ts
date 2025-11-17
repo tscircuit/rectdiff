@@ -70,9 +70,24 @@ export class RectDiffSolver extends BaseSolver {
     return { meshNodes: this._meshNodes }
   }
 
+  // Helper to get color based on z layer
+  private getColorForZLayer(zLayers: number[]): { fill: string; stroke: string } {
+    const minZ = Math.min(...zLayers)
+    const colors = [
+      { fill: "#dbeafe", stroke: "#3b82f6" }, // blue (z=0)
+      { fill: "#fef3c7", stroke: "#f59e0b" }, // amber (z=1)
+      { fill: "#d1fae5", stroke: "#10b981" }, // green (z=2)
+      { fill: "#e9d5ff", stroke: "#a855f7" }, // purple (z=3)
+      { fill: "#fed7aa", stroke: "#f97316" }, // orange (z=4)
+      { fill: "#fecaca", stroke: "#ef4444" }, // red (z=5)
+    ]
+    return colors[minZ % colors.length]
+  }
+
   // Streaming visualization: board + obstacles + current placements.
   override visualize(): GraphicsObject {
     const rects: NonNullable<GraphicsObject["rects"]> = []
+    const points: NonNullable<GraphicsObject["points"]> = []
 
     // board
     rects.push({
@@ -102,15 +117,30 @@ export class RectDiffSolver extends BaseSolver {
       }
     }
 
+    // candidate positions (where expansion started from)
+    if (this.state?.candidates?.length) {
+      for (const cand of this.state.candidates) {
+        points.push({
+          x: cand.x,
+          y: cand.y,
+          radius: 2,
+          fill: "#9333ea",
+          stroke: "#6b21a8",
+          label: `z:${cand.z}`,
+        })
+      }
+    }
+
     // current placements (streaming) if not yet solved
     if (this.state?.placed?.length) {
       for (const p of this.state.placed) {
+        const colors = this.getColorForZLayer(p.zLayers)
         rects.push({
           center: { x: p.rect.x + p.rect.width / 2, y: p.rect.y + p.rect.height / 2 },
           width: p.rect.width,
           height: p.rect.height,
-          fill: "#d1fae5",
-          stroke: "#10b981",
+          fill: colors.fill,
+          stroke: colors.stroke,
           label: `free\nz:${p.zLayers.join(",")}`,
         })
       }
@@ -120,6 +150,7 @@ export class RectDiffSolver extends BaseSolver {
       title: "RectDiff (incremental)",
       coordinateSystem: "cartesian",
       rects,
+      points,
     }
   }
 }
