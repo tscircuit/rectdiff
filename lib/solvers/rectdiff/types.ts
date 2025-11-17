@@ -19,8 +19,6 @@ export type GridFill3DOptions = {
   minMulti: { width: number; height: number; minLayers: number }
   preferMultiLayer?: boolean
   maxMultiLayerSpan?: number
-  /** Hard cap for the width/height of a single-layer node. Use Infinity to disable. */
-  maxSingleLayerNodeSize?: number
 }
 
 export type Candidate3D = {
@@ -43,10 +41,9 @@ export type RectDiffState = {
   layerNames: string[]
   layerCount: number
   bounds: XYRect
-  options: Required<Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan" | "maxSingleLayerNodeSize">> & {
+  options: Required<Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">> & {
     gridSizes: number[]
     maxMultiLayerSpan: number | undefined
-    maxSingleLayerNodeSize: number
   }
   obstaclesByLayer: XYRect[][]
 

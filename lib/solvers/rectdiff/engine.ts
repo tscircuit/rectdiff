@@ -31,10 +31,9 @@ export function initState(srj: SimpleRouteJson, opts: Partial<GridFill3DOptions>
   }
 
   const trace = Math.max(0.01, srj.minTraceWidth || 0.15)
-  const defaults: Required<Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan" | "maxSingleLayerNodeSize">> & {
+  const defaults: Required<Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">> & {
     gridSizes: number[]
     maxMultiLayerSpan: number | undefined
-    maxSingleLayerNodeSize: number
   } = {
     gridSizes: computeDefaultGridSizes(bounds),
     initialCellRatio: 0.2,
@@ -47,7 +46,6 @@ export function initState(srj: SimpleRouteJson, opts: Partial<GridFill3DOptions>
     },
     preferMultiLayer: true,
     maxMultiLayerSpan: undefined,
-    maxSingleLayerNodeSize: 0.5,
   }
 
   const options = { ...defaults, ...opts, gridSizes: opts.gridSizes ?? defaults.gridSizes }
@@ -84,7 +82,6 @@ export function stepGrid(state: RectDiffState): void {
     minMulti,
     preferMultiLayer,
     maxMultiLayerSpan,
-    maxSingleLayerNodeSize,
   } =
     state.options
   const grid = gridSizes[state.gridIndex]!
@@ -172,7 +169,7 @@ export function stepGrid(state: RectDiffState): void {
       if (state.placedByLayer[z]) blockers.push(...state.placedByLayer[z]!)
     }
 
-    let rect = expandRectFromSeed(
+    const rect = expandRectFromSeed(
       cand.x,
       cand.y,
       grid,
@@ -183,18 +180,6 @@ export function stepGrid(state: RectDiffState): void {
       attempt.minReq,
     )
     if (!rect) continue
-
-    // Enforce cap on single-layer nodes to favor multi-layer placement
-    if (attempt.kind === "single" && Number.isFinite(maxSingleLayerNodeSize)) {
-      const cap = maxSingleLayerNodeSize as number
-      const clampedW = Math.max(minSingle.width, Math.min(rect.width, cap))
-      const clampedH = Math.max(minSingle.height, Math.min(rect.height, cap))
-      if (clampedW !== rect.width || clampedH !== rect.height) {
-        const cx = rect.x + rect.width / 2
-        const cy = rect.y + rect.height / 2
-        rect = { x: cx - clampedW / 2, y: cy - clampedH / 2, width: clampedW, height: clampedH }
-      }
-    }
 
     // Accept placement
     const placed: Placed3D = { rect, zLayers: [...attempt.layers] }
