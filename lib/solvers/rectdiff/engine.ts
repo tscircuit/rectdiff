@@ -114,10 +114,11 @@ export function stepGrid(state: RectDiffState): void {
     } else {
       // Before expansion, run a one-time edge-analysis pass to catch narrow gaps
       if (!state.edgeAnalysisDone) {
-        const sample = Math.max(grid / 2, Math.min(minSingle.width, minSingle.height) / 2)
+        // Use the minimum single-layer size as the threshold for finding gaps
+        const minSize = Math.min(minSingle.width, minSingle.height)
         state.candidates = computeEdgeCandidates3D(
           state.bounds,
-          sample,
+          minSize,
           state.layerCount,
           state.obstaclesByLayer,
           state.placedByLayer,
