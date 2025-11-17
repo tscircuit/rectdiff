@@ -1,60 +1,107 @@
 // lib/solvers/rectdiff/candidates.ts
 import type { Candidate3D, XYRect } from "./types"
-import { EPS, containsPoint, distancePointToRectEdges, clamp } from "./geometry"
+import { EPS, clamp, containsPoint, distancePointToRectEdges } from "./geometry"
+
+function isFullyOccupiedAllLayers(
+  x: number,
+  y: number,
+  layerCount: number,
+  obstaclesByLayer: XYRect[][],
+  placedByLayer: XYRect[][],
+): boolean {
+  for (let z = 0; z < layerCount; z++) {
+    const obs = obstaclesByLayer[z] ?? []
+    const placed = placedByLayer[z] ?? []
+    const occ =
+      obs.some((b) => containsPoint(b, x, y)) ||
+      placed.some((b) => containsPoint(b, x, y))
+    if (!occ) return false
+  }
+  return true
+}
 
 export function computeCandidates3D(
   bounds: XYRect,
   gridSize: number,
   layerCount: number,
   obstaclesByLayer: XYRect[][],
-  placedByLayer: XYRect[][],
+  placedByLayer: XYRect[][],         // all current nodes (soft + hard)
+  hardPlacedByLayer: XYRect[][],     // only full-stack nodes, treated as hard
 ): Candidate3D[] {
-  const out: Candidate3D[] = []
+  const out = new Map<string, Candidate3D>() // key by (x,y)
 
-  for (let z = 0; z < layerCount; z++) {
-    const blockers = [...(obstaclesByLayer[z] ?? []), ...(placedByLayer[z] ?? [])]
+  for (let x = bounds.x; x < bounds.x + bounds.width; x += gridSize) {
+    for (let y = bounds.y; y < bounds.y + bounds.height; y += gridSize) {
+      // Skip outermost row/col (stable with prior behavior)
+      if (
+        Math.abs(x - bounds.x) < EPS ||
+        Math.abs(y - bounds.y) < EPS ||
+        x > bounds.x + bounds.width - gridSize - EPS ||
+        y > bounds.y + bounds.height - gridSize - EPS
+      ) {
+        continue
+      }
 
-    for (let x = bounds.x; x < bounds.x + bounds.width; x += gridSize) {
-      for (let y = bounds.y; y < bounds.y + bounds.height; y += gridSize) {
-        // avoid seeding on the outermost row/col
-        if (
-          Math.abs(x - bounds.x) < EPS ||
-          Math.abs(y - bounds.y) < EPS ||
-          x > bounds.x + bounds.width - gridSize - EPS ||
-          y > bounds.y + bounds.height - gridSize - EPS
-        ) {
-          continue
-        }
+      // New rule: Only drop if EVERY layer is occupied (by obstacle or node)
+      if (isFullyOccupiedAllLayers(x, y, layerCount, obstaclesByLayer, placedByLayer)) continue
 
-        let inside = false
-        for (const b of blockers) {
-          if (containsPoint(b, x, y)) {
-            inside = true
-            const bottom = b.y + b.height
-            const remain = bottom - y
-            const skip = Math.max(0, Math.floor(remain / gridSize))
-            if (skip > 0) y += (skip - 1) * gridSize
-            break
-          }
-        }
-        if (inside) continue
-
-        const d = Math.min(
-          distancePointToRectEdges(x, y, bounds),
-          ...(blockers.length ? blockers.map((b) => distancePointToRectEdges(x, y, b)) : [Infinity]),
+      // Find the best (longest) free contiguous Z span at (x,y) ignoring soft nodes.
+      let bestSpan: number[] = []
+      let bestZ = 0
+      for (let z = 0; z < layerCount; z++) {
+        const s = longestFreeSpanAroundZ(
+          x,
+          y,
+          z,
+          layerCount,
+          1,
+          undefined,            // no cap here
+          obstaclesByLayer,
+          hardPlacedByLayer,    // IMPORTANT: ignore soft nodes
         )
-        // Prefer seeds that can span many Z layers at this (x,y)
-        const span = longestFreeSpanAroundZ(
-          x, y, z, layerCount, 1, undefined, obstaclesByLayer, placedByLayer
-        )
-        out.push({ x, y, z, distance: d, zSpanLen: span.length })
+        if (s.length > bestSpan.length) {
+          bestSpan = s
+          bestZ = z
+        }
+      }
+      const anchorZ = bestSpan.length
+        ? bestSpan[Math.floor(bestSpan.length / 2)]!
+        : bestZ
+
+      // Distance heuristic against hard blockers only (obstacles + full-stack)
+      const hardAtZ = [
+        ...(obstaclesByLayer[anchorZ] ?? []),
+        ...(hardPlacedByLayer[anchorZ] ?? []),
+      ]
+      const d = Math.min(
+        distancePointToRectEdges(x, y, bounds),
+        ...(hardAtZ.length
+          ? hardAtZ.map((b) => distancePointToRectEdges(x, y, b))
+          : [Infinity]),
+      )
+
+      const k = `${x.toFixed(6)}|${y.toFixed(6)}`
+      const cand: Candidate3D = {
+        x,
+        y,
+        z: anchorZ,
+        distance: d,
+        zSpanLen: bestSpan.length,
+      }
+      const prev = out.get(k)
+      if (
+        !prev ||
+        cand.zSpanLen! > (prev.zSpanLen ?? 0) ||
+        (cand.zSpanLen === prev.zSpanLen && cand.distance > prev.distance)
+      ) {
+        out.set(k, cand)
       }
     }
   }
 
-  // Sort by multi-layer opportunity first, then by clearance from blockers.
-  out.sort((a, b) => (b.zSpanLen! - a.zSpanLen!) || (b.distance - a.distance))
-  return out
+  const arr = Array.from(out.values())
+  arr.sort((a, b) => (b.zSpanLen! - a.zSpanLen!) || (b.distance - a.distance))
+  return arr
 }
 
 /** Longest contiguous free span around z (optionally capped) */
@@ -167,7 +214,8 @@ export function computeEdgeCandidates3D(
   minSize: number,
   layerCount: number,
   obstaclesByLayer: XYRect[][],
-  placedByLayer: XYRect[][],
+  placedByLayer: XYRect[][],     // all nodes
+  hardPlacedByLayer: XYRect[][], // full-stack nodes
 ): Candidate3D[] {
   const out: Candidate3D[] = []
   // Use small inset from edges for placement
@@ -175,28 +223,38 @@ export function computeEdgeCandidates3D(
   const dedup = new Set<string>()
   const key = (x: number, y: number, z: number) => `${z}|${x.toFixed(6)}|${y.toFixed(6)}`
 
+  function fullyOcc(x: number, y: number) {
+    return isFullyOccupiedAllLayers(x, y, layerCount, obstaclesByLayer, placedByLayer)
+  }
+
   function pushIfFree(x: number, y: number, z: number) {
     if (
       x < bounds.x + EPS || y < bounds.y + EPS ||
       x > bounds.x + bounds.width - EPS || y > bounds.y + bounds.height - EPS
     ) return
-    const blockers = [...(obstaclesByLayer[z] ?? []), ...(placedByLayer[z] ?? [])]
-    if (blockers.some((b) => containsPoint(b, x, y))) return
+    if (fullyOcc(x, y)) return // new rule: only drop if truly impossible
+
+    // Distance uses obstacles + hard nodes (soft nodes ignored for ranking)
+    const hard = [
+      ...(obstaclesByLayer[z] ?? []),
+      ...(hardPlacedByLayer[z] ?? []),
+    ]
     const d = Math.min(
       distancePointToRectEdges(x, y, bounds),
-      ...(blockers.length ? blockers.map((b) => distancePointToRectEdges(x, y, b)) : [Infinity]),
+      ...(hard.length ? hard.map((b) => distancePointToRectEdges(x, y, b)) : [Infinity]),
     )
-    const span = longestFreeSpanAroundZ(
-      x, y, z, layerCount, 1, undefined, obstaclesByLayer, placedByLayer
-    )
+
     const k = key(x, y, z)
     if (dedup.has(k)) return
     dedup.add(k)
+
+    // Approximate z-span strength at this z (ignoring soft nodes)
+    const span = longestFreeSpanAroundZ(x, y, z, layerCount, 1, undefined, obstaclesByLayer, hardPlacedByLayer)
     out.push({ x, y, z, distance: d, zSpanLen: span.length, isEdgeSeed: true })
   }
 
   for (let z = 0; z < layerCount; z++) {
-    const blockers = [...(obstaclesByLayer[z] ?? []), ...(placedByLayer[z] ?? [])]
+    const blockers = [...(obstaclesByLayer[z] ?? []), ...(hardPlacedByLayer[z] ?? [])]
 
     // 1) Board edges — find exact uncovered segments along each edge
 

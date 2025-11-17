@@ -122,3 +122,33 @@ test("RectDiffSolver respects single-layer minimums", () => {
     expect(node.height).toBeGreaterThanOrEqual(minHeight - 1e-6)
   }
 })
+
+test("disruptive placement resizes single-layer nodes", () => {
+  const srj: SimpleRouteJson = {
+    bounds: { minX: 0, maxX: 10, minY: 0, maxY: 10 },
+    obstacles: [],
+    connections: [],
+    layerCount: 3,
+    minTraceWidth: 0.2,
+  }
+  const solver = new RectDiffSolver({ simpleRouteJson: srj, mode: "grid" })
+  solver.setup()
+
+  // Manually seed a soft, single-layer node occupying center (simulate early placement)
+  const state = (solver as any).state
+  const r = { x: 4, y: 4, width: 2, height: 2 }
+  state.placed.push({ rect: r, zLayers: [1] })
+  state.placedByLayer[1].push(r)
+
+  // Run to completion
+  solver.solve()
+
+  // Expect at least one node spanning multiple layers at/through the center
+  const mesh = solver.getOutput().meshNodes
+  const throughCenter = mesh.find(n =>
+    Math.abs(n.center.x - 5) < 0.6 &&
+    Math.abs(n.center.y - 5) < 0.6 &&
+    (n.availableZ?.length ?? 0) >= 2
+  )
+  expect(throughCenter).toBeTruthy()
+})

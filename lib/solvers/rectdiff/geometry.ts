@@ -243,3 +243,42 @@ export function expandRectFromSeed(
 
   return best
 }
+
+export function intersect1D(a0: number, a1: number, b0: number, b1: number) {
+  const lo = Math.max(a0, b0)
+  const hi = Math.min(a1, b1)
+  return hi > lo + EPS ? [lo, hi] as const : null
+}
+
+/** Return A \ B as up to 4 non-overlapping rectangles (or [A] if no overlap). */
+export function subtractRect2D(A: XYRect, B: XYRect): XYRect[] {
+  if (!overlaps(A, B)) return [A]
+
+  const Xi = intersect1D(A.x, A.x + A.width, B.x, B.x + B.width)
+  const Yi = intersect1D(A.y, A.y + A.height, B.y, B.y + B.height)
+  if (!Xi || !Yi) return [A]
+
+  const [X0, X1] = Xi
+  const [Y0, Y1] = Yi
+  const out: XYRect[] = []
+
+  // Left strip
+  if (X0 > A.x + EPS) {
+    out.push({ x: A.x, y: A.y, width: X0 - A.x, height: A.height })
+  }
+  // Right strip
+  if (A.x + A.width > X1 + EPS) {
+    out.push({ x: X1, y: A.y, width: (A.x + A.width) - X1, height: A.height })
+  }
+  // Top wedge in the middle band
+  const midW = Math.max(0, X1 - X0)
+  if (midW > EPS && Y0 > A.y + EPS) {
+    out.push({ x: X0, y: A.y, width: midW, height: Y0 - A.y })
+  }
+  // Bottom wedge in the middle band
+  if (midW > EPS && A.y + A.height > Y1 + EPS) {
+    out.push({ x: X0, y: Y1, width: midW, height: (A.y + A.height) - Y1 })
+  }
+
+  return out.filter((r) => r.width > EPS && r.height > EPS)
+}
