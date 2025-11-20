@@ -41,7 +41,9 @@ export type RectDiffState = {
   layerNames: string[]
   layerCount: number
   bounds: XYRect
-  options: Required<Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">> & {
+  options: Required<
+    Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">
+  > & {
     gridSizes: number[]
     maxMultiLayerSpan: number | undefined
   }

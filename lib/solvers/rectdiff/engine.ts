@@ -1,5 +1,11 @@
 // lib/solvers/rectdiff/engine.ts
-import type { GridFill3DOptions, Placed3D, Rect3d, RectDiffState, XYRect } from "./types"
+import type {
+  GridFill3DOptions,
+  Placed3D,
+  Rect3d,
+  RectDiffState,
+  XYRect,
+} from "./types"
 import type { SimpleRouteJson } from "../../types/srj-types"
 import {
   computeCandidates3D,
@@ -7,10 +13,19 @@ import {
   computeEdgeCandidates3D,
   longestFreeSpanAroundZ,
 } from "./candidates"
-import { EPS, containsPoint, expandRectFromSeed, overlaps, subtractRect2D } from "./geometry"
+import {
+  EPS,
+  containsPoint,
+  expandRectFromSeed,
+  overlaps,
+  subtractRect2D,
+} from "./geometry"
 import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
 
-export function initState(srj: SimpleRouteJson, opts: Partial<GridFill3DOptions>): RectDiffState {
+export function initState(
+  srj: SimpleRouteJson,
+  opts: Partial<GridFill3DOptions>,
+): RectDiffState {
   const { layerNames, zIndexByName } = buildZIndexMap(srj)
   const layerCount = Math.max(1, layerNames.length, srj.layerCount || 1)
 
@@ -22,16 +37,22 @@ export function initState(srj: SimpleRouteJson, opts: Partial<GridFill3DOptions>
   }
 
   // Obstacles per layer
-  const obstaclesByLayer: XYRect[][] = Array.from({ length: layerCount }, () => [])
+  const obstaclesByLayer: XYRect[][] = Array.from(
+    { length: layerCount },
+    () => [],
+  )
   for (const ob of srj.obstacles ?? []) {
     const r = obstacleToXYRect(ob)
     if (!r) continue
     const zs = obstacleZs(ob, zIndexByName)
-    for (const z of zs) if (z >= 0 && z < layerCount) obstaclesByLayer[z]!.push(r)
+    for (const z of zs)
+      if (z >= 0 && z < layerCount) obstaclesByLayer[z]!.push(r)
   }
 
   const trace = Math.max(0.01, srj.minTraceWidth || 0.15)
-  const defaults: Required<Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">> & {
+  const defaults: Required<
+    Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">
+  > & {
     gridSizes: number[]
     maxMultiLayerSpan: number | undefined
   } = {
@@ -48,7 +69,11 @@ export function initState(srj: SimpleRouteJson, opts: Partial<GridFill3DOptions>
     maxMultiLayerSpan: undefined,
   }
 
-  const options = { ...defaults, ...opts, gridSizes: opts.gridSizes ?? defaults.gridSizes }
+  const options = {
+    ...defaults,
+    ...opts,
+    gridSizes: opts.gridSizes ?? defaults.gridSizes,
+  }
 
   const placedByLayer: XYRect[][] = Array.from({ length: layerCount }, () => [])
 
@@ -83,7 +108,11 @@ function buildHardPlacedByLayer(state: RectDiffState): XYRect[][] {
   return out
 }
 
-function isFullyOccupiedAtPoint(state: RectDiffState, x: number, y: number): boolean {
+function isFullyOccupiedAtPoint(
+  state: RectDiffState,
+  x: number,
+  y: number,
+): boolean {
   for (let z = 0; z < state.layerCount; z++) {
     const obs = state.obstaclesByLayer[z] ?? []
     const placed = state.placedByLayer[z] ?? []
@@ -126,8 +155,14 @@ function resizeSoftOverlaps(state: RectDiffState, newIndex: number) {
     }
 
     // Re-add carved pieces for affected layers, dropping tiny slivers
-    const minW = Math.min(state.options.minSingle.width, state.options.minMulti.width)
-    const minH = Math.min(state.options.minSingle.height, state.options.minMulti.height)
+    const minW = Math.min(
+      state.options.minSingle.width,
+      state.options.minMulti.width,
+    )
+    const minH = Math.min(
+      state.options.minSingle.height,
+      state.options.minMulti.height,
+    )
     for (const p of parts) {
       if (p.width + EPS >= minW && p.height + EPS >= minH) {
         toAdd.push({ rect: p, zLayers: sharedZ.slice() })
@@ -136,14 +171,16 @@ function resizeSoftOverlaps(state: RectDiffState, newIndex: number) {
   }
 
   // Remove (and clear placedByLayer)
-  removeIdx.sort((a, b) => b - a).forEach((idx) => {
-    const rem = state.placed.splice(idx, 1)[0]!
-    for (const z of rem.zLayers) {
-      const arr = state.placedByLayer[z]!
-      const j = arr.findIndex((r) => r === rem.rect)
-      if (j >= 0) arr.splice(j, 1)
-    }
-  })
+  removeIdx
+    .sort((a, b) => b - a)
+    .forEach((idx) => {
+      const rem = state.placed.splice(idx, 1)[0]!
+      for (const z of rem.zLayers) {
+        const arr = state.placedByLayer[z]!
+        const j = arr.findIndex((r) => r === rem.rect)
+        if (j >= 0) arr.splice(j, 1)
+      }
+    })
 
   // Add replacements
   for (const p of toAdd) {
@@ -175,8 +212,8 @@ export function stepGrid(state: RectDiffState): void {
       grid,
       state.layerCount,
       state.obstaclesByLayer,
-      state.placedByLayer,     // all nodes (soft + hard) for fully-occupied test
-      hardPlacedByLayer,       // hard blockers for ranking/span
+      state.placedByLayer, // all nodes (soft + hard) for fully-occupied test
+      hardPlacedByLayer, // hard blockers for ranking/span
     )
     state.totalSeedsThisGrid = state.candidates.length
     state.consumedSeedsThisGrid = 0
@@ -197,7 +234,7 @@ export function stepGrid(state: RectDiffState): void {
           minSize,
           state.layerCount,
           state.obstaclesByLayer,
-          state.placedByLayer,   // for fully-occupied test
+          state.placedByLayer, // for fully-occupied test
           hardPlacedByLayer,
         )
         state.edgeAnalysisDone = true
@@ -234,9 +271,17 @@ export function stepGrid(state: RectDiffState): void {
   }> = []
 
   if (span.length >= minMulti.minLayers) {
-    attempts.push({ kind: "multi", layers: span, minReq: { width: minMulti.width, height: minMulti.height } })
+    attempts.push({
+      kind: "multi",
+      layers: span,
+      minReq: { width: minMulti.width, height: minMulti.height },
+    })
   }
-  attempts.push({ kind: "single", layers: [cand.z], minReq: { width: minSingle.width, height: minSingle.height } })
+  attempts.push({
+    kind: "single",
+    layers: [cand.z],
+    minReq: { width: minSingle.width, height: minSingle.height },
+  })
 
   const ordered = preferMultiLayer ? attempts : attempts.reverse()
 
@@ -244,7 +289,8 @@ export function stepGrid(state: RectDiffState): void {
     // HARD blockers only: obstacles on those layers + full-stack nodes
     const hardBlockers: XYRect[] = []
     for (const z of attempt.layers) {
-      if (state.obstaclesByLayer[z]) hardBlockers.push(...state.obstaclesByLayer[z]!)
+      if (state.obstaclesByLayer[z])
+        hardBlockers.push(...state.obstaclesByLayer[z]!)
       if (hardPlacedByLayer[z]) hardBlockers.push(...hardPlacedByLayer[z]!)
     }
 
@@ -253,7 +299,7 @@ export function stepGrid(state: RectDiffState): void {
       cand.y,
       grid,
       state.bounds,
-      hardBlockers,      // soft nodes DO NOT block expansion
+      hardBlockers, // soft nodes DO NOT block expansion
       initialCellRatio,
       maxAspectRatio,
       attempt.minReq,
@@ -269,7 +315,9 @@ export function stepGrid(state: RectDiffState): void {
     resizeSoftOverlaps(state, newIndex)
 
     // New: relax candidate culling — only drop seeds that became fully occupied
-    state.candidates = state.candidates.filter((c) => !isFullyOccupiedAtPoint(state, c.x, c.y))
+    state.candidates = state.candidates.filter(
+      (c) => !isFullyOccupiedAtPoint(state, c.x, c.y),
+    )
 
     return // processed one candidate
   }
@@ -304,8 +352,8 @@ export function stepExpansion(state: RectDiffState): void {
     lastGrid,
     state.bounds,
     hardBlockers,
-    0,       // seed bias off
-    null,    // no aspect cap in expansion pass
+    0, // seed bias off
+    null, // no aspect cap in expansion pass
     { width: p.rect.width, height: p.rect.height },
   )
 

@@ -25,8 +25,8 @@ export function computeCandidates3D(
   gridSize: number,
   layerCount: number,
   obstaclesByLayer: XYRect[][],
-  placedByLayer: XYRect[][],         // all current nodes (soft + hard)
-  hardPlacedByLayer: XYRect[][],     // only full-stack nodes, treated as hard
+  placedByLayer: XYRect[][], // all current nodes (soft + hard)
+  hardPlacedByLayer: XYRect[][], // only full-stack nodes, treated as hard
 ): Candidate3D[] {
   const out = new Map<string, Candidate3D>() // key by (x,y)
 
@@ -43,7 +43,16 @@ export function computeCandidates3D(
       }
 
       // New rule: Only drop if EVERY layer is occupied (by obstacle or node)
-      if (isFullyOccupiedAllLayers(x, y, layerCount, obstaclesByLayer, placedByLayer)) continue
+      if (
+        isFullyOccupiedAllLayers(
+          x,
+          y,
+          layerCount,
+          obstaclesByLayer,
+          placedByLayer,
+        )
+      )
+        continue
 
       // Find the best (longest) free contiguous Z span at (x,y) ignoring soft nodes.
       let bestSpan: number[] = []
@@ -55,9 +64,9 @@ export function computeCandidates3D(
           z,
           layerCount,
           1,
-          undefined,            // no cap here
+          undefined, // no cap here
           obstaclesByLayer,
-          hardPlacedByLayer,    // IMPORTANT: ignore soft nodes
+          hardPlacedByLayer, // IMPORTANT: ignore soft nodes
         )
         if (s.length > bestSpan.length) {
           bestSpan = s
@@ -100,7 +109,7 @@ export function computeCandidates3D(
   }
 
   const arr = Array.from(out.values())
-  arr.sort((a, b) => (b.zSpanLen! - a.zSpanLen!) || (b.distance - a.distance))
+  arr.sort((a, b) => b.zSpanLen! - a.zSpanLen! || b.distance - a.distance)
   return arr
 }
 
@@ -116,7 +125,10 @@ export function longestFreeSpanAroundZ(
   placedByLayer: XYRect[][],
 ): number[] {
   const isFreeAt = (layer: number) => {
-    const blockers = [...(obstaclesByLayer[layer] ?? []), ...(placedByLayer[layer] ?? [])]
+    const blockers = [
+      ...(obstaclesByLayer[layer] ?? []),
+      ...(placedByLayer[layer] ?? []),
+    ]
     return !blockers.some((b) => containsPoint(b, x, y))
   }
   let lo = z
@@ -214,24 +226,34 @@ export function computeEdgeCandidates3D(
   minSize: number,
   layerCount: number,
   obstaclesByLayer: XYRect[][],
-  placedByLayer: XYRect[][],     // all nodes
+  placedByLayer: XYRect[][], // all nodes
   hardPlacedByLayer: XYRect[][], // full-stack nodes
 ): Candidate3D[] {
   const out: Candidate3D[] = []
   // Use small inset from edges for placement
   const δ = Math.max(minSize * 0.15, EPS * 3)
   const dedup = new Set<string>()
-  const key = (x: number, y: number, z: number) => `${z}|${x.toFixed(6)}|${y.toFixed(6)}`
+  const key = (x: number, y: number, z: number) =>
+    `${z}|${x.toFixed(6)}|${y.toFixed(6)}`
 
   function fullyOcc(x: number, y: number) {
-    return isFullyOccupiedAllLayers(x, y, layerCount, obstaclesByLayer, placedByLayer)
+    return isFullyOccupiedAllLayers(
+      x,
+      y,
+      layerCount,
+      obstaclesByLayer,
+      placedByLayer,
+    )
   }
 
   function pushIfFree(x: number, y: number, z: number) {
     if (
-      x < bounds.x + EPS || y < bounds.y + EPS ||
-      x > bounds.x + bounds.width - EPS || y > bounds.y + bounds.height - EPS
-    ) return
+      x < bounds.x + EPS ||
+      y < bounds.y + EPS ||
+      x > bounds.x + bounds.width - EPS ||
+      y > bounds.y + bounds.height - EPS
+    )
+      return
     if (fullyOcc(x, y)) return // new rule: only drop if truly impossible
 
     // Distance uses obstacles + hard nodes (soft nodes ignored for ranking)
@@ -241,7 +263,9 @@ export function computeEdgeCandidates3D(
     ]
     const d = Math.min(
       distancePointToRectEdges(x, y, bounds),
-      ...(hard.length ? hard.map((b) => distancePointToRectEdges(x, y, b)) : [Infinity]),
+      ...(hard.length
+        ? hard.map((b) => distancePointToRectEdges(x, y, b))
+        : [Infinity]),
     )
 
     const k = key(x, y, z)
@@ -249,12 +273,24 @@ export function computeEdgeCandidates3D(
     dedup.add(k)
 
     // Approximate z-span strength at this z (ignoring soft nodes)
-    const span = longestFreeSpanAroundZ(x, y, z, layerCount, 1, undefined, obstaclesByLayer, hardPlacedByLayer)
+    const span = longestFreeSpanAroundZ(
+      x,
+      y,
+      z,
+      layerCount,
+      1,
+      undefined,
+      obstaclesByLayer,
+      hardPlacedByLayer,
+    )
     out.push({ x, y, z, distance: d, zSpanLen: span.length, isEdgeSeed: true })
   }
 
   for (let z = 0; z < layerCount; z++) {
-    const blockers = [...(obstaclesByLayer[z] ?? []), ...(hardPlacedByLayer[z] ?? [])]
+    const blockers = [
+      ...(obstaclesByLayer[z] ?? []),
+      ...(hardPlacedByLayer[z] ?? []),
+    ]
 
     // 1) Board edges — find exact uncovered segments along each edge
 
@@ -272,10 +308,18 @@ export function computeEdgeCandidates3D(
     // Top edge (y = bounds.y + δ)
     const topY = bounds.y + δ
     const topCovering = blockers
-      .filter(b => b.y <= topY && b.y + b.height >= topY)
-      .map(b => ({ start: Math.max(bounds.x, b.x), end: Math.min(bounds.x + bounds.width, b.x + b.width) }))
+      .filter((b) => b.y <= topY && b.y + b.height >= topY)
+      .map((b) => ({
+        start: Math.max(bounds.x, b.x),
+        end: Math.min(bounds.x + bounds.width, b.x + b.width),
+      }))
     // Find uncovered segments that are large enough to potentially fill
-    const topUncovered = computeUncoveredSegments(bounds.x + δ, bounds.x + bounds.width - δ, topCovering, minSize * 0.5)
+    const topUncovered = computeUncoveredSegments(
+      bounds.x + δ,
+      bounds.x + bounds.width - δ,
+      topCovering,
+      minSize * 0.5,
+    )
     for (const seg of topUncovered) {
       const segLen = seg.end - seg.start
       if (segLen >= minSize) {
@@ -291,9 +335,17 @@ export function computeEdgeCandidates3D(
     // Bottom edge (y = bounds.y + bounds.height - δ)
     const bottomY = bounds.y + bounds.height - δ
     const bottomCovering = blockers
-      .filter(b => b.y <= bottomY && b.y + b.height >= bottomY)
-      .map(b => ({ start: Math.max(bounds.x, b.x), end: Math.min(bounds.x + bounds.width, b.x + b.width) }))
-    const bottomUncovered = computeUncoveredSegments(bounds.x + δ, bounds.x + bounds.width - δ, bottomCovering, minSize * 0.5)
+      .filter((b) => b.y <= bottomY && b.y + b.height >= bottomY)
+      .map((b) => ({
+        start: Math.max(bounds.x, b.x),
+        end: Math.min(bounds.x + bounds.width, b.x + b.width),
+      }))
+    const bottomUncovered = computeUncoveredSegments(
+      bounds.x + δ,
+      bounds.x + bounds.width - δ,
+      bottomCovering,
+      minSize * 0.5,
+    )
     for (const seg of bottomUncovered) {
       const segLen = seg.end - seg.start
       if (segLen >= minSize) {
@@ -308,9 +360,17 @@ export function computeEdgeCandidates3D(
     // Left edge (x = bounds.x + δ)
     const leftX = bounds.x + δ
     const leftCovering = blockers
-      .filter(b => b.x <= leftX && b.x + b.width >= leftX)
-      .map(b => ({ start: Math.max(bounds.y, b.y), end: Math.min(bounds.y + bounds.height, b.y + b.height) }))
-    const leftUncovered = computeUncoveredSegments(bounds.y + δ, bounds.y + bounds.height - δ, leftCovering, minSize * 0.5)
+      .filter((b) => b.x <= leftX && b.x + b.width >= leftX)
+      .map((b) => ({
+        start: Math.max(bounds.y, b.y),
+        end: Math.min(bounds.y + bounds.height, b.y + b.height),
+      }))
+    const leftUncovered = computeUncoveredSegments(
+      bounds.y + δ,
+      bounds.y + bounds.height - δ,
+      leftCovering,
+      minSize * 0.5,
+    )
     for (const seg of leftUncovered) {
       const segLen = seg.end - seg.start
       if (segLen >= minSize) {
@@ -325,9 +385,17 @@ export function computeEdgeCandidates3D(
     // Right edge (x = bounds.x + bounds.width - δ)
     const rightX = bounds.x + bounds.width - δ
     const rightCovering = blockers
-      .filter(b => b.x <= rightX && b.x + b.width >= rightX)
-      .map(b => ({ start: Math.max(bounds.y, b.y), end: Math.min(bounds.y + bounds.height, b.y + b.height) }))
-    const rightUncovered = computeUncoveredSegments(bounds.y + δ, bounds.y + bounds.height - δ, rightCovering, minSize * 0.5)
+      .filter((b) => b.x <= rightX && b.x + b.width >= rightX)
+      .map((b) => ({
+        start: Math.max(bounds.y, b.y),
+        end: Math.min(bounds.y + bounds.height, b.y + b.height),
+      }))
+    const rightUncovered = computeUncoveredSegments(
+      bounds.y + δ,
+      bounds.y + bounds.height - δ,
+      rightCovering,
+      minSize * 0.5,
+    )
     for (const seg of rightUncovered) {
       const segLen = seg.end - seg.start
       if (segLen >= minSize) {
@@ -345,9 +413,19 @@ export function computeEdgeCandidates3D(
       const obLeftX = b.x - δ
       if (obLeftX > bounds.x + EPS && obLeftX < bounds.x + bounds.width - EPS) {
         const obLeftCovering = blockers
-          .filter(bl => bl !== b && bl.x <= obLeftX && bl.x + bl.width >= obLeftX)
-          .map(bl => ({ start: Math.max(b.y, bl.y), end: Math.min(b.y + b.height, bl.y + bl.height) }))
-        const obLeftUncovered = computeUncoveredSegments(b.y, b.y + b.height, obLeftCovering, minSize * 0.5)
+          .filter(
+            (bl) => bl !== b && bl.x <= obLeftX && bl.x + bl.width >= obLeftX,
+          )
+          .map((bl) => ({
+            start: Math.max(b.y, bl.y),
+            end: Math.min(b.y + b.height, bl.y + bl.height),
+          }))
+        const obLeftUncovered = computeUncoveredSegments(
+          b.y,
+          b.y + b.height,
+          obLeftCovering,
+          minSize * 0.5,
+        )
         for (const seg of obLeftUncovered) {
           pushIfFree(obLeftX, seg.center, z)
         }
@@ -355,11 +433,24 @@ export function computeEdgeCandidates3D(
 
       // Right edge of blocker (x = b.x + b.width + δ)
       const obRightX = b.x + b.width + δ
-      if (obRightX > bounds.x + EPS && obRightX < bounds.x + bounds.width - EPS) {
+      if (
+        obRightX > bounds.x + EPS &&
+        obRightX < bounds.x + bounds.width - EPS
+      ) {
         const obRightCovering = blockers
-          .filter(bl => bl !== b && bl.x <= obRightX && bl.x + bl.width >= obRightX)
-          .map(bl => ({ start: Math.max(b.y, bl.y), end: Math.min(b.y + b.height, bl.y + bl.height) }))
-        const obRightUncovered = computeUncoveredSegments(b.y, b.y + b.height, obRightCovering, minSize * 0.5)
+          .filter(
+            (bl) => bl !== b && bl.x <= obRightX && bl.x + bl.width >= obRightX,
+          )
+          .map((bl) => ({
+            start: Math.max(b.y, bl.y),
+            end: Math.min(b.y + b.height, bl.y + bl.height),
+          }))
+        const obRightUncovered = computeUncoveredSegments(
+          b.y,
+          b.y + b.height,
+          obRightCovering,
+          minSize * 0.5,
+        )
         for (const seg of obRightUncovered) {
           pushIfFree(obRightX, seg.center, z)
         }
@@ -369,9 +460,19 @@ export function computeEdgeCandidates3D(
       const obTopY = b.y - δ
       if (obTopY > bounds.y + EPS && obTopY < bounds.y + bounds.height - EPS) {
         const obTopCovering = blockers
-          .filter(bl => bl !== b && bl.y <= obTopY && bl.y + bl.height >= obTopY)
-          .map(bl => ({ start: Math.max(b.x, bl.x), end: Math.min(b.x + b.width, bl.x + bl.width) }))
-        const obTopUncovered = computeUncoveredSegments(b.x, b.x + b.width, obTopCovering, minSize * 0.5)
+          .filter(
+            (bl) => bl !== b && bl.y <= obTopY && bl.y + bl.height >= obTopY,
+          )
+          .map((bl) => ({
+            start: Math.max(b.x, bl.x),
+            end: Math.min(b.x + b.width, bl.x + bl.width),
+          }))
+        const obTopUncovered = computeUncoveredSegments(
+          b.x,
+          b.x + b.width,
+          obTopCovering,
+          minSize * 0.5,
+        )
         for (const seg of obTopUncovered) {
           pushIfFree(seg.center, obTopY, z)
         }
@@ -379,11 +480,25 @@ export function computeEdgeCandidates3D(
 
       // Bottom edge of blocker (y = b.y + b.height + δ)
       const obBottomY = b.y + b.height + δ
-      if (obBottomY > bounds.y + EPS && obBottomY < bounds.y + bounds.height - EPS) {
+      if (
+        obBottomY > bounds.y + EPS &&
+        obBottomY < bounds.y + bounds.height - EPS
+      ) {
         const obBottomCovering = blockers
-          .filter(bl => bl !== b && bl.y <= obBottomY && bl.y + bl.height >= obBottomY)
-          .map(bl => ({ start: Math.max(b.x, bl.x), end: Math.min(b.x + b.width, bl.x + bl.width) }))
-        const obBottomUncovered = computeUncoveredSegments(b.x, b.x + b.width, obBottomCovering, minSize * 0.5)
+          .filter(
+            (bl) =>
+              bl !== b && bl.y <= obBottomY && bl.y + bl.height >= obBottomY,
+          )
+          .map((bl) => ({
+            start: Math.max(b.x, bl.x),
+            end: Math.min(b.x + b.width, bl.x + bl.width),
+          }))
+        const obBottomUncovered = computeUncoveredSegments(
+          b.x,
+          b.x + b.width,
+          obBottomCovering,
+          minSize * 0.5,
+        )
         for (const seg of obBottomUncovered) {
           pushIfFree(seg.center, obBottomY, z)
         }
@@ -392,6 +507,6 @@ export function computeEdgeCandidates3D(
   }
 
   // Strong multi-layer preference then distance.
-  out.sort((a, b) => (b.zSpanLen! - a.zSpanLen!) || (b.distance - a.distance))
+  out.sort((a, b) => b.zSpanLen! - a.zSpanLen! || b.distance - a.distance)
   return out
 }

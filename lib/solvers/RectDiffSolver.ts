@@ -5,7 +5,13 @@ import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode } from "../types/capacity-mesh-types"
 
 import type { GridFill3DOptions, RectDiffState } from "./rectdiff/types"
-import { initState, stepGrid, stepExpansion, finalizeRects, computeProgress } from "./rectdiff/engine"
+import {
+  initState,
+  stepGrid,
+  stepExpansion,
+  finalizeRects,
+  computeProgress,
+} from "./rectdiff/engine"
 import { rectsToMeshNodes } from "./rectdiff/rectsToMeshNodes"
 
 // A streaming, one-step-per-iteration solver.
@@ -71,7 +77,10 @@ export class RectDiffSolver extends BaseSolver {
   }
 
   // Helper to get color based on z layer
-  private getColorForZLayer(zLayers: number[]): { fill: string; stroke: string } {
+  private getColorForZLayer(zLayers: number[]): {
+    fill: string
+    stroke: string
+  } {
     const minZ = Math.min(...zLayers)
     const colors = [
       { fill: "#dbeafe", stroke: "#3b82f6" }, // blue (z=0)
@@ -135,7 +144,10 @@ export class RectDiffSolver extends BaseSolver {
       for (const p of this.state.placed) {
         const colors = this.getColorForZLayer(p.zLayers)
         rects.push({
-          center: { x: p.rect.x + p.rect.width / 2, y: p.rect.y + p.rect.height / 2 },
+          center: {
+            x: p.rect.x + p.rect.width / 2,
+            y: p.rect.y + p.rect.height / 2,
+          },
           width: p.rect.width,
           height: p.rect.height,
           fill: colors.fill,

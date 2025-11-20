@@ -79,7 +79,7 @@ test("RectDiffSolver handles multi-layer spans", () => {
 
   // Check if any nodes span multiple layers
   const multiLayerNodes = output.meshNodes.filter(
-    (n) => n.availableZ && n.availableZ.length >= 2
+    (n) => n.availableZ && n.availableZ.length >= 2,
   )
 
   // With no obstacles and preferMultiLayer=true, we should get multi-layer nodes
@@ -145,10 +145,11 @@ test("disruptive placement resizes single-layer nodes", () => {
 
   // Expect at least one node spanning multiple layers at/through the center
   const mesh = solver.getOutput().meshNodes
-  const throughCenter = mesh.find(n =>
-    Math.abs(n.center.x - 5) < 0.6 &&
-    Math.abs(n.center.y - 5) < 0.6 &&
-    (n.availableZ?.length ?? 0) >= 2
+  const throughCenter = mesh.find(
+    (n) =>
+      Math.abs(n.center.x - 5) < 0.6 &&
+      Math.abs(n.center.y - 5) < 0.6 &&
+      (n.availableZ?.length ?? 0) >= 2,
   )
   expect(throughCenter).toBeTruthy()
 })

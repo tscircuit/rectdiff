@@ -2,7 +2,8 @@
 import type { XYRect } from "./types"
 
 export const EPS = 1e-9
-export const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+export const clamp = (v: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, v))
 export const gt = (a: number, b: number) => a > b + EPS
 export const gte = (a: number, b: number) => a > b - EPS
 export const lt = (a: number, b: number) => a < b - EPS
@@ -19,8 +20,10 @@ export function overlaps(a: XYRect, b: XYRect) {
 
 export function containsPoint(r: XYRect, x: number, y: number) {
   return (
-    x >= r.x - EPS && x <= r.x + r.width + EPS &&
-    y >= r.y - EPS && y <= r.y + r.height + EPS
+    x >= r.x - EPS &&
+    x <= r.x + r.width + EPS &&
+    y >= r.y - EPS &&
+    y <= r.y + r.height + EPS
   )
 }
 
@@ -33,7 +36,10 @@ export function distancePointToRectEdges(px: number, py: number, r: XYRect) {
   ]
   let best = Infinity
   for (const [x1, y1, x2, y2] of edges) {
-    const A = px - x1, B = py - y1, C = x2 - x1, D = y2 - y1
+    const A = px - x1,
+      B = py - y1,
+      C = x2 - x1,
+      D = y2 - y1
     const dot = A * C + B * D
     const lenSq = C * C + D * D
     let t = lenSq !== 0 ? dot / lenSq : 0
@@ -48,7 +54,10 @@ export function distancePointToRectEdges(px: number, py: number, r: XYRect) {
 // --- directional expansion caps (respect board + blockers + aspect) ---
 
 function maxExpandRight(
-  r: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined
+  r: XYRect,
+  bounds: XYRect,
+  blockers: XYRect[],
+  maxAspect: number | null | undefined,
 ) {
   // Start with board boundary
   let maxWidth = bounds.x + bounds.width - r.x
@@ -56,14 +65,18 @@ function maxExpandRight(
   // Check all blockers that could limit rightward expansion
   for (const b of blockers) {
     // Only consider blockers that vertically overlap with current rect
-    const verticallyOverlaps = r.y + r.height > b.y + EPS && b.y + b.height > r.y + EPS
+    const verticallyOverlaps =
+      r.y + r.height > b.y + EPS && b.y + b.height > r.y + EPS
     if (verticallyOverlaps) {
       // Blocker is to the right - limits how far we can expand
       if (gte(b.x, r.x + r.width)) {
         maxWidth = Math.min(maxWidth, b.x - r.x)
       }
       // Blocker overlaps current position - can't expand at all
-      else if (b.x + b.width > r.x + r.width - EPS && b.x < r.x + r.width + EPS) {
+      else if (
+        b.x + b.width > r.x + r.width - EPS &&
+        b.x < r.x + r.width + EPS
+      ) {
         return 0
       }
     }
@@ -74,14 +87,18 @@ function maxExpandRight(
 
   // Apply aspect ratio constraint
   if (maxAspect != null) {
-    const w = r.width, h = r.height
+    const w = r.width,
+      h = r.height
     if (w >= h) e = Math.min(e, maxAspect * h - w)
   }
   return Math.max(0, e)
 }
 
 function maxExpandDown(
-  r: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined
+  r: XYRect,
+  bounds: XYRect,
+  blockers: XYRect[],
+  maxAspect: number | null | undefined,
 ) {
   // Start with board boundary
   let maxHeight = bounds.y + bounds.height - r.y
@@ -96,7 +113,10 @@ function maxExpandDown(
         maxHeight = Math.min(maxHeight, b.y - r.y)
       }
       // Blocker overlaps current position - can't expand at all
-      else if (b.y + b.height > r.y + r.height - EPS && b.y < r.y + r.height + EPS) {
+      else if (
+        b.y + b.height > r.y + r.height - EPS &&
+        b.y < r.y + r.height + EPS
+      ) {
         return 0
       }
     }
@@ -107,14 +127,18 @@ function maxExpandDown(
 
   // Apply aspect ratio constraint
   if (maxAspect != null) {
-    const w = r.width, h = r.height
+    const w = r.width,
+      h = r.height
     if (h >= w) e = Math.min(e, maxAspect * w - h)
   }
   return Math.max(0, e)
 }
 
 function maxExpandLeft(
-  r: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined
+  r: XYRect,
+  bounds: XYRect,
+  blockers: XYRect[],
+  maxAspect: number | null | undefined,
 ) {
   // Start with board boundary
   let minX = bounds.x
@@ -122,7 +146,8 @@ function maxExpandLeft(
   // Check all blockers that could limit leftward expansion
   for (const b of blockers) {
     // Only consider blockers that vertically overlap with current rect
-    const verticallyOverlaps = r.y + r.height > b.y + EPS && b.y + b.height > r.y + EPS
+    const verticallyOverlaps =
+      r.y + r.height > b.y + EPS && b.y + b.height > r.y + EPS
     if (verticallyOverlaps) {
       // Blocker is to the left - limits how far we can expand
       if (lte(b.x + b.width, r.x)) {
@@ -140,14 +165,18 @@ function maxExpandLeft(
 
   // Apply aspect ratio constraint
   if (maxAspect != null) {
-    const w = r.width, h = r.height
+    const w = r.width,
+      h = r.height
     if (w >= h) e = Math.min(e, maxAspect * h - w)
   }
   return Math.max(0, e)
 }
 
 function maxExpandUp(
-  r: XYRect, bounds: XYRect, blockers: XYRect[], maxAspect: number | null | undefined
+  r: XYRect,
+  bounds: XYRect,
+  blockers: XYRect[],
+  maxAspect: number | null | undefined,
 ) {
   // Start with board boundary
   let minY = bounds.y
@@ -173,7 +202,8 @@ function maxExpandUp(
 
   // Apply aspect ratio constraint
   if (maxAspect != null) {
-    const w = r.width, h = r.height
+    const w = r.width,
+      h = r.height
     if (h >= w) e = Math.min(e, maxAspect * w - h)
   }
   return Math.max(0, e)
@@ -206,12 +236,20 @@ export function expandRectFromSeed(
   let bestArea = 0
 
   STRATS: for (const s of strategies) {
-    let r: XYRect = { x: startX + s.ox, y: startY + s.oy, width: initialW, height: initialH }
+    let r: XYRect = {
+      x: startX + s.ox,
+      y: startY + s.oy,
+      width: initialW,
+      height: initialH,
+    }
 
     // keep initial inside board
-    if (lt(r.x, bounds.x) || lt(r.y, bounds.y) ||
-        gt(r.x + r.width, bounds.x + bounds.width) ||
-        gt(r.y + r.height, bounds.y + bounds.height)) {
+    if (
+      lt(r.x, bounds.x) ||
+      lt(r.y, bounds.y) ||
+      gt(r.x + r.width, bounds.x + bounds.width) ||
+      gt(r.y + r.height, bounds.y + bounds.height)
+    ) {
       continue
     }
 
@@ -223,21 +261,36 @@ export function expandRectFromSeed(
     while (improved) {
       improved = false
       const eR = maxExpandRight(r, bounds, blockers, maxAspectRatio)
-      if (eR > 0) { r = { ...r, width: r.width + eR }; improved = true }
+      if (eR > 0) {
+        r = { ...r, width: r.width + eR }
+        improved = true
+      }
 
       const eD = maxExpandDown(r, bounds, blockers, maxAspectRatio)
-      if (eD > 0) { r = { ...r, height: r.height + eD }; improved = true }
+      if (eD > 0) {
+        r = { ...r, height: r.height + eD }
+        improved = true
+      }
 
       const eL = maxExpandLeft(r, bounds, blockers, maxAspectRatio)
-      if (eL > 0) { r = { x: r.x - eL, y: r.y, width: r.width + eL, height: r.height }; improved = true }
+      if (eL > 0) {
+        r = { x: r.x - eL, y: r.y, width: r.width + eL, height: r.height }
+        improved = true
+      }
 
       const eU = maxExpandUp(r, bounds, blockers, maxAspectRatio)
-      if (eU > 0) { r = { x: r.x, y: r.y - eU, width: r.width, height: r.height + eU }; improved = true }
+      if (eU > 0) {
+        r = { x: r.x, y: r.y - eU, width: r.width, height: r.height + eU }
+        improved = true
+      }
     }
 
     if (r.width + EPS >= minReq.width && r.height + EPS >= minReq.height) {
       const area = r.width * r.height
-      if (area > bestArea) { best = r; bestArea = area }
+      if (area > bestArea) {
+        best = r
+        bestArea = area
+      }
     }
   }
 
@@ -247,7 +300,7 @@ export function expandRectFromSeed(
 export function intersect1D(a0: number, a1: number, b0: number, b1: number) {
   const lo = Math.max(a0, b0)
   const hi = Math.min(a1, b1)
-  return hi > lo + EPS ? [lo, hi] as const : null
+  return hi > lo + EPS ? ([lo, hi] as const) : null
 }
 
 /** Return A \ B as up to 4 non-overlapping rectangles (or [A] if no overlap). */
@@ -268,7 +321,7 @@ export function subtractRect2D(A: XYRect, B: XYRect): XYRect[] {
   }
   // Right strip
   if (A.x + A.width > X1 + EPS) {
-    out.push({ x: X1, y: A.y, width: (A.x + A.width) - X1, height: A.height })
+    out.push({ x: X1, y: A.y, width: A.x + A.width - X1, height: A.height })
   }
   // Top wedge in the middle band
   const midW = Math.max(0, X1 - X0)
@@ -277,7 +330,7 @@ export function subtractRect2D(A: XYRect, B: XYRect): XYRect[] {
   }
   // Bottom wedge in the middle band
   if (midW > EPS && A.y + A.height > Y1 + EPS) {
-    out.push({ x: X0, y: Y1, width: midW, height: (A.y + A.height) - Y1 })
+    out.push({ x: X0, y: Y1, width: midW, height: A.y + A.height - Y1 })
   }
 
   return out.filter((r) => r.width > EPS && r.height > EPS)

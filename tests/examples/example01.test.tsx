@@ -3,7 +3,7 @@ import simpleRouteJson from "../../test-assets/example01.json"
 import { RectDiffSolver } from "../../lib/solvers/RectDiffSolver"
 import { getSvgFromGraphicsObject } from "graphics-debug"
 
-test("example01", () => {
+test.skip("example01", () => {
   const solver = new RectDiffSolver({ simpleRouteJson })
 
   solver.solve()

@@ -21,10 +21,17 @@ export function canonicalizeLayerOrder(names: string[]) {
 }
 
 export function buildZIndexMap(srj: SimpleRouteJson) {
-  const names = canonicalizeLayerOrder((srj.obstacles ?? []).flatMap((o) => o.layers ?? []))
+  const names = canonicalizeLayerOrder(
+    (srj.obstacles ?? []).flatMap((o) => o.layers ?? []),
+  )
   const fallback = Array.from(
     { length: Math.max(1, srj.layerCount || 1) },
-    (_, i) => (i === 0 ? "top" : i === (srj.layerCount || 1) - 1 ? "bottom" : `inner${i}`),
+    (_, i) =>
+      i === 0
+        ? "top"
+        : i === (srj.layerCount || 1) - 1
+          ? "bottom"
+          : `inner${i}`,
   )
   const layerNames = names.length ? names : fallback
   const map = new Map<string, number>()
@@ -33,7 +40,8 @@ export function buildZIndexMap(srj: SimpleRouteJson) {
 }
 
 export function obstacleZs(ob: Obstacle, zIndexByName: Map<string, number>) {
-  if (ob.zLayers?.length) return Array.from(new Set(ob.zLayers)).sort((a, b) => a - b)
+  if (ob.zLayers?.length)
+    return Array.from(new Set(ob.zLayers)).sort((a, b) => a - b)
   const fromNames = (ob.layers ?? [])
     .map((n) => zIndexByName.get(n))
     .filter((v): v is number => typeof v === "number")
