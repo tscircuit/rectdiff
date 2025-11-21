@@ -25,6 +25,12 @@ export class RectDiffSolver extends BaseSolver {
   private state!: RectDiffState
   private _meshNodes: CapacityMeshNode[] = []
 
+  // --- Add caching properties ---
+  private _cachedIntermediateOutput: { meshNodes: CapacityMeshNode[] } | null =
+    null
+  private _cachedStateSignature: string = ""
+  // ------------------------------
+
   constructor(opts: {
     simpleRouteJson: SimpleRouteJson
     mode?: "grid" | "exact"
@@ -73,7 +79,49 @@ export class RectDiffSolver extends BaseSolver {
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    return { meshNodes: this._meshNodes }
+    // If the solver is finished, return the final, cached result for performance.
+    if (this.solved) {
+      return { meshNodes: this._meshNodes }
+    }
+
+    // Create a signature based on current state to determine if we need to recompute
+    const currentSignature = this.state
+      ? JSON.stringify({
+          phase: this.state.phase,
+          gridIndex: this.state.gridIndex,
+          placedCount: this.state.placed.length,
+          expansionIndex: this.state.expansionIndex,
+          candidatesCount: this.state.candidates.length,
+          totalSeedsThisGrid: this.state.totalSeedsThisGrid,
+          consumedSeedsThisGrid: this.state.consumedSeedsThisGrid,
+        })
+      : ""
+
+    // --- Caching logic for intermediate state ---
+    if (
+      this._cachedStateSignature === currentSignature &&
+      this._cachedIntermediateOutput
+    ) {
+      return this._cachedIntermediateOutput
+    }
+    // -------------------------------------------
+
+    let result: { meshNodes: CapacityMeshNode[] }
+
+    // If the solver is running, dynamically generate a snapshot of the current state.
+    if (this.state?.placed) {
+      const intermediateRects = finalizeRects(this.state)
+      result = { meshNodes: rectsToMeshNodes(intermediateRects) }
+    } else {
+      // If there's no state yet, return an empty array.
+      result = { meshNodes: [] }
+    }
+
+    // --- Cache the new output ---
+    this._cachedIntermediateOutput = result
+    this._cachedStateSignature = currentSignature
+    return this._cachedIntermediateOutput
+    // ----------------------------
   }
 
   // Helper to get color based on z layer

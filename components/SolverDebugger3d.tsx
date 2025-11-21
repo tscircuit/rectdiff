@@ -240,6 +240,13 @@ const ThreeBoardView: React.FC<{
       const controls = new OrbitControls(camera, renderer.domElement)
       controls.enableDamping = true
 
+      // --- Add state and clock for fly mode ---
+      const clock = new THREE.Clock()
+      let isFlyModeActive = false
+      const keyState: { [key: string]: boolean } = {}
+      let flyModeSpeed = 50 // Default movement speed
+      // --------------------------------------
+
       const amb = new THREE.AmbientLight(0xffffff, 0.9)
       scene.add(amb)
       const dir = new THREE.DirectionalLight(0xffffff, 0.6)
@@ -486,6 +493,69 @@ const ThreeBoardView: React.FC<{
       )
       controls.update()
 
+      // --- Implement fly mode event handlers ---
+      const onMouseDown = (event: MouseEvent) => {
+        // Activate on right-click
+        if (event.button === 2) {
+          event.preventDefault()
+          renderer.domElement.requestPointerLock()
+        }
+      }
+
+      const onMouseUp = (event: MouseEvent) => {
+        // Deactivate on right-click release
+        if (event.button === 2) {
+          event.preventDefault()
+          if (document.pointerLockElement === renderer.domElement) {
+            document.exitPointerLock()
+          }
+        }
+      }
+
+      const onPointerLockChange = () => {
+        if (document.pointerLockElement === renderer.domElement) {
+          isFlyModeActive = true
+          controls.enabled = false
+        } else {
+          isFlyModeActive = false
+          controls.enabled = true
+        }
+      }
+
+      const onMouseMove = (event: MouseEvent) => {
+        if (!isFlyModeActive) return
+        const movementX = event.movementX || 0
+        const movementY = event.movementY || 0
+
+        const euler = new THREE.Euler(0, 0, 0, "YXZ")
+        euler.setFromQuaternion(camera.quaternion)
+
+        euler.y -= movementX * 0.002
+        euler.x -= movementY * 0.002
+        euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x)) // Clamp pitch
+
+        camera.quaternion.setFromEuler(euler)
+      }
+
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (!isFlyModeActive) return
+        keyState[event.code] = true
+      }
+
+      const onKeyUp = (event: KeyboardEvent) => {
+        if (!isFlyModeActive) return
+        keyState[event.code] = false
+      }
+
+      const onWheel = (event: WheelEvent) => {
+        if (!isFlyModeActive) return
+        event.preventDefault()
+        // Adjust speed based on scroll direction
+        const speedChange = event.deltaY > 0 ? -5 : 5
+        flyModeSpeed = Math.max(10, Math.min(200, flyModeSpeed + speedChange))
+      }
+      // ---------------------------------------
+
       const onResize = () => {
         const W = el.clientWidth || w
         const H = el.clientHeight || h
@@ -495,10 +565,57 @@ const ThreeBoardView: React.FC<{
       }
       window.addEventListener("resize", onResize)
 
+      // --- Add event listeners for fly mode ---
+      renderer.domElement.addEventListener("mousedown", onMouseDown)
+      document.addEventListener("mouseup", onMouseUp) // Listen on document for reliable release
+      document.addEventListener("pointerlockchange", onPointerLockChange)
+      document.addEventListener("mousemove", onMouseMove)
+      window.addEventListener("keydown", onKeyDown)
+      window.addEventListener("keyup", onKeyUp)
+      renderer.domElement.addEventListener("wheel", onWheel, { passive: false })
+      // ------------------------------------
+
       let raf = 0
       const animate = () => {
         raf = requestAnimationFrame(animate)
-        controls.update()
+        const delta = clock.getDelta()
+
+        if (isFlyModeActive) {
+          const moveSpeed = flyModeSpeed // Use dynamic speed
+
+          const forwardVector = new THREE.Vector3()
+          camera.getWorldDirection(forwardVector)
+          // Use a flat forward vector for FPS-style controls (no sinking/flying up)
+          const flatForward = new THREE.Vector3(
+            forwardVector.x,
+            0,
+            forwardVector.z,
+          ).normalize()
+
+          const rightVector = new THREE.Vector3()
+            .crossVectors(camera.up, forwardVector)
+            .normalize()
+
+          // Movement controls
+          if (keyState["KeyW"])
+            camera.position.addScaledVector(flatForward, moveSpeed * delta)
+          if (keyState["KeyS"])
+            camera.position.addScaledVector(flatForward, -moveSpeed * delta)
+          if (keyState["KeyA"])
+            camera.position.addScaledVector(rightVector, moveSpeed * delta) // Reversed: A = right
+          if (keyState["KeyD"])
+            camera.position.addScaledVector(rightVector, -moveSpeed * delta) // Reversed: D = left
+
+          // Up/down controls (Q/E)
+          if (keyState["KeyQ"]) camera.position.y += moveSpeed * delta // Q = up
+          if (keyState["KeyE"]) camera.position.y -= moveSpeed * delta // E = down
+
+          // Sync orbit controls target to prevent snap-back
+          controls.target.copy(camera.position).add(forwardVector)
+        } else {
+          controls.update()
+        }
+
         renderer.render(scene, camera)
       }
       animate()
@@ -506,6 +623,17 @@ const ThreeBoardView: React.FC<{
       destroyRef.current = () => {
         cancelAnimationFrame(raf)
         window.removeEventListener("resize", onResize)
+
+        // --- Remove fly mode event listeners ---
+        renderer.domElement.removeEventListener("mousedown", onMouseDown)
+        document.removeEventListener("mouseup", onMouseUp)
+        document.removeEventListener("pointerlockchange", onPointerLockChange)
+        document.removeEventListener("mousemove", onMouseMove)
+        window.removeEventListener("keydown", onKeyDown)
+        window.removeEventListener("keyup", onKeyUp)
+        renderer.domElement.removeEventListener("wheel", onWheel)
+        // ----------------------------------
+
         renderer.dispose()
         el.innerHTML = ""
       }
