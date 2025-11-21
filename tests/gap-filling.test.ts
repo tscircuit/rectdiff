@@ -177,60 +177,8 @@ test("gap-filling visual snapshot", async () => {
 
   solver.solve()
 
-  const output = solver.getOutput()
-
-  // Create a visualization
-  const graphicsObjects: any[] = []
-
-  // Draw bounds
-  graphicsObjects.push({
-    type: "rect",
-    x: simpleRouteJson.bounds.minX,
-    y: simpleRouteJson.bounds.minY,
-    width: simpleRouteJson.bounds.maxX - simpleRouteJson.bounds.minX,
-    height: simpleRouteJson.bounds.maxY - simpleRouteJson.bounds.minY,
-    stroke: "black",
-    strokeWidth: 0.05,
-    fill: "none",
-  })
-
-  // Draw obstacles
-  for (const obstacle of simpleRouteJson.obstacles) {
-    graphicsObjects.push({
-      type: "rect",
-      x: obstacle.center.x - obstacle.width / 2,
-      y: obstacle.center.y - obstacle.height / 2,
-      width: obstacle.width,
-      height: obstacle.height,
-      fill: "#ff0000",
-      fillOpacity: 0.3,
-      stroke: "#ff0000",
-      strokeWidth: 0.02,
-    })
-  }
-
-  // Draw mesh nodes
-  for (const node of output.meshNodes) {
-    const isMultiLayer = (node.availableZ?.length ?? 0) > 1
-    const color = isMultiLayer ? "#0066cc" : "#66cc00"
-
-    graphicsObjects.push({
-      type: "rect",
-      x: node.center.x - node.width / 2,
-      y: node.center.y - node.height / 2,
-      width: node.width,
-      height: node.height,
-      fill: color,
-      fillOpacity: 0.4,
-      stroke: color,
-      strokeWidth: 0.02,
-    })
-  }
-
-  const svg = getSvgFromGraphicsObject({
-    type: "group",
-    children: graphicsObjects,
-  })
+  // Use the solver's built-in visualization
+  const svg = getSvgFromGraphicsObject(solver.visualize())
 
   await expect(svg).toMatchSvgSnapshot(import.meta.path)
 })
