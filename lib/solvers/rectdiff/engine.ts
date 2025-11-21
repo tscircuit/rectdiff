@@ -21,6 +21,7 @@ import {
   subtractRect2D,
 } from "./geometry"
 import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
+import { fillAdjacentNodeGaps } from "./gap-filling"
 
 export function initState(
   srj: SimpleRouteJson,
@@ -328,6 +329,8 @@ export function stepGrid(state: RectDiffState): void {
 /** One micro-step during the EXPANSION phase: expand exactly one placed rect */
 export function stepExpansion(state: RectDiffState): void {
   if (state.expansionIndex >= state.placed.length) {
+    // Fill gaps between adjacent nodes before marking as done
+    fillAdjacentNodeGaps(state)
     state.phase = "DONE"
     return
   }
