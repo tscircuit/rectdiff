@@ -9,6 +9,7 @@ export type Rect3d = {
   maxX: number
   maxY: number
   zLayers: number[] // sorted contiguous integers
+  isObstacle?: boolean
 }
 
 export type GridFill3DOptions = {
