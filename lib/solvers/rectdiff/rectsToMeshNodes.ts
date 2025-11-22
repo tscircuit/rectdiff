@@ -16,7 +16,10 @@ export function rectsToMeshNodes(rects: Rect3d[]): CapacityMeshNode[] {
       height: h,
       layer: "top",
       availableZ: r.zLayers.slice(),
+      _containsObstacle: r.isObstacle,
+      _containsTarget: r.isObstacle,
     })
   }
+
   return out
 }
