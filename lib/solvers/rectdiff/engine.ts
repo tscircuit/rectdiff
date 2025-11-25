@@ -45,8 +45,17 @@ export function initState(
     const r = obstacleToXYRect(ob)
     if (!r) continue
     const zs = obstacleZs(ob, zIndexByName)
-    for (const z of zs)
-      if (z >= 0 && z < layerCount) obstaclesByLayer[z]!.push(r)
+    const invalidZs = zs.filter((z) => z < 0 || z >= layerCount)
+    if (invalidZs.length) {
+      throw new Error(
+        `RectDiffSolver: obstacle uses z-layer indices ${invalidZs.join(
+          ",",
+        )} outside 0-${layerCount - 1}`,
+      )
+    }
+    // Persist normalized zLayers back onto the shared SRJ so downstream solvers see them.
+    if ((!ob.zLayers || ob.zLayers.length === 0) && zs.length) ob.zLayers = zs
+    for (const z of zs) obstaclesByLayer[z]!.push(r)
   }
 
   const trace = Math.max(0.01, srj.minTraceWidth || 0.15)
