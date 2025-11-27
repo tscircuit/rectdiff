@@ -34,7 +34,7 @@ export type Candidate3D = {
 }
 export type Placed3D = { rect: XYRect; zLayers: number[] }
 
-export type Phase = "GRID" | "EXPANSION" | "DONE"
+export type Phase = "GRID" | "EXPANSION" | "GAP_FILL" | "DONE"
 
 export type RectDiffState = {
   // static

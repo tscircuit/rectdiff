@@ -22,6 +22,9 @@ import {
 } from "./geometry"
 import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
 
+/**
+ * Initialize the RectDiff solver state from SimpleRouteJson.
+ */
 export function initState(
   srj: SimpleRouteJson,
   opts: Partial<GridFill3DOptions>,
@@ -106,7 +109,9 @@ export function initState(
   }
 }
 
-// Build per-layer list of "hard" placed rects = nodes spanning all layers
+/**
+ * Build per-layer list of "hard" placed rects (nodes spanning all layers).
+ */
 function buildHardPlacedByLayer(state: RectDiffState): XYRect[][] {
   const out: XYRect[][] = Array.from({ length: state.layerCount }, () => [])
   for (const p of state.placed) {
@@ -117,23 +122,27 @@ function buildHardPlacedByLayer(state: RectDiffState): XYRect[][] {
   return out
 }
 
+/**
+ * Check if a point is occupied on ALL layers.
+ */
 function isFullyOccupiedAtPoint(
   state: RectDiffState,
-  x: number,
-  y: number,
+  point: { x: number; y: number },
 ): boolean {
   for (let z = 0; z < state.layerCount; z++) {
     const obs = state.obstaclesByLayer[z] ?? []
     const placed = state.placedByLayer[z] ?? []
     const occ =
-      obs.some((b) => containsPoint(b, x, y)) ||
-      placed.some((b) => containsPoint(b, x, y))
+      obs.some((b) => containsPoint(b, point.x, point.y)) ||
+      placed.some((b) => containsPoint(b, point.x, point.y))
     if (!occ) return false
   }
   return true
 }
 
-/** Shrink/split any *soft* (non-full-stack) nodes overlapped by `newIndex` */
+/**
+ * Shrink/split any soft (non-full-stack) nodes overlapped by the newcomer.
+ */
 function resizeSoftOverlaps(state: RectDiffState, newIndex: number) {
   const newcomer = state.placed[newIndex]!
   const { rect: newR, zLayers: newZs } = newcomer
@@ -198,7 +207,9 @@ function resizeSoftOverlaps(state: RectDiffState, newIndex: number) {
   }
 }
 
-/** One micro-step during the GRID phase: handle (or fetch) exactly one candidate */
+/**
+ * One micro-step during the GRID phase: handle exactly one candidate.
+ */
 export function stepGrid(state: RectDiffState): void {
   const {
     gridSizes,
@@ -216,14 +227,14 @@ export function stepGrid(state: RectDiffState): void {
 
   // Ensure candidates exist for this grid
   if (state.candidates.length === 0 && state.consumedSeedsThisGrid === 0) {
-    state.candidates = computeCandidates3D(
-      state.bounds,
-      grid,
-      state.layerCount,
-      state.obstaclesByLayer,
-      state.placedByLayer, // all nodes (soft + hard) for fully-occupied test
-      hardPlacedByLayer, // hard blockers for ranking/span
-    )
+    state.candidates = computeCandidates3D({
+      bounds: state.bounds,
+      gridSize: grid,
+      layerCount: state.layerCount,
+      obstaclesByLayer: state.obstaclesByLayer,
+      placedByLayer: state.placedByLayer,
+      hardPlacedByLayer,
+    })
     state.totalSeedsThisGrid = state.candidates.length
     state.consumedSeedsThisGrid = 0
   }
@@ -238,14 +249,14 @@ export function stepGrid(state: RectDiffState): void {
     } else {
       if (!state.edgeAnalysisDone) {
         const minSize = Math.min(minSingle.width, minSingle.height)
-        state.candidates = computeEdgeCandidates3D(
-          state.bounds,
+        state.candidates = computeEdgeCandidates3D({
+          bounds: state.bounds,
           minSize,
-          state.layerCount,
-          state.obstaclesByLayer,
-          state.placedByLayer, // for fully-occupied test
+          layerCount: state.layerCount,
+          obstaclesByLayer: state.obstaclesByLayer,
+          placedByLayer: state.placedByLayer,
           hardPlacedByLayer,
-        )
+        })
         state.edgeAnalysisDone = true
         state.totalSeedsThisGrid = state.candidates.length
         state.consumedSeedsThisGrid = 0
@@ -262,16 +273,16 @@ export function stepGrid(state: RectDiffState): void {
   state.consumedSeedsThisGrid += 1
 
   // Evaluate attempts — multi-layer span first (computed ignoring soft nodes)
-  const span = longestFreeSpanAroundZ(
-    cand.x,
-    cand.y,
-    cand.z,
-    state.layerCount,
-    minMulti.minLayers,
-    maxMultiLayerSpan,
-    state.obstaclesByLayer,
-    hardPlacedByLayer, // ignore soft nodes for span
-  )
+  const span = longestFreeSpanAroundZ({
+    x: cand.x,
+    y: cand.y,
+    z: cand.z,
+    layerCount: state.layerCount,
+    minSpan: minMulti.minLayers,
+    maxSpan: maxMultiLayerSpan,
+    obstaclesByLayer: state.obstaclesByLayer,
+    placedByLayer: hardPlacedByLayer,
+  })
 
   const attempts: Array<{
     kind: "multi" | "single"
@@ -303,16 +314,16 @@ export function stepGrid(state: RectDiffState): void {
       if (hardPlacedByLayer[z]) hardBlockers.push(...hardPlacedByLayer[z]!)
     }
 
-    const rect = expandRectFromSeed(
-      cand.x,
-      cand.y,
-      grid,
-      state.bounds,
-      hardBlockers, // soft nodes DO NOT block expansion
+    const rect = expandRectFromSeed({
+      startX: cand.x,
+      startY: cand.y,
+      gridSize: grid,
+      bounds: state.bounds,
+      blockers: hardBlockers,
       initialCellRatio,
       maxAspectRatio,
-      attempt.minReq,
-    )
+      minReq: attempt.minReq,
+    })
     if (!rect) continue
 
     // Place the new node
@@ -325,7 +336,7 @@ export function stepGrid(state: RectDiffState): void {
 
     // New: relax candidate culling — only drop seeds that became fully occupied
     state.candidates = state.candidates.filter(
-      (c) => !isFullyOccupiedAtPoint(state, c.x, c.y),
+      (c) => !isFullyOccupiedAtPoint(state, { x: c.x, y: c.y }),
     )
 
     return // processed one candidate
@@ -334,10 +345,13 @@ export function stepGrid(state: RectDiffState): void {
   // Neither attempt worked; drop this candidate for now.
 }
 
-/** One micro-step during the EXPANSION phase: expand exactly one placed rect */
+/**
+ * One micro-step during the EXPANSION phase: expand exactly one placed rect.
+ */
 export function stepExpansion(state: RectDiffState): void {
   if (state.expansionIndex >= state.placed.length) {
-    state.phase = "DONE"
+    // Transition to gap fill phase instead of done
+    state.phase = "GAP_FILL"
     return
   }
 
@@ -355,16 +369,16 @@ export function stepExpansion(state: RectDiffState): void {
   }
 
   const oldRect = p.rect
-  const expanded = expandRectFromSeed(
-    p.rect.x + p.rect.width / 2,
-    p.rect.y + p.rect.height / 2,
-    lastGrid,
-    state.bounds,
-    hardBlockers,
-    0, // seed bias off
-    null, // no aspect cap in expansion pass
-    { width: p.rect.width, height: p.rect.height },
-  )
+  const expanded = expandRectFromSeed({
+    startX: p.rect.x + p.rect.width / 2,
+    startY: p.rect.y + p.rect.height / 2,
+    gridSize: lastGrid,
+    bounds: state.bounds,
+    blockers: hardBlockers,
+    initialCellRatio: 0,
+    maxAspectRatio: null,
+    minReq: { width: p.rect.width, height: p.rect.height },
+  })
 
   if (expanded) {
     // Update placement + per-layer index (replace old rect object)
@@ -382,6 +396,9 @@ export function stepExpansion(state: RectDiffState): void {
   state.expansionIndex += 1
 }
 
+/**
+ * Finalize placed rectangles into output format.
+ */
 export function finalizeRects(state: RectDiffState): Rect3d[] {
   // Convert all placed (free space) nodes to output format
   const out: Rect3d[] = state.placed.map((p) => ({
@@ -423,7 +440,9 @@ export function finalizeRects(state: RectDiffState): Rect3d[] {
   return out
 }
 
-/** Optional: rough progress number for BaseSolver.progress */
+/**
+ * Calculate rough progress number for BaseSolver.progress.
+ */
 export function computeProgress(state: RectDiffState): number {
   const grids = state.options.gridSizes.length
   if (state.phase === "GRID") {

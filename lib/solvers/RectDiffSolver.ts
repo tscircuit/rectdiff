@@ -13,31 +13,39 @@ import {
   computeProgress,
 } from "./rectdiff/engine"
 import { rectsToMeshNodes } from "./rectdiff/rectsToMeshNodes"
+import type { GapFillOptions } from "./rectdiff/gapfill/types"
+import {
+  findUncoveredPoints,
+  calculateCoverage,
+} from "./rectdiff/gapfill/engine"
+import { GapFillSubSolver } from "./rectdiff/subsolvers/GapFillSubSolver"
 
-// A streaming, one-step-per-iteration solver.
-// Tests that call `solver.solve()` still work because BaseSolver.solve()
-// loops until this.solved flips true.
-
+/**
+ * A streaming, one-step-per-iteration solver for capacity mesh generation.
+ */
 export class RectDiffSolver extends BaseSolver {
   private srj: SimpleRouteJson
-  private mode: "grid" | "exact"
   private gridOptions: Partial<GridFill3DOptions>
+  private gapFillOptions: Partial<GapFillOptions>
   private state!: RectDiffState
   private _meshNodes: CapacityMeshNode[] = []
 
+  /** Active subsolver for GAP_FILL phases. */
+  declare activeSubSolver: GapFillSubSolver | null
+
   constructor(opts: {
     simpleRouteJson: SimpleRouteJson
-    mode?: "grid" | "exact"
     gridOptions?: Partial<GridFill3DOptions>
+    gapFillOptions?: Partial<GapFillOptions>
   }) {
     super()
     this.srj = opts.simpleRouteJson
-    this.mode = opts.mode ?? "grid"
     this.gridOptions = opts.gridOptions ?? {}
+    this.gapFillOptions = opts.gapFillOptions ?? {}
+    this.activeSubSolver = null
   }
 
   override _setup() {
-    // For now "exact" mode falls back to grid; keep switch if you add exact later.
     this.state = initState(this.srj, this.gridOptions)
     this.stats = {
       phase: this.state.phase,
@@ -45,12 +53,51 @@ export class RectDiffSolver extends BaseSolver {
     }
   }
 
-  /** IMPORTANT: exactly ONE small step per call */
+  /** Exactly ONE small step per call. */
   override _step() {
     if (this.state.phase === "GRID") {
       stepGrid(this.state)
     } else if (this.state.phase === "EXPANSION") {
       stepExpansion(this.state)
+    } else if (this.state.phase === "GAP_FILL") {
+      // Initialize gap fill subsolver if needed
+      if (
+        !this.activeSubSolver ||
+        !(this.activeSubSolver instanceof GapFillSubSolver)
+      ) {
+        const minTrace = this.srj.minTraceWidth || 0.15
+        const minGapSize = Math.max(0.01, minTrace / 10)
+        const boundsSize = Math.min(
+          this.state.bounds.width,
+          this.state.bounds.height,
+        )
+        this.activeSubSolver = new GapFillSubSolver({
+          placed: this.state.placed,
+          options: {
+            minWidth: minGapSize,
+            minHeight: minGapSize,
+            scanResolution: Math.max(0.05, boundsSize / 100),
+            ...this.gapFillOptions,
+          },
+          layerCtx: {
+            bounds: this.state.bounds,
+            layerCount: this.state.layerCount,
+            obstaclesByLayer: this.state.obstaclesByLayer,
+            placedByLayer: this.state.placedByLayer,
+          },
+        })
+      }
+
+      this.activeSubSolver.step()
+
+      if (this.activeSubSolver.solved) {
+        // Transfer results back to main state
+        const output = this.activeSubSolver.getOutput()
+        this.state.placed = output.placed
+        this.state.placedByLayer = output.placedByLayer
+        this.activeSubSolver = null
+        this.state.phase = "DONE"
+      }
     } else if (this.state.phase === "DONE") {
       // Finalize once
       if (!this.solved) {
@@ -65,47 +112,101 @@ export class RectDiffSolver extends BaseSolver {
     this.stats.phase = this.state.phase
     this.stats.gridIndex = this.state.gridIndex
     this.stats.placed = this.state.placed.length
+    if (this.activeSubSolver instanceof GapFillSubSolver) {
+      const output = this.activeSubSolver.getOutput()
+      this.stats.gapsFilled = output.filledCount
+    }
   }
 
-  // Let BaseSolver update this.progress automatically if present.
+  /** Compute solver progress (0 to 1). */
   computeProgress(): number {
-    return computeProgress(this.state)
+    if (this.solved || this.state.phase === "DONE") {
+      return 1
+    }
+    if (
+      this.state.phase === "GAP_FILL" &&
+      this.activeSubSolver instanceof GapFillSubSolver
+    ) {
+      return 0.85 + 0.1 * this.activeSubSolver.computeProgress()
+    }
+    return computeProgress(this.state) * 0.85
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
     return { meshNodes: this._meshNodes }
   }
 
-  // Helper to get color based on z layer
+  /** Get coverage percentage (0-1). */
+  getCoverage(sampleResolution: number = 0.05): number {
+    return calculateCoverage(
+      { sampleResolution },
+      {
+        bounds: this.state.bounds,
+        layerCount: this.state.layerCount,
+        obstaclesByLayer: this.state.obstaclesByLayer,
+        placedByLayer: this.state.placedByLayer,
+      },
+    )
+  }
+
+  /** Find uncovered points for debugging gaps. */
+  getUncoveredPoints(
+    sampleResolution: number = 0.05,
+  ): Array<{ x: number; y: number; z: number }> {
+    return findUncoveredPoints(
+      { sampleResolution },
+      {
+        bounds: this.state.bounds,
+        layerCount: this.state.layerCount,
+        obstaclesByLayer: this.state.obstaclesByLayer,
+        placedByLayer: this.state.placedByLayer,
+      },
+    )
+  }
+
+  /** Get color based on z layer for visualization. */
   private getColorForZLayer(zLayers: number[]): {
     fill: string
     stroke: string
   } {
     const minZ = Math.min(...zLayers)
     const colors = [
-      { fill: "#dbeafe", stroke: "#3b82f6" }, // blue (z=0)
-      { fill: "#fef3c7", stroke: "#f59e0b" }, // amber (z=1)
-      { fill: "#d1fae5", stroke: "#10b981" }, // green (z=2)
-      { fill: "#e9d5ff", stroke: "#a855f7" }, // purple (z=3)
-      { fill: "#fed7aa", stroke: "#f97316" }, // orange (z=4)
-      { fill: "#fecaca", stroke: "#ef4444" }, // red (z=5)
+      { fill: "#dbeafe", stroke: "#3b82f6" },
+      { fill: "#fef3c7", stroke: "#f59e0b" },
+      { fill: "#d1fae5", stroke: "#10b981" },
+      { fill: "#e9d5ff", stroke: "#a855f7" },
+      { fill: "#fed7aa", stroke: "#f97316" },
+      { fill: "#fecaca", stroke: "#ef4444" },
     ]
     return colors[minZ % colors.length]!
   }
 
-  // Streaming visualization: board + obstacles + current placements.
+  /** Streaming visualization: board + obstacles + current placements. */
   override visualize(): GraphicsObject {
+    // If a subsolver is active, delegate to its visualization
+    if (this.activeSubSolver) {
+      return this.activeSubSolver.visualize()
+    }
+
     const rects: NonNullable<GraphicsObject["rects"]> = []
     const points: NonNullable<GraphicsObject["points"]> = []
+
+    // Board bounds - use srj bounds which is always available
+    const boardBounds = {
+      minX: this.srj.bounds.minX,
+      maxX: this.srj.bounds.maxX,
+      minY: this.srj.bounds.minY,
+      maxY: this.srj.bounds.maxY,
+    }
 
     // board
     rects.push({
       center: {
-        x: (this.srj.bounds.minX + this.srj.bounds.maxX) / 2,
-        y: (this.srj.bounds.minY + this.srj.bounds.maxY) / 2,
+        x: (boardBounds.minX + boardBounds.maxX) / 2,
+        y: (boardBounds.minY + boardBounds.maxY) / 2,
       },
-      width: this.srj.bounds.maxX - this.srj.bounds.minX,
-      height: this.srj.bounds.maxY - this.srj.bounds.minY,
+      width: boardBounds.maxX - boardBounds.minX,
+      height: boardBounds.maxY - boardBounds.minY,
       fill: "none",
       stroke: "#111827",
       label: "board",
@@ -158,7 +259,7 @@ export class RectDiffSolver extends BaseSolver {
     }
 
     return {
-      title: "RectDiff (incremental)",
+      title: `RectDiff (${this.state?.phase ?? "init"})`,
       coordinateSystem: "cartesian",
       rects,
       points,

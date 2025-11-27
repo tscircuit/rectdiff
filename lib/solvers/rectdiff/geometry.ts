@@ -209,17 +209,28 @@ function maxExpandUp(
   return Math.max(0, e)
 }
 
-/** Grow a rect around (startX,startY), honoring bounds/blockers/aspect/min sizes */
-export function expandRectFromSeed(
-  startX: number,
-  startY: number,
-  gridSize: number,
-  bounds: XYRect,
-  blockers: XYRect[],
-  initialCellRatio: number,
-  maxAspectRatio: number | null | undefined,
-  minReq: { width: number; height: number },
-): XYRect | null {
+/** Grow a rect around a seed point, honoring bounds/blockers/aspect/min sizes. */
+export function expandRectFromSeed(params: {
+  startX: number
+  startY: number
+  gridSize: number
+  bounds: XYRect
+  blockers: XYRect[]
+  initialCellRatio: number
+  maxAspectRatio: number | null | undefined
+  minReq: { width: number; height: number }
+}): XYRect | null {
+  const {
+    startX,
+    startY,
+    gridSize,
+    bounds,
+    blockers,
+    initialCellRatio,
+    maxAspectRatio,
+    minReq,
+  } = params
+
   const minSide = Math.max(1e-9, gridSize * initialCellRatio)
   const initialW = Math.max(minSide, minReq.width)
   const initialH = Math.max(minSide, minReq.height)
@@ -297,6 +308,7 @@ export function expandRectFromSeed(
   return best
 }
 
+/** Find the intersection of two 1D intervals, or null if they don't overlap. */
 export function intersect1D(a0: number, a1: number, b0: number, b1: number) {
   const lo = Math.max(a0, b0)
   const hi = Math.min(a1, b1)

@@ -27,7 +27,6 @@ test("RectDiffSolver creates mesh nodes with grid-based approach", () => {
 
   const solver = new RectDiffSolver({
     simpleRouteJson,
-    mode: "grid",
   })
 
   solver.solve()
@@ -62,7 +61,6 @@ test("RectDiffSolver handles multi-layer spans", () => {
 
   const solver = new RectDiffSolver({
     simpleRouteJson,
-    mode: "grid",
     gridOptions: {
       minSingle: { width: 0.4, height: 0.4 },
       minMulti: { width: 1.0, height: 1.0, minLayers: 2 },
@@ -105,7 +103,6 @@ test("RectDiffSolver respects single-layer minimums", () => {
 
   const solver = new RectDiffSolver({
     simpleRouteJson,
-    mode: "grid",
     gridOptions: {
       minSingle: { width: minWidth, height: minHeight },
       minMulti: { width: 1.0, height: 1.0, minLayers: 2 },
@@ -131,7 +128,7 @@ test("disruptive placement resizes single-layer nodes", () => {
     layerCount: 3,
     minTraceWidth: 0.2,
   }
-  const solver = new RectDiffSolver({ simpleRouteJson: srj, mode: "grid" })
+  const solver = new RectDiffSolver({ simpleRouteJson: srj })
   solver.setup()
 
   // Manually seed a soft, single-layer node occupying center (simulate early placement)

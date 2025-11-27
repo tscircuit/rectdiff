@@ -29,7 +29,7 @@ test("RectDiffSolver maps obstacle layers to numeric zLayers", () => {
     ],
   }
 
-  const solver = new RectDiffSolver({ simpleRouteJson: srj, mode: "grid" })
+  const solver = new RectDiffSolver({ simpleRouteJson: srj })
   solver.setup()
 
   expect(srj.obstacles[0]?.zLayers).toEqual([0])
