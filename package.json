@@ -15,23 +15,26 @@
     "@react-hook/resize-observer": "^2.0.2",
     "@tscircuit/solver-utils": "^0.0.3",
     "@types/bun": "latest",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
     "@types/three": "^0.181.0",
     "biome": "^0.3.3",
     "bun-match-svg": "^0.0.14",
     "graphics-debug": "^0.0.70",
     "rbush": "^4.0.1",
-    "react": "^19.2.0",
-    "react-cosmos": "^7.0.0",
-    "react-cosmos-plugin-vite": "^7.0.0",
-    "react-dom": "^19.2.0",
+    "react": "18",
+    "react-cosmos": "^6.2.3",
+    "react-cosmos-plugin-vite": "^6.2.0",
+    "react-dom": "18",
     "three": "^0.181.1",
-    "tsup": "^8.5.1"
+    "tsup": "^8.5.1",
+    "vite": "^6.0.11",
+    "@vitejs/plugin-react": "^4"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "D": "^1.0.0",
-    "vite": "^7.2.2"
+    "D": "^1.0.0"
   }
 }
