@@ -1,1 +1,1 @@
-import "react-cosmos/client";
+import "react-cosmos/client"
