@@ -14,18 +14,31 @@ import {
 } from "../gapfill/engine"
 
 /**
- * SubSolver for filling gaps left by the grid-based placement.
+ * A sub-solver that fills empty spaces (gaps) left by the main grid-based
+ * placement algorithm.
  *
- * ## Algorithm Overview
- * Creates new rectangles to fill empty spaces (gaps) left after main grid placement.
- * Maximizes board coverage by detecting uncovered areas and placing optimally-sized rectangles.
+ * The preceding grid-based placement is fast but can leave irregular un-placed
+ * areas. This solver maximizes board coverage by finding and filling these
+ * gaps, which is critical for producing a high-quality capacity mesh.
  *
- * ## How It Works
- * 1. **Gap Detection**: Scans board to find uncovered rectangular regions, prioritizing larger gaps
- * 2. **Rectangle Expansion**: For each gap, expands a rectangle from seed points until hitting obstacles
- * 3. **Placement**: Places successfully expanded rectangles into the solution
+ * The core of the algorithm is its gap-detection phase. It works by first
+ * collecting all unique x and y-coordinates from the edges of existing
+ * obstacles and placed rectangles. This set of coordinates is supplemented by a
+ * uniform grid based on the `scanResolution` parameter. Together, these form a
+ * non-uniform grid of cells. The solver then tests the center of each cell for
+ * coverage. Contiguous uncovered cells are merged into larger, maximal
+ * rectangles, which become the candidate gaps to be filled.
  *
- * Uses a four-stage process: scan → select → expand → place for each gap.
+ * Once a prioritized list of gaps is generated (favoring larger, multi-layer
+ * gaps), the solver iteratively attempts to fill each one by expanding a new
+ * rectangle from a seed point until it collides with an existing boundary.
+ *
+ * The time complexity is dominated by the gap detection, which is approximately
+ * O((N+1/R)^2 * B), where N is the number of objects, R is the scan
+ * resolution, and B is the number of blockers. The algorithm's performance is
+ * therefore highly dependent on the `scanResolution`. It is a heuristic
+ * designed to be "fast enough" by avoiding a brute-force search, instead
+ * relying on this grid-based cell checking to find significant gaps.
  */
 export class GapFillSubSolver extends BaseSolver {
   private state: GapFillState
