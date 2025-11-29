@@ -3,7 +3,7 @@ import type { XYRect } from "../../types"
 import type { GapRegion, LayerContext } from "../types"
 import { EPS } from "../../geometry"
 import { findGapsOnLayer } from "./findGapsOnLayer"
-import { rectsOverlap } from "./rectsOverlap"
+import { rectsOverlap } from "../../../../../utils/rectsOverlap"
 import { deduplicateGaps } from "./deduplicateGaps"
 
 /**
