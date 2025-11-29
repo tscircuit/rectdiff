@@ -1,0 +1,1 @@
+import "react-cosmos/client"
