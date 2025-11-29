@@ -1,7 +1,7 @@
 // lib/solvers/rectdiff/gapfill/detection/deduplicateGaps.ts
+import { rectsEqual } from "../../../../../utils/rectsEqual"
+import { rectsOverlap } from "../../../../../utils/rectsOverlap"
 import type { GapRegion } from "../types"
-import { rectsEqual } from "./rectsEqual"
-import { rectsOverlap } from "./rectsOverlap"
 
 export function deduplicateGaps(gaps: GapRegion[]): GapRegion[] {
   const result: GapRegion[] = []
