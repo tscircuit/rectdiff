@@ -52,50 +52,6 @@ export function distancePointToRectEdges(px: number, py: number, r: XYRect) {
 }
 
 /**
- * Calculate the distance from a ray origin to the nearest intersection with the outline.
- * Ray is cast in one of the 4 cardinal directions.
- */
-function getRayIntersectionDistance(
-  ox: number,
-  oy: number,
-  dx: number,
-  dy: number,
-  outline: Array<{ x: number; y: number }>,
-): number {
-  let minDist = Infinity
-
-  for (let i = 0; i < outline.length; i++) {
-    const p1 = outline[i]!
-    const p2 = outline[(i + 1) % outline.length]!
-
-    // Segment P1-P2
-    const x1 = p1.x,
-      y1 = p1.y
-    const x2 = p2.x,
-      y2 = p2.y
-
-    // Ray: P = O + t * D
-    // Segment: P = A + u * (B - A)
-    // Solve for t and u
-    // dx * t - (x2 - x1) * u = x1 - ox
-    // dy * t - (y2 - y1) * u = y1 - oy
-
-    const det = dx * (y2 - y1) - dy * (x2 - x1)
-    if (Math.abs(det) < EPS) continue // Parallel
-
-    const u = (dx * (y1 - oy) - dy * (x1 - ox)) / det
-    const t = ((x2 - x1) * (y1 - oy) - (y2 - y1) * (x1 - ox)) / det
-
-    // Check if intersection is within segment (0 <= u <= 1) and forward of ray (t > 0)
-    if (u >= -EPS && u <= 1 + EPS && t >= -EPS) {
-      minDist = Math.min(minDist, t)
-    }
-  }
-
-  return minDist
-}
-
-/**
  * Check if a point is inside a polygon using ray casting (even-odd rule).
  */
 export function isPointInPolygon(
@@ -115,7 +71,109 @@ export function isPointInPolygon(
   return inside
 }
 
-// --- directional expansion caps (respect board + blockers + aspect) ---
+function getRightRayIntersectionDistance(
+  ox: number,
+  oy: number,
+  outline: Array<{ x: number; y: number }>,
+): number {
+  let minDist = Infinity
+
+  for (let i = 0; i < outline.length; i++) {
+    const p1 = outline[i]!
+    const p2 = outline[(i + 1) % outline.length]!
+
+    const x1 = p1.x,
+      y1 = p1.y
+    const x2 = p2.x,
+      y2 = p2.y
+
+    // Horizontal segment
+    if (Math.abs(y1 - y2) < EPS) {
+      if (Math.abs(oy - y1) < EPS) {
+        // Collinear and horizontal with ray
+        if ((ox < x1 || ox < x2) && (Math.max(x1, x2) > ox - EPS)) {
+          minDist = Math.min(minDist, Math.min(x1, x2) - ox)
+        }
+      }
+    }
+    // Vertical segment
+    else if (Math.abs(x1 - x2) < EPS) {
+      // If ray crosses segment's X and segment crosses ray's Y
+      if (x1 > ox - EPS && oy >= Math.min(y1, y2) - EPS && oy <= Math.max(y1, y2) + EPS) {
+        minDist = Math.min(minDist, x1 - ox)
+      }
+    }
+    // General segment
+    else {
+      const denom = (x2 - x1) * 0 - (y2 - y1) * 1 // dx * (y2 - y1) - dy * (x2 - x1) for dx=1, dy=0
+      if (Math.abs(denom) < EPS) continue // Should not happen often with general segments
+      
+      const t = ((x1 - ox) * (y2 - y1) - (y1 - oy) * (x2 - x1)) / denom
+
+      // Check if intersection is within segment (0 <= u <= 1) and forward of ray (t >= -EPS)
+      if (t >= -EPS && oy >= Math.min(y1, y2) - EPS && oy <= Math.max(y1, y2) + EPS) {
+        const intersectionX = ox + t * 1; // dx = 1
+        if (intersectionX > ox - EPS) {
+            minDist = Math.min(minDist, t)
+        }
+      }
+    }
+  }
+
+  return minDist
+}
+
+function getDownRayIntersectionDistance(
+  ox: number,
+  oy: number,
+  outline: Array<{ x: number; y: number }>,
+): number {
+  let minDist = Infinity
+
+  for (let i = 0; i < outline.length; i++) {
+    const p1 = outline[i]!
+    const p2 = outline[(i + 1) % outline.length]!
+
+    const x1 = p1.x,
+      y1 = p1.y
+    const x2 = p2.x,
+      y2 = p2.y
+
+    // Vertical segment
+    if (Math.abs(x1 - x2) < EPS) {
+      if (Math.abs(ox - x1) < EPS) {
+        // Collinear and vertical with ray
+        if ((oy < y1 || oy < y2) && (Math.max(y1, y2) > oy - EPS)) {
+          minDist = Math.min(minDist, Math.min(y1, y2) - oy)
+        }
+      }
+    }
+    // Horizontal segment
+    else if (Math.abs(y1 - y2) < EPS) {
+      // If ray crosses segment's Y and segment crosses ray's X
+      if (y1 > oy - EPS && ox >= Math.min(x1, x2) - EPS && ox <= Math.max(x1, x2) + EPS) {
+        minDist = Math.min(minDist, y1 - oy)
+      }
+    }
+    // General segment
+    else {
+      const denom = (x2 - x1) * 1 - (y2 - y1) * 0 // dx * (y2 - y1) - dy * (x2 - x1) for dx=0, dy=1
+      if (Math.abs(denom) < EPS) continue 
+      
+      const t = ((x1 - ox) * (y2 - y1) - (y1 - oy) * (x2 - x1)) / denom
+
+      // Check if intersection is within segment (0 <= u <= 1) and forward of ray (t >= -EPS)
+      if (t >= -EPS && ox >= Math.min(x1, x2) - EPS && ox <= Math.max(x1, x2) + EPS) {
+        const intersectionY = oy + t * 1; // dy = 1
+        if (intersectionY > oy - EPS) {
+            minDist = Math.min(minDist, t)
+        }
+      }
+    }
+  }
+
+  return minDist
+}
 
 function maxExpandRight(
   r: XYRect,
@@ -131,25 +189,19 @@ function maxExpandRight(
   if (outline && outline.length > 2) {
     console.log("Geometry: maxExpandRight checking outline")
     // Cast rays from the top-right and bottom-right corners of the expanding edge
-    const d1 = getRayIntersectionDistance(
+    const d1 = getRightRayIntersectionDistance(
       r.x + r.width,
       r.y,
-      1,
-      0,
       outline,
     )
-    const d2 = getRayIntersectionDistance(
+    const d2 = getRightRayIntersectionDistance(
       r.x + r.width,
       r.y + r.height,
-      1,
-      0,
       outline,
     )
-    const d3 = getRayIntersectionDistance(
+    const d3 = getRightRayIntersectionDistance(
       r.x + r.width,
       r.y + r.height / 2, // Midpoint ray
-      1,
-      0,
       outline,
     )
     console.log(
@@ -190,6 +242,58 @@ function maxExpandRight(
   return Math.max(0, e)
 }
 
+function getLeftRayIntersectionDistance(
+  ox: number,
+  oy: number,
+  outline: Array<{ x: number; y: number }>,
+): number {
+  let minDist = Infinity
+
+  for (let i = 0; i < outline.length; i++) {
+    const p1 = outline[i]!
+    const p2 = outline[(i + 1) % outline.length]!
+
+    const x1 = p1.x,
+      y1 = p1.y
+    const x2 = p2.x,
+      y2 = p2.y
+
+    // Horizontal segment
+    if (Math.abs(y1 - y2) < EPS) {
+      if (Math.abs(oy - y1) < EPS) {
+        // Collinear and horizontal with ray
+        if ((ox > x1 || ox > x2) && (Math.min(x1, x2) < ox + EPS)) {
+          minDist = Math.min(minDist, ox - Math.max(x1, x2))
+        }
+      }
+    }
+    // Vertical segment
+    else if (Math.abs(x1 - x2) < EPS) {
+      // If ray crosses segment's X and segment crosses ray's Y
+      if (x1 < ox + EPS && oy >= Math.min(y1, y2) - EPS && oy <= Math.max(y1, y2) + EPS) {
+        minDist = Math.min(minDist, ox - x1)
+      }
+    }
+    // General segment
+    else {
+      const denom = (x2 - x1) * 0 - (y2 - y1) * -1 // dx * (y2 - y1) - dy * (x2 - x1) for dx=-1, dy=0
+      if (Math.abs(denom) < EPS) continue
+      
+      const t = ((x1 - ox) * (y2 - y1) - (y1 - oy) * (x2 - x1)) / denom
+
+      // Check if intersection is within segment (0 <= u <= 1) and forward of ray (t >= -EPS)
+      if (t >= -EPS && oy >= Math.min(y1, y2) - EPS && oy <= Math.max(y1, y2) + EPS) {
+        const intersectionX = ox + t * -1; // dx = -1
+        if (intersectionX < ox + EPS) {
+            minDist = Math.min(minDist, t)
+        }
+      }
+    }
+  }
+
+  return minDist
+}
+
 function maxExpandDown(
   r: XYRect,
   bounds: XYRect,
@@ -203,25 +307,19 @@ function maxExpandDown(
   // Check outline constraint
   if (outline && outline.length > 2) {
     // Cast rays from the bottom-left and bottom-right corners of the expanding edge
-    const d1 = getRayIntersectionDistance(
+    const d1 = getDownRayIntersectionDistance(
       r.x,
       r.y + r.height,
-      0,
-      1,
       outline,
     )
-    const d2 = getRayIntersectionDistance(
+    const d2 = getDownRayIntersectionDistance(
       r.x + r.width,
       r.y + r.height,
-      0,
-      1,
       outline,
     )
-    const d3 = getRayIntersectionDistance(
+    const d3 = getDownRayIntersectionDistance(
       r.x + r.width / 2, // Midpoint ray
       r.y + r.height,
-      0,
-      1,
       outline,
     )
     console.log(
@@ -261,6 +359,58 @@ function maxExpandDown(
   return Math.max(0, e)
 }
 
+function getUpRayIntersectionDistance(
+  ox: number,
+  oy: number,
+  outline: Array<{ x: number; y: number }>,
+): number {
+  let minDist = Infinity
+
+  for (let i = 0; i < outline.length; i++) {
+    const p1 = outline[i]!
+    const p2 = outline[(i + 1) % outline.length]!
+
+    const x1 = p1.x,
+      y1 = p1.y
+    const x2 = p2.x,
+      y2 = p2.y
+
+    // Vertical segment
+    if (Math.abs(x1 - x2) < EPS) {
+      if (Math.abs(ox - x1) < EPS) {
+        // Collinear and vertical with ray
+        if ((oy > y1 || oy > y2) && (Math.min(y1, y2) < oy + EPS)) {
+          minDist = Math.min(minDist, oy - Math.max(y1, y2))
+        }
+      }
+    }
+    // Horizontal segment
+    else if (Math.abs(y1 - y2) < EPS) {
+      // If ray crosses segment's Y and segment crosses ray's X
+      if (y1 < oy + EPS && ox >= Math.min(x1, x2) - EPS && ox <= Math.max(x1, x2) + EPS) {
+        minDist = Math.min(minDist, oy - y1)
+      }
+    }
+    // General segment
+    else {
+      const denom = (x2 - x1) * 0 - (y2 - y1) * -1 // dx * (y2 - y1) - dy * (x2 - x1) for dx=0, dy=-1
+      if (Math.abs(denom) < EPS) continue
+      
+      const t = ((x1 - ox) * (y2 - y1) - (y1 - oy) * (x2 - x1)) / denom
+
+      // Check if intersection is within segment (0 <= u <= 1) and forward of ray (t >= -EPS)
+      if (t >= -EPS && ox >= Math.min(x1, x2) - EPS && ox <= Math.max(x1, x2) + EPS) {
+        const intersectionY = oy + t * -1; // dy = -1
+        if (intersectionY < oy + EPS) {
+            minDist = Math.min(minDist, t)
+        }
+      }
+    }
+  }
+
+  return minDist
+}
+
 function maxExpandLeft(
   r: XYRect,
   bounds: XYRect,
@@ -275,25 +425,19 @@ function maxExpandLeft(
   if (outline && outline.length > 2) {
     // Cast rays from the top-left and bottom-left corners of the expanding edge
     // Ray direction is -1, 0 (left)
-    const d1 = getRayIntersectionDistance(
+    const d1 = getLeftRayIntersectionDistance(
       r.x,
       r.y,
-      -1,
-      0,
       outline,
     )
-    const d2 = getRayIntersectionDistance(
+    const d2 = getLeftRayIntersectionDistance(
       r.x,
       r.y + r.height,
-      -1,
-      0,
       outline,
     )
-    const d3 = getRayIntersectionDistance(
+    const d3 = getLeftRayIntersectionDistance(
       r.x,
       r.y + r.height / 2, // Midpoint ray
-      -1,
-      0,
       outline,
     )
     const dist = Math.min(d1, d2, d3)
@@ -348,25 +492,19 @@ function maxExpandUp(
   if (outline && outline.length > 2) {
     // Cast rays from the top-left and top-right corners of the expanding edge
     // Ray direction is 0, -1 (up)
-    const d1 = getRayIntersectionDistance(
+    const d1 = getUpRayIntersectionDistance(
       r.x,
       r.y,
-      0,
-      -1,
       outline,
     )
-    const d2 = getRayIntersectionDistance(
+    const d2 = getUpRayIntersectionDistance(
       r.x + r.width,
       r.y,
-      0,
-      -1,
       outline,
     )
-    const d3 = getRayIntersectionDistance(
+    const d3 = getUpRayIntersectionDistance(
       r.x + r.width / 2, // Midpoint ray
       r.y,
-      0,
-      -1,
       outline,
     )
     const dist = Math.min(d1, d2, d3)
