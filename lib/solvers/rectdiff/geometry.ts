@@ -87,7 +87,7 @@ function getRayIntersectionDistance(
     const t = ((x2 - x1) * (y1 - oy) - (y2 - y1) * (x1 - ox)) / det
 
     // Check if intersection is within segment (0 <= u <= 1) and forward of ray (t > 0)
-    if (u >= 0 && u <= 1 && t > EPS) {
+    if (u >= -EPS && u <= 1 + EPS && t >= -EPS) {
       minDist = Math.min(minDist, t)
     }
   }
