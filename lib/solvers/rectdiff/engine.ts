@@ -97,6 +97,7 @@ export function initState(
     bounds,
     options,
     obstaclesByLayer,
+    outline: srj.outline, // Pass outline to state
     phase: "GRID",
     gridIndex: 0,
     candidates: [],
@@ -323,6 +324,7 @@ export function stepGrid(state: RectDiffState): void {
       initialCellRatio,
       maxAspectRatio,
       minReq: attempt.minReq,
+      outline: state.outline,
     })
     if (!rect) continue
 
@@ -378,6 +380,7 @@ export function stepExpansion(state: RectDiffState): void {
     initialCellRatio: 0,
     maxAspectRatio: null,
     minReq: { width: p.rect.width, height: p.rect.height },
+    outline: state.outline,
   })
 
   if (expanded) {

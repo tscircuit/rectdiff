@@ -51,6 +51,50 @@ export function distancePointToRectEdges(px: number, py: number, r: XYRect) {
   return best
 }
 
+/**
+ * Calculate the distance from a ray origin to the nearest intersection with the outline.
+ * Ray is cast in one of the 4 cardinal directions.
+ */
+function getRayIntersectionDistance(
+  ox: number,
+  oy: number,
+  dx: number,
+  dy: number,
+  outline: Array<{ x: number; y: number }>,
+): number {
+  let minDist = Infinity
+
+  for (let i = 0; i < outline.length; i++) {
+    const p1 = outline[i]!
+    const p2 = outline[(i + 1) % outline.length]!
+
+    // Segment P1-P2
+    const x1 = p1.x,
+      y1 = p1.y
+    const x2 = p2.x,
+      y2 = p2.y
+
+    // Ray: P = O + t * D
+    // Segment: P = A + u * (B - A)
+    // Solve for t and u
+    // dx * t - (x2 - x1) * u = x1 - ox
+    // dy * t - (y2 - y1) * u = y1 - oy
+
+    const det = dx * (y2 - y1) - dy * (x2 - x1)
+    if (Math.abs(det) < EPS) continue // Parallel
+
+    const u = (dx * (y1 - oy) - dy * (x1 - ox)) / det
+    const t = ((x2 - x1) * (y1 - oy) - (y2 - y1) * (x1 - ox)) / det
+
+    // Check if intersection is within segment (0 <= u <= 1) and forward of ray (t > 0)
+    if (u >= 0 && u <= 1 && t > EPS) {
+      minDist = Math.min(minDist, t)
+    }
+  }
+
+  return minDist
+}
+
 // --- directional expansion caps (respect board + blockers + aspect) ---
 
 function maxExpandRight(
@@ -58,9 +102,30 @@ function maxExpandRight(
   bounds: XYRect,
   blockers: XYRect[],
   maxAspect: number | null | undefined,
+  outline?: Array<{ x: number; y: number }>,
 ) {
   // Start with board boundary
   let maxWidth = bounds.x + bounds.width - r.x
+
+  // Check outline constraint
+  if (outline && outline.length > 2) {
+    // Cast rays from the top-right and bottom-right corners of the expanding edge
+    const d1 = getRayIntersectionDistance(
+      r.x + r.width,
+      r.y,
+      1,
+      0,
+      outline,
+    )
+    const d2 = getRayIntersectionDistance(
+      r.x + r.width,
+      r.y + r.height,
+      1,
+      0,
+      outline,
+    )
+    maxWidth = Math.min(maxWidth, d1, d2)
+  }
 
   // Check all blockers that could limit rightward expansion
   for (const b of blockers) {
@@ -99,9 +164,30 @@ function maxExpandDown(
   bounds: XYRect,
   blockers: XYRect[],
   maxAspect: number | null | undefined,
+  outline?: Array<{ x: number; y: number }>,
 ) {
   // Start with board boundary
   let maxHeight = bounds.y + bounds.height - r.y
+
+  // Check outline constraint
+  if (outline && outline.length > 2) {
+    // Cast rays from the bottom-left and bottom-right corners of the expanding edge
+    const d1 = getRayIntersectionDistance(
+      r.x,
+      r.y + r.height,
+      0,
+      1,
+      outline,
+    )
+    const d2 = getRayIntersectionDistance(
+      r.x + r.width,
+      r.y + r.height,
+      0,
+      1,
+      outline,
+    )
+    maxHeight = Math.min(maxHeight, d1, d2)
+  }
 
   // Check all blockers that could limit downward expansion
   for (const b of blockers) {
@@ -139,9 +225,35 @@ function maxExpandLeft(
   bounds: XYRect,
   blockers: XYRect[],
   maxAspect: number | null | undefined,
+  outline?: Array<{ x: number; y: number }>,
 ) {
   // Start with board boundary
   let minX = bounds.x
+
+  // Check outline constraint
+  if (outline && outline.length > 2) {
+    // Cast rays from the top-left and bottom-left corners of the expanding edge
+    // Ray direction is -1, 0 (left)
+    const d1 = getRayIntersectionDistance(
+      r.x,
+      r.y,
+      -1,
+      0,
+      outline,
+    )
+    const d2 = getRayIntersectionDistance(
+      r.x,
+      r.y + r.height,
+      -1,
+      0,
+      outline,
+    )
+    // Distance returned is positive scalar t. New minX = r.x - min(d)
+    const dist = Math.min(d1, d2)
+    if (dist !== Infinity) {
+        minX = Math.max(minX, r.x - dist)
+    }
+  }
 
   // Check all blockers that could limit leftward expansion
   for (const b of blockers) {
@@ -177,9 +289,35 @@ function maxExpandUp(
   bounds: XYRect,
   blockers: XYRect[],
   maxAspect: number | null | undefined,
+  outline?: Array<{ x: number; y: number }>,
 ) {
   // Start with board boundary
   let minY = bounds.y
+
+  // Check outline constraint
+  if (outline && outline.length > 2) {
+    // Cast rays from the top-left and top-right corners of the expanding edge
+    // Ray direction is 0, -1 (up)
+    const d1 = getRayIntersectionDistance(
+      r.x,
+      r.y,
+      0,
+      -1,
+      outline,
+    )
+    const d2 = getRayIntersectionDistance(
+      r.x + r.width,
+      r.y,
+      0,
+      -1,
+      outline,
+    )
+    // Distance returned is positive scalar t. New minY = r.y - min(d)
+    const dist = Math.min(d1, d2)
+    if (dist !== Infinity) {
+        minY = Math.max(minY, r.y - dist)
+    }
+  }
 
   // Check all blockers that could limit upward expansion
   for (const b of blockers) {
@@ -219,6 +357,7 @@ export function expandRectFromSeed(params: {
   initialCellRatio: number
   maxAspectRatio: number | null | undefined
   minReq: { width: number; height: number }
+  outline?: Array<{ x: number; y: number }>
 }): XYRect | null {
   const {
     startX,
@@ -229,6 +368,7 @@ export function expandRectFromSeed(params: {
     initialCellRatio,
     maxAspectRatio,
     minReq,
+    outline,
   } = params
 
   const minSide = Math.max(1e-9, gridSize * initialCellRatio)
@@ -271,25 +411,25 @@ export function expandRectFromSeed(params: {
     let improved = true
     while (improved) {
       improved = false
-      const eR = maxExpandRight(r, bounds, blockers, maxAspectRatio)
+      const eR = maxExpandRight(r, bounds, blockers, maxAspectRatio, outline)
       if (eR > 0) {
         r = { ...r, width: r.width + eR }
         improved = true
       }
 
-      const eD = maxExpandDown(r, bounds, blockers, maxAspectRatio)
+      const eD = maxExpandDown(r, bounds, blockers, maxAspectRatio, outline)
       if (eD > 0) {
         r = { ...r, height: r.height + eD }
         improved = true
       }
 
-      const eL = maxExpandLeft(r, bounds, blockers, maxAspectRatio)
+      const eL = maxExpandLeft(r, bounds, blockers, maxAspectRatio, outline)
       if (eL > 0) {
         r = { x: r.x - eL, y: r.y, width: r.width + eL, height: r.height }
         improved = true
       }
 
-      const eU = maxExpandUp(r, bounds, blockers, maxAspectRatio)
+      const eU = maxExpandUp(r, bounds, blockers, maxAspectRatio, outline)
       if (eU > 0) {
         r = { x: r.x, y: r.y - eU, width: r.width, height: r.height + eU }
         improved = true
