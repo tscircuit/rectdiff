@@ -235,6 +235,7 @@ export function stepGrid(state: RectDiffState): void {
       obstaclesByLayer: state.obstaclesByLayer,
       placedByLayer: state.placedByLayer,
       hardPlacedByLayer,
+      outline: state.outline,
     })
     state.totalSeedsThisGrid = state.candidates.length
     state.consumedSeedsThisGrid = 0

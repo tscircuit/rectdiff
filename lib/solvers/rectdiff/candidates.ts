@@ -1,6 +1,12 @@
 // lib/solvers/rectdiff/candidates.ts
 import type { Candidate3D, XYRect } from "./types"
-import { EPS, clamp, containsPoint, distancePointToRectEdges } from "./geometry"
+import {
+  EPS,
+  clamp,
+  containsPoint,
+  distancePointToRectEdges,
+  isPointInPolygon,
+} from "./geometry"
 
 /**
  * Check if a point is occupied on all layers.
@@ -34,6 +40,7 @@ export function computeCandidates3D(params: {
   obstaclesByLayer: XYRect[][]
   placedByLayer: XYRect[][]
   hardPlacedByLayer: XYRect[][]
+  outline?: Array<{ x: number; y: number }>
 }): Candidate3D[] {
   const {
     bounds,
@@ -42,6 +49,7 @@ export function computeCandidates3D(params: {
     obstaclesByLayer,
     placedByLayer,
     hardPlacedByLayer,
+    outline,
   } = params
   const out = new Map<string, Candidate3D>() // key by (x,y)
 
@@ -55,6 +63,13 @@ export function computeCandidates3D(params: {
         y > bounds.y + bounds.height - gridSize - EPS
       ) {
         continue
+      }
+
+      // Option 1: Seed Filtering
+      if (outline && outline.length > 2) {
+        if (!isPointInPolygon(x, y, outline)) {
+          continue
+        }
       }
 
       // New rule: Only drop if EVERY layer is occupied (by obstacle or node)

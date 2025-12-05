@@ -95,6 +95,26 @@ function getRayIntersectionDistance(
   return minDist
 }
 
+/**
+ * Check if a point is inside a polygon using ray casting (even-odd rule).
+ */
+export function isPointInPolygon(
+  x: number,
+  y: number,
+  polygon: Array<{ x: number; y: number }>,
+): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const pi = polygon[i]!
+    const pj = polygon[j]!
+
+    const intersect =
+      pi.y > y !== pj.y > y && x < ((pj.x - pi.x) * (y - pi.y)) / (pj.y - pi.y) + pi.x
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
 // --- directional expansion caps (respect board + blockers + aspect) ---
 
 function maxExpandRight(
