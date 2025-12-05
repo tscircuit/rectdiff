@@ -92,7 +92,7 @@ function getRightRayIntersectionDistance(
       if (Math.abs(oy - y1) < EPS) {
         // Collinear and horizontal with ray
         if ((ox < x1 || ox < x2) && (Math.max(x1, x2) > ox - EPS)) {
-          minDist = Math.min(minDist, Math.min(x1, x2) - ox)
+          minDist = Math.min(minDist, Math.max(0, Math.min(x1, x2) - ox))
         }
       }
     }
@@ -100,7 +100,7 @@ function getRightRayIntersectionDistance(
     else if (Math.abs(x1 - x2) < EPS) {
       // If ray crosses segment's X and segment crosses ray's Y
       if (x1 > ox - EPS && oy >= Math.min(y1, y2) - EPS && oy <= Math.max(y1, y2) + EPS) {
-        minDist = Math.min(minDist, x1 - ox)
+        minDist = Math.min(minDist, Math.max(0, x1 - ox))
       }
     }
     // General segment
@@ -144,7 +144,7 @@ function getDownRayIntersectionDistance(
       if (Math.abs(ox - x1) < EPS) {
         // Collinear and vertical with ray
         if ((oy < y1 || oy < y2) && (Math.max(y1, y2) > oy - EPS)) {
-          minDist = Math.min(minDist, Math.min(y1, y2) - oy)
+          minDist = Math.min(minDist, Math.max(0, Math.min(y1, y2) - oy))
         }
       }
     }
@@ -152,7 +152,7 @@ function getDownRayIntersectionDistance(
     else if (Math.abs(y1 - y2) < EPS) {
       // If ray crosses segment's Y and segment crosses ray's X
       if (y1 > oy - EPS && ox >= Math.min(x1, x2) - EPS && ox <= Math.max(x1, x2) + EPS) {
-        minDist = Math.min(minDist, y1 - oy)
+        minDist = Math.min(minDist, Math.max(0, y1 - oy))
       }
     }
     // General segment
@@ -263,7 +263,7 @@ function getLeftRayIntersectionDistance(
       if (Math.abs(oy - y1) < EPS) {
         // Collinear and horizontal with ray
         if ((ox > x1 || ox > x2) && (Math.min(x1, x2) < ox + EPS)) {
-          minDist = Math.min(minDist, ox - Math.max(x1, x2))
+          minDist = Math.min(minDist, Math.max(0, ox - Math.max(x1, x2)))
         }
       }
     }
@@ -271,7 +271,7 @@ function getLeftRayIntersectionDistance(
     else if (Math.abs(x1 - x2) < EPS) {
       // If ray crosses segment's X and segment crosses ray's Y
       if (x1 < ox + EPS && oy >= Math.min(y1, y2) - EPS && oy <= Math.max(y1, y2) + EPS) {
-        minDist = Math.min(minDist, ox - x1)
+        minDist = Math.min(minDist, Math.max(0, ox - x1))
       }
     }
     // General segment
@@ -380,7 +380,7 @@ function getUpRayIntersectionDistance(
       if (Math.abs(ox - x1) < EPS) {
         // Collinear and vertical with ray
         if ((oy > y1 || oy > y2) && (Math.min(y1, y2) < oy + EPS)) {
-          minDist = Math.min(minDist, oy - Math.max(y1, y2))
+          minDist = Math.min(minDist, Math.max(0, oy - Math.max(y1, y2)))
         }
       }
     }
@@ -388,7 +388,7 @@ function getUpRayIntersectionDistance(
     else if (Math.abs(y1 - y2) < EPS) {
       // If ray crosses segment's Y and segment crosses ray's X
       if (y1 < oy + EPS && ox >= Math.min(x1, x2) - EPS && ox <= Math.max(x1, x2) + EPS) {
-        minDist = Math.min(minDist, oy - y1)
+        minDist = Math.min(minDist, Math.max(0, oy - y1))
       }
     }
     // General segment
