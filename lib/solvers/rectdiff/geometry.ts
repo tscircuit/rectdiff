@@ -105,7 +105,7 @@ function getRightRayIntersectionDistance(
     }
     // General segment
     else {
-      const denom = (x2 - x1) * 0 - (y2 - y1) * 1 // dx * (y2 - y1) - dy * (x2 - x1) for dx=1, dy=0
+      const denom = 1 * (y2 - y1) - 0 * (x2 - x1) // dx * (y2 - y1) - dy * (x2 - x1) for dx=1, dy=0
       if (Math.abs(denom) < EPS) continue // Should not happen often with general segments
       
       const t = ((x1 - ox) * (y2 - y1) - (y1 - oy) * (x2 - x1)) / denom
@@ -157,7 +157,7 @@ function getDownRayIntersectionDistance(
     }
     // General segment
     else {
-      const denom = (x2 - x1) * 1 - (y2 - y1) * 0 // dx * (y2 - y1) - dy * (x2 - x1) for dx=0, dy=1
+      const denom = 0 * (y2 - y1) - 1 * (x2 - x1) // dx * (y2 - y1) - dy * (x2 - x1) for dx=0, dy=1
       if (Math.abs(denom) < EPS) continue 
       
       const t = ((x1 - ox) * (y2 - y1) - (y1 - oy) * (x2 - x1)) / denom
@@ -276,7 +276,7 @@ function getLeftRayIntersectionDistance(
     }
     // General segment
     else {
-      const denom = (x2 - x1) * 0 - (y2 - y1) * -1 // dx * (y2 - y1) - dy * (x2 - x1) for dx=-1, dy=0
+      const denom = -1 * (y2 - y1) - 0 * (x2 - x1) // dx * (y2 - y1) - dy * (x2 - x1) for dx=-1, dy=0
       if (Math.abs(denom) < EPS) continue
       
       const t = ((x1 - ox) * (y2 - y1) - (y1 - oy) * (x2 - x1)) / denom
@@ -393,7 +393,7 @@ function getUpRayIntersectionDistance(
     }
     // General segment
     else {
-      const denom = (x2 - x1) * 0 - (y2 - y1) * -1 // dx * (y2 - y1) - dy * (x2 - x1) for dx=0, dy=-1
+      const denom = 0 * (y2 - y1) - -1 * (x2 - x1) // dx * (y2 - y1) - dy * (x2 - x1) for dx=0, dy=-1
       if (Math.abs(denom) < EPS) continue
       
       const t = ((x1 - ox) * (y2 - y1) - (y1 - oy) * (x2 - x1)) / denom
