@@ -53,6 +53,12 @@ export function computeCandidates3D(params: {
   } = params
   const out = new Map<string, Candidate3D>() // key by (x,y)
 
+  console.log(
+    "Candidates: computeCandidates3D outline length:",
+    outline?.length,
+  )
+  let logCount = 0
+
   for (let x = bounds.x; x < bounds.x + bounds.width; x += gridSize) {
     for (let y = bounds.y; y < bounds.y + bounds.height; y += gridSize) {
       // Skip outermost row/col (stable with prior behavior)
@@ -67,7 +73,14 @@ export function computeCandidates3D(params: {
 
       // Option 1: Seed Filtering
       if (outline && outline.length > 2) {
-        if (!isPointInPolygon(x, y, outline)) {
+        const inside = isPointInPolygon(x, y, outline)
+        if (logCount < 50) {
+          console.log(
+            `Candidates: Point (${x.toFixed(2)}, ${y.toFixed(2)}) inside? ${inside}`,
+          )
+          logCount++
+        }
+        if (!inside) {
           continue
         }
       }

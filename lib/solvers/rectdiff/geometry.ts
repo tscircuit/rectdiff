@@ -129,6 +129,7 @@ function maxExpandRight(
 
   // Check outline constraint
   if (outline && outline.length > 2) {
+    console.log("Geometry: maxExpandRight checking outline")
     // Cast rays from the top-right and bottom-right corners of the expanding edge
     const d1 = getRayIntersectionDistance(
       r.x + r.width,
@@ -143,6 +144,9 @@ function maxExpandRight(
       1,
       0,
       outline,
+    )
+    console.log(
+      `Geometry: maxExpandRight results for r=(${r.x.toFixed(2)},${r.y.toFixed(2)},w=${r.width.toFixed(2)},h=${r.height.toFixed(2)}): d1=${d1.toFixed(2)}, d2=${d2.toFixed(2)}, currentMaxWidth=${maxWidth.toFixed(2)}`,
     )
     maxWidth = Math.min(maxWidth, d1, d2)
   }
