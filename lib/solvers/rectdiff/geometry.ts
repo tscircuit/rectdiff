@@ -145,10 +145,17 @@ function maxExpandRight(
       0,
       outline,
     )
-    console.log(
-      `Geometry: maxExpandRight results for r=(${r.x.toFixed(2)},${r.y.toFixed(2)},w=${r.width.toFixed(2)},h=${r.height.toFixed(2)}): d1=${d1.toFixed(2)}, d2=${d2.toFixed(2)}, currentMaxWidth=${maxWidth.toFixed(2)}`,
+    const d3 = getRayIntersectionDistance(
+      r.x + r.width,
+      r.y + r.height / 2, // Midpoint ray
+      1,
+      0,
+      outline,
     )
-    maxWidth = Math.min(maxWidth, d1, d2)
+    console.log(
+      `Geometry: maxExpandRight results for r=(${r.x.toFixed(2)},${r.y.toFixed(2)},w=${r.width.toFixed(2)},h=${r.height.toFixed(2)}): d1=${d1.toFixed(2)}, d2=${d2.toFixed(2)}, d3=${d3.toFixed(2)}, currentMaxWidth=${maxWidth.toFixed(2)}`,
+    )
+    maxWidth = Math.min(maxWidth, d1, d2, d3)
   }
 
   // Check all blockers that could limit rightward expansion
@@ -210,7 +217,17 @@ function maxExpandDown(
       1,
       outline,
     )
-    maxHeight = Math.min(maxHeight, d1, d2)
+    const d3 = getRayIntersectionDistance(
+      r.x + r.width / 2, // Midpoint ray
+      r.y + r.height,
+      0,
+      1,
+      outline,
+    )
+    console.log(
+      `Geometry: maxExpandDown results for r=(${r.x.toFixed(2)},${r.y.toFixed(2)},w=${r.width.toFixed(2)},h=${r.height.toFixed(2)}): d1=${d1.toFixed(2)}, d2=${d2.toFixed(2)}, d3=${d3.toFixed(2)}, currentMaxHeight=${maxHeight.toFixed(2)}`,
+    )
+    maxHeight = Math.min(maxHeight, d1, d2, d3)
   }
 
   // Check all blockers that could limit downward expansion
@@ -272,10 +289,19 @@ function maxExpandLeft(
       0,
       outline,
     )
-    // Distance returned is positive scalar t. New minX = r.x - min(d)
-    const dist = Math.min(d1, d2)
+    const d3 = getRayIntersectionDistance(
+      r.x,
+      r.y + r.height / 2, // Midpoint ray
+      -1,
+      0,
+      outline,
+    )
+    const dist = Math.min(d1, d2, d3)
+    console.log(
+      `Geometry: maxExpandLeft results for r=(${r.x.toFixed(2)},${r.y.toFixed(2)},w=${r.width.toFixed(2)},h=${r.height.toFixed(2)}): d1=${d1.toFixed(2)}, d2=${d2.toFixed(2)}, d3=${d3.toFixed(2)}, currentMinX=${minX.toFixed(2)}`,
+    )
     if (dist !== Infinity) {
-        minX = Math.max(minX, r.x - dist)
+      minX = Math.max(minX, r.x - dist)
     }
   }
 
@@ -336,10 +362,19 @@ function maxExpandUp(
       -1,
       outline,
     )
-    // Distance returned is positive scalar t. New minY = r.y - min(d)
-    const dist = Math.min(d1, d2)
+    const d3 = getRayIntersectionDistance(
+      r.x + r.width / 2, // Midpoint ray
+      r.y,
+      0,
+      -1,
+      outline,
+    )
+    const dist = Math.min(d1, d2, d3)
+    console.log(
+      `Geometry: maxExpandUp results for r=(${r.x.toFixed(2)},${r.y.toFixed(2)},w=${r.width.toFixed(2)},h=${r.height.toFixed(2)}): d1=${d1.toFixed(2)}, d2=${d2.toFixed(2)}, d3=${d3.toFixed(2)}, currentMinY=${minY.toFixed(2)}`,
+    )
     if (dist !== Infinity) {
-        minY = Math.max(minY, r.y - dist)
+      minY = Math.max(minY, r.y - dist)
     }
   }
 
