@@ -49,6 +49,7 @@ export type RectDiffState = {
     maxMultiLayerSpan: number | undefined
   }
   obstaclesByLayer: XYRect[][]
+  outline?: Array<{ x: number; y: number }>
 
   // evolving
   phase: Phase

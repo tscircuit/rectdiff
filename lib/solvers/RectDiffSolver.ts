@@ -43,6 +43,10 @@ export class RectDiffSolver extends BaseSolver {
     this.gridOptions = opts.gridOptions ?? {}
     this.gapFillOptions = opts.gapFillOptions ?? {}
     this.activeSubSolver = null
+    console.log(
+      "RectDiffSolver: Initialized with outline:",
+      this.srj.outline ? this.srj.outline.length : "None",
+    )
   }
 
   override _setup() {

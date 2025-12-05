@@ -89,6 +89,11 @@ export function initState(
 
   const placedByLayer: XYRect[][] = Array.from({ length: layerCount }, () => [])
 
+  console.log(
+    "Engine: initState outline:",
+    srj.outline ? srj.outline.length : "None",
+  )
+
   // Begin at the **first** grid level; candidates computed lazily on first step
   return {
     srj,
@@ -97,6 +102,7 @@ export function initState(
     bounds,
     options,
     obstaclesByLayer,
+    outline: srj.outline, // Pass outline to state
     phase: "GRID",
     gridIndex: 0,
     candidates: [],
@@ -227,6 +233,10 @@ export function stepGrid(state: RectDiffState): void {
 
   // Ensure candidates exist for this grid
   if (state.candidates.length === 0 && state.consumedSeedsThisGrid === 0) {
+    console.log(
+      "Engine: computeCandidates3D outline:",
+      state.outline ? state.outline.length : "None",
+    )
     state.candidates = computeCandidates3D({
       bounds: state.bounds,
       gridSize: grid,
@@ -234,6 +244,7 @@ export function stepGrid(state: RectDiffState): void {
       obstaclesByLayer: state.obstaclesByLayer,
       placedByLayer: state.placedByLayer,
       hardPlacedByLayer,
+      outline: state.outline,
     })
     state.totalSeedsThisGrid = state.candidates.length
     state.consumedSeedsThisGrid = 0
@@ -323,6 +334,7 @@ export function stepGrid(state: RectDiffState): void {
       initialCellRatio,
       maxAspectRatio,
       minReq: attempt.minReq,
+      outline: state.outline,
     })
     if (!rect) continue
 
@@ -369,6 +381,10 @@ export function stepExpansion(state: RectDiffState): void {
   }
 
   const oldRect = p.rect
+  console.log(
+    "Engine: stepExpansion calling expandRectFromSeed, outline:",
+    state.outline ? state.outline.length : "None",
+  )
   const expanded = expandRectFromSeed({
     startX: p.rect.x + p.rect.width / 2,
     startY: p.rect.y + p.rect.height / 2,
@@ -378,6 +394,7 @@ export function stepExpansion(state: RectDiffState): void {
     initialCellRatio: 0,
     maxAspectRatio: null,
     minReq: { width: p.rect.width, height: p.rect.height },
+    outline: state.outline,
   })
 
   if (expanded) {
