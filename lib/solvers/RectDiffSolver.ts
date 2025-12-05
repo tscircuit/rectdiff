@@ -190,6 +190,7 @@ export class RectDiffSolver extends BaseSolver {
 
     const rects: NonNullable<GraphicsObject["rects"]> = []
     const points: NonNullable<GraphicsObject["points"]> = []
+    const lines: NonNullable<GraphicsObject["lines"]> = [] // Initialize lines array
 
     // Board bounds - use srj bounds which is always available
     const boardBounds = {
@@ -199,18 +200,27 @@ export class RectDiffSolver extends BaseSolver {
       maxY: this.srj.bounds.maxY,
     }
 
-    // board
-    rects.push({
-      center: {
-        x: (boardBounds.minX + boardBounds.maxX) / 2,
-        y: (boardBounds.minY + boardBounds.maxY) / 2,
-      },
-      width: boardBounds.maxX - boardBounds.minX,
-      height: boardBounds.maxY - boardBounds.minY,
-      fill: "none",
-      stroke: "#111827",
-      label: "board",
-    })
+    // board or outline
+    if (this.srj.outline && this.srj.outline.length > 1) {
+      lines.push({
+        points: [...this.srj.outline, this.srj.outline[0]!], // Close the loop by adding the first point again
+        strokeColor: "#111827",
+        strokeWidth: 0.01,
+        label: "outline",
+      })
+    } else {
+      rects.push({
+        center: {
+          x: (boardBounds.minX + boardBounds.maxX) / 2,
+          y: (boardBounds.minY + boardBounds.maxY) / 2,
+        },
+        width: boardBounds.maxX - boardBounds.minX,
+        height: boardBounds.maxY - boardBounds.minY,
+        fill: "none",
+        stroke: "#111827",
+        label: "board",
+      })
+    }
 
     // obstacles (rect & oval as bounding boxes)
     for (const ob of this.srj.obstacles ?? []) {
@@ -263,6 +273,7 @@ export class RectDiffSolver extends BaseSolver {
       coordinateSystem: "cartesian",
       rects,
       points,
+      lines, // Include lines in the returned GraphicsObject
     }
   }
 }
