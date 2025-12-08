@@ -13,6 +13,8 @@ import {
   computeProgress,
 } from "./rectdiff/engine"
 import { rectsToMeshNodes } from "./rectdiff/rectsToMeshNodes"
+import { overlaps } from "./rectdiff/geometry"
+import type { GapFillOptions } from "./rectdiff/gapfill/types"
 import {
   findUncoveredPoints,
   calculateCoverage,
@@ -178,7 +180,33 @@ export class RectDiffSolver extends BaseSolver {
 
     // board void rects
     if (this.state?.boardVoidRects) {
+      // If outline exists, compute its bbox to hide outer padding voids
+      let outlineBBox: {
+        x: number
+        y: number
+        width: number
+        height: number
+      } | null = null
+
+      if (this.srj.outline && this.srj.outline.length > 0) {
+        const xs = this.srj.outline.map((p) => p.x)
+        const ys = this.srj.outline.map((p) => p.y)
+        const minX = Math.min(...xs)
+        const minY = Math.min(...ys)
+        outlineBBox = {
+          x: minX,
+          y: minY,
+          width: Math.max(...xs) - minX,
+          height: Math.max(...ys) - minY,
+        }
+      }
+
       for (const r of this.state.boardVoidRects) {
+        // If we have an outline, only show voids that overlap its bbox (hides outer padding)
+        if (outlineBBox && !overlaps(r, outlineBBox)) {
+          continue
+        }
+
         rects.push({
           center: { x: r.x + r.width / 2, y: r.y + r.height / 2 },
           width: r.width,
