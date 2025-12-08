@@ -164,12 +164,12 @@ export class RectDiffSolver extends BaseSolver {
     }
 
     // obstacles (rect & oval as bounding boxes)
-    for (const ob of this.srj.obstacles ?? []) {
-      if (ob.type === "rect" || ob.type === "oval") {
+    for (const obstacle of this.srj.obstacles ?? []) {
+      if (obstacle.type === "rect" || obstacle.type === "oval") {
         rects.push({
-          center: { x: ob.center.x, y: ob.center.y },
-          width: ob.width,
-          height: ob.height,
+          center: { x: obstacle.center.x, y: obstacle.center.y },
+          width: obstacle.width,
+          height: obstacle.height,
           fill: "#fee2e2",
           stroke: "#ef4444",
           layer: "obstacle",

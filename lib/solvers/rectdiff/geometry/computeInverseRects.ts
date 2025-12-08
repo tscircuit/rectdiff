@@ -1,6 +1,6 @@
 import type { XYRect } from "../types"
 import { isPointInPolygon } from "./isPointInPolygon"
-const EPS = 1e-9
+import { EPS } from "../geometry" // Import EPS from common geometry file
 
 /**
  * Decompose the empty space inside 'bounds' but outside 'polygon' into rectangles.

@@ -58,11 +58,11 @@ export function initState(
     }
   }
 
-  for (const ob of srj.obstacles ?? []) {
-    const r = obstacleToXYRect(ob)
-    if (!r) continue
-    const zs = obstacleZs(ob, zIndexByName)
-    const invalidZs = zs.filter((z) => z < 0 || z >= layerCount)
+  for (const obstacle of srj.obstacles ?? []) {
+    const rect = obstacleToXYRect(obstacle)
+    if (!rect) continue
+    const zLayers = obstacleZs(obstacle, zIndexByName)
+    const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
     if (invalidZs.length) {
       throw new Error(
         `RectDiffSolver: obstacle uses z-layer indices ${invalidZs.join(
@@ -71,8 +71,9 @@ export function initState(
       )
     }
     // Persist normalized zLayers back onto the shared SRJ so downstream solvers see them.
-    if ((!ob.zLayers || ob.zLayers.length === 0) && zs.length) ob.zLayers = zs
-    for (const z of zs) obstaclesByLayer[z]!.push(r)
+    if ((!obstacle.zLayers || obstacle.zLayers.length === 0) && zLayers.length)
+      obstacle.zLayers = zLayers
+    for (const z of zLayers) obstaclesByLayer[z]!.push(rect)
   }
 
   const trace = Math.max(0.01, srj.minTraceWidth || 0.15)
