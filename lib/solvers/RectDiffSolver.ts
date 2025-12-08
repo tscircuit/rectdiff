@@ -176,6 +176,20 @@ export class RectDiffSolver extends BaseSolver {
       }
     }
 
+    // board void rects
+    if (this.state?.boardVoidRects) {
+      for (const r of this.state.boardVoidRects) {
+        rects.push({
+          center: { x: r.x + r.width / 2, y: r.y + r.height / 2 },
+          width: r.width,
+          height: r.height,
+          fill: "rgba(0, 0, 0, 0.5)",
+          stroke: "none",
+          label: "void",
+        })
+      }
+    }
+
     // candidate positions (where expansion started from)
     if (this.state?.candidates?.length) {
       for (const cand of this.state.candidates) {

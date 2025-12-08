@@ -20,6 +20,7 @@ import {
   overlaps,
   subtractRect2D,
 } from "./geometry"
+import { computeInverseRects } from "./geometry/computeInverseRects"
 import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
 
 /**
@@ -44,6 +45,19 @@ export function initState(
     { length: layerCount },
     () => [],
   )
+
+  // Compute void rects from outline if present
+  let boardVoidRects: XYRect[] = []
+  if (srj.outline && srj.outline.length > 2) {
+    boardVoidRects = computeInverseRects(bounds, srj.outline)
+    // Add void rects as obstacles to ALL layers
+    for (const voidR of boardVoidRects) {
+      for (let z = 0; z < layerCount; z++) {
+        obstaclesByLayer[z]!.push(voidR)
+      }
+    }
+  }
+
   for (const ob of srj.obstacles ?? []) {
     const r = obstacleToXYRect(ob)
     if (!r) continue
@@ -97,6 +111,7 @@ export function initState(
     bounds,
     options,
     obstaclesByLayer,
+    boardVoidRects,
     phase: "GRID",
     gridIndex: 0,
     candidates: [],

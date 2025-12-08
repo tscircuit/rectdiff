@@ -49,6 +49,7 @@ export type RectDiffState = {
     maxMultiLayerSpan: number | undefined
   }
   obstaclesByLayer: XYRect[][]
+  boardVoidRects: XYRect[] // newly added for viz
 
   // evolving
   phase: Phase
