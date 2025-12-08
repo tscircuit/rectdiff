@@ -13,12 +13,12 @@ import {
   computeProgress,
 } from "./rectdiff/engine"
 import { rectsToMeshNodes } from "./rectdiff/rectsToMeshNodes"
+import { overlaps } from "./rectdiff/geometry"
 import type { GapFillOptions } from "./rectdiff/gapfill/types"
 import {
   findUncoveredPoints,
   calculateCoverage,
 } from "./rectdiff/gapfill/engine"
-import { GapFillSubSolver } from "./rectdiff/subsolvers/GapFillSubSolver"
 
 /**
  * A streaming, one-step-per-iteration solver for capacity mesh generation.
@@ -26,23 +26,16 @@ import { GapFillSubSolver } from "./rectdiff/subsolvers/GapFillSubSolver"
 export class RectDiffSolver extends BaseSolver {
   private srj: SimpleRouteJson
   private gridOptions: Partial<GridFill3DOptions>
-  private gapFillOptions: Partial<GapFillOptions>
   private state!: RectDiffState
   private _meshNodes: CapacityMeshNode[] = []
-
-  /** Active subsolver for GAP_FILL phases. */
-  declare activeSubSolver: GapFillSubSolver | null
 
   constructor(opts: {
     simpleRouteJson: SimpleRouteJson
     gridOptions?: Partial<GridFill3DOptions>
-    gapFillOptions?: Partial<GapFillOptions>
   }) {
     super()
     this.srj = opts.simpleRouteJson
     this.gridOptions = opts.gridOptions ?? {}
-    this.gapFillOptions = opts.gapFillOptions ?? {}
-    this.activeSubSolver = null
   }
 
   override _setup() {
@@ -60,44 +53,7 @@ export class RectDiffSolver extends BaseSolver {
     } else if (this.state.phase === "EXPANSION") {
       stepExpansion(this.state)
     } else if (this.state.phase === "GAP_FILL") {
-      // Initialize gap fill subsolver if needed
-      if (
-        !this.activeSubSolver ||
-        !(this.activeSubSolver instanceof GapFillSubSolver)
-      ) {
-        const minTrace = this.srj.minTraceWidth || 0.15
-        const minGapSize = Math.max(0.01, minTrace / 10)
-        const boundsSize = Math.min(
-          this.state.bounds.width,
-          this.state.bounds.height,
-        )
-        this.activeSubSolver = new GapFillSubSolver({
-          placed: this.state.placed,
-          options: {
-            minWidth: minGapSize,
-            minHeight: minGapSize,
-            scanResolution: Math.max(0.05, boundsSize / 100),
-            ...this.gapFillOptions,
-          },
-          layerCtx: {
-            bounds: this.state.bounds,
-            layerCount: this.state.layerCount,
-            obstaclesByLayer: this.state.obstaclesByLayer,
-            placedByLayer: this.state.placedByLayer,
-          },
-        })
-      }
-
-      this.activeSubSolver.step()
-
-      if (this.activeSubSolver.solved) {
-        // Transfer results back to main state
-        const output = this.activeSubSolver.getOutput()
-        this.state.placed = output.placed
-        this.state.placedByLayer = output.placedByLayer
-        this.activeSubSolver = null
-        this.state.phase = "DONE"
-      }
+      this.state.phase = "DONE"
     } else if (this.state.phase === "DONE") {
       // Finalize once
       if (!this.solved) {
@@ -112,10 +68,6 @@ export class RectDiffSolver extends BaseSolver {
     this.stats.phase = this.state.phase
     this.stats.gridIndex = this.state.gridIndex
     this.stats.placed = this.state.placed.length
-    if (this.activeSubSolver instanceof GapFillSubSolver) {
-      const output = this.activeSubSolver.getOutput()
-      this.stats.gapsFilled = output.filledCount
-    }
   }
 
   /** Compute solver progress (0 to 1). */
@@ -123,13 +75,7 @@ export class RectDiffSolver extends BaseSolver {
     if (this.solved || this.state.phase === "DONE") {
       return 1
     }
-    if (
-      this.state.phase === "GAP_FILL" &&
-      this.activeSubSolver instanceof GapFillSubSolver
-    ) {
-      return 0.85 + 0.1 * this.activeSubSolver.computeProgress()
-    }
-    return computeProgress(this.state) * 0.85
+    return computeProgress(this.state)
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
@@ -183,11 +129,6 @@ export class RectDiffSolver extends BaseSolver {
 
   /** Streaming visualization: board + obstacles + current placements. */
   override visualize(): GraphicsObject {
-    // If a subsolver is active, delegate to its visualization
-    if (this.activeSubSolver) {
-      return this.activeSubSolver.visualize()
-    }
-
     const rects: NonNullable<GraphicsObject["rects"]> = []
     const points: NonNullable<GraphicsObject["points"]> = []
     const lines: NonNullable<GraphicsObject["lines"]> = [] // Initialize lines array
@@ -223,16 +164,56 @@ export class RectDiffSolver extends BaseSolver {
     }
 
     // obstacles (rect & oval as bounding boxes)
-    for (const ob of this.srj.obstacles ?? []) {
-      if (ob.type === "rect" || ob.type === "oval") {
+    for (const obstacle of this.srj.obstacles ?? []) {
+      if (obstacle.type === "rect" || obstacle.type === "oval") {
         rects.push({
-          center: { x: ob.center.x, y: ob.center.y },
-          width: ob.width,
-          height: ob.height,
+          center: { x: obstacle.center.x, y: obstacle.center.y },
+          width: obstacle.width,
+          height: obstacle.height,
           fill: "#fee2e2",
           stroke: "#ef4444",
           layer: "obstacle",
           label: "obstacle",
+        })
+      }
+    }
+
+    // board void rects
+    if (this.state?.boardVoidRects) {
+      // If outline exists, compute its bbox to hide outer padding voids
+      let outlineBBox: {
+        x: number
+        y: number
+        width: number
+        height: number
+      } | null = null
+
+      if (this.srj.outline && this.srj.outline.length > 0) {
+        const xs = this.srj.outline.map((p) => p.x)
+        const ys = this.srj.outline.map((p) => p.y)
+        const minX = Math.min(...xs)
+        const minY = Math.min(...ys)
+        outlineBBox = {
+          x: minX,
+          y: minY,
+          width: Math.max(...xs) - minX,
+          height: Math.max(...ys) - minY,
+        }
+      }
+
+      for (const r of this.state.boardVoidRects) {
+        // If we have an outline, only show voids that overlap its bbox (hides outer padding)
+        if (outlineBBox && !overlaps(r, outlineBBox)) {
+          continue
+        }
+
+        rects.push({
+          center: { x: r.x + r.width / 2, y: r.y + r.height / 2 },
+          width: r.width,
+          height: r.height,
+          fill: "rgba(0, 0, 0, 0.5)",
+          stroke: "none",
+          label: "void",
         })
       }
     }

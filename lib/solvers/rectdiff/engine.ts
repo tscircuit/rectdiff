@@ -20,6 +20,7 @@ import {
   overlaps,
   subtractRect2D,
 } from "./geometry"
+import { computeInverseRects } from "./geometry/computeInverseRects"
 import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
 
 /**
@@ -44,11 +45,24 @@ export function initState(
     { length: layerCount },
     () => [],
   )
-  for (const ob of srj.obstacles ?? []) {
-    const r = obstacleToXYRect(ob)
-    if (!r) continue
-    const zs = obstacleZs(ob, zIndexByName)
-    const invalidZs = zs.filter((z) => z < 0 || z >= layerCount)
+
+  // Compute void rects from outline if present
+  let boardVoidRects: XYRect[] = []
+  if (srj.outline && srj.outline.length > 2) {
+    boardVoidRects = computeInverseRects(bounds, srj.outline)
+    // Add void rects as obstacles to ALL layers
+    for (const voidR of boardVoidRects) {
+      for (let z = 0; z < layerCount; z++) {
+        obstaclesByLayer[z]!.push(voidR)
+      }
+    }
+  }
+
+  for (const obstacle of srj.obstacles ?? []) {
+    const rect = obstacleToXYRect(obstacle)
+    if (!rect) continue
+    const zLayers = obstacleZs(obstacle, zIndexByName)
+    const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
     if (invalidZs.length) {
       throw new Error(
         `RectDiffSolver: obstacle uses z-layer indices ${invalidZs.join(
@@ -57,8 +71,9 @@ export function initState(
       )
     }
     // Persist normalized zLayers back onto the shared SRJ so downstream solvers see them.
-    if ((!ob.zLayers || ob.zLayers.length === 0) && zs.length) ob.zLayers = zs
-    for (const z of zs) obstaclesByLayer[z]!.push(r)
+    if ((!obstacle.zLayers || obstacle.zLayers.length === 0) && zLayers.length)
+      obstacle.zLayers = zLayers
+    for (const z of zLayers) obstaclesByLayer[z]!.push(rect)
   }
 
   const trace = Math.max(0.01, srj.minTraceWidth || 0.15)
@@ -97,6 +112,7 @@ export function initState(
     bounds,
     options,
     obstaclesByLayer,
+    boardVoidRects,
     phase: "GRID",
     gridIndex: 0,
     candidates: [],
@@ -426,7 +442,10 @@ export function finalizeRects(state: RectDiffState): Rect3d[] {
   })
 
   // Append obstacle nodes to the output
+  const voidSet = new Set(state.boardVoidRects || [])
   for (const [rect, layerIndices] of layersByObstacleRect.entries()) {
+    if (voidSet.has(rect)) continue // Skip void rects
+
     out.push({
       minX: rect.x,
       minY: rect.y,
