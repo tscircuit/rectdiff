@@ -441,7 +441,10 @@ export function finalizeRects(state: RectDiffState): Rect3d[] {
   })
 
   // Append obstacle nodes to the output
+  const voidSet = new Set(state.boardVoidRects || [])
   for (const [rect, layerIndices] of layersByObstacleRect.entries()) {
+    if (voidSet.has(rect)) continue // Skip void rects
+
     out.push({
       minX: rect.x,
       minY: rect.y,
