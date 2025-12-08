@@ -84,6 +84,7 @@ export class RectDiffSolver extends BaseSolver {
             layerCount: this.state.layerCount,
             obstaclesByLayer: this.state.obstaclesByLayer,
             placedByLayer: this.state.placedByLayer,
+            outlineSegments: this.state.outlineSegments,
           },
         })
       }
@@ -145,6 +146,7 @@ export class RectDiffSolver extends BaseSolver {
         layerCount: this.state.layerCount,
         obstaclesByLayer: this.state.obstaclesByLayer,
         placedByLayer: this.state.placedByLayer,
+        outlineSegments: this.state.outlineSegments,
       },
     )
   }
@@ -160,6 +162,7 @@ export class RectDiffSolver extends BaseSolver {
         layerCount: this.state.layerCount,
         obstaclesByLayer: this.state.obstaclesByLayer,
         placedByLayer: this.state.placedByLayer,
+        outlineSegments: this.state.outlineSegments,
       },
     )
   }

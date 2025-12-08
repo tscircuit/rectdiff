@@ -34,6 +34,7 @@ export function tryExpandGap(
     initialCellRatio: 0,
     maxAspectRatio: null,
     minReq: { width: state.options.minWidth, height: state.options.minHeight },
+    outlineSegments: state.outlineSegments,
   })
 
   if (!rect) {
@@ -64,6 +65,7 @@ export function tryExpandGap(
           width: state.options.minWidth,
           height: state.options.minHeight,
         },
+        outlineSegments: state.outlineSegments,
       })
 
       if (altRect) {

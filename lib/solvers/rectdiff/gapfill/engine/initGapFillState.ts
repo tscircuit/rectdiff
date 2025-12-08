@@ -39,6 +39,7 @@ export function initGapFillState(
     bounds: { ...ctx.bounds },
     layerCount: ctx.layerCount,
     obstaclesByLayer: ctx.obstaclesByLayer,
+    outlineSegments: ctx.outlineSegments,
     placed: placedCopy,
     placedByLayer: placedByLayerCopy,
     options: opts,

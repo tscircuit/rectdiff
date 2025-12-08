@@ -1,5 +1,5 @@
 // lib/solvers/rectdiff/geometry.ts
-import type { XYRect } from "./types"
+import type { OutlineSegments, XYRect } from "./types"
 
 export const EPS = 1e-9
 export const clamp = (v: number, lo: number, hi: number) =>
@@ -51,6 +51,140 @@ export function distancePointToRectEdges(px: number, py: number, r: XYRect) {
   return best
 }
 
+export function buildOutlineSegments(
+  outline: Array<{ x: number; y: number }>,
+): OutlineSegments {
+  const segments: OutlineSegments = { vertical: [], horizontal: [] }
+  if (outline.length < 2) return segments
+
+  for (let i = 0; i < outline.length; i++) {
+    const p1 = outline[i]!
+    const p2 = outline[(i + 1) % outline.length]!
+    if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < EPS) continue
+    const seg = {
+      x1: p1.x,
+      y1: p1.y,
+      x2: p2.x,
+      y2: p2.y,
+      minX: Math.min(p1.x, p2.x),
+      maxX: Math.max(p1.x, p2.x),
+      minY: Math.min(p1.y, p2.y),
+      maxY: Math.max(p1.y, p2.y),
+      vertical: Math.abs(p1.x - p2.x) < EPS,
+    }
+
+    if (seg.vertical) segments.vertical.push(seg)
+    else if (Math.abs(p1.y - p2.y) < EPS) segments.horizontal.push(seg)
+  }
+
+  return segments
+}
+
+export function isPointInsideOutline(
+  x: number,
+  y: number,
+  outline: OutlineSegments | undefined,
+): boolean {
+  if (!outline) return true
+
+  // Points that lie exactly on a horizontal boundary are considered inside.
+  for (const seg of outline.horizontal) {
+    if (Math.abs(seg.y1 - y) > EPS) continue
+    if (x + EPS < seg.minX || x - EPS > seg.maxX) continue
+    return true
+  }
+
+  // Ray casting along +x direction
+  let intersections = 0
+  for (const seg of outline.vertical) {
+    if (y < seg.minY - EPS || y > seg.maxY + EPS) continue
+    if (x > seg.maxX + EPS) continue
+
+    if (Math.abs(seg.x1 - x) < EPS) return true
+    if (seg.x1 >= x - EPS) intersections++
+  }
+  return intersections % 2 === 1
+}
+
+export function distancePointToOutline(
+  x: number,
+  y: number,
+  outline: OutlineSegments,
+): number {
+  let best = Infinity
+  for (const seg of [...outline.vertical, ...outline.horizontal]) {
+    const dx = seg.x2 - seg.x1
+    const dy = seg.y2 - seg.y1
+    const lenSq = dx * dx + dy * dy
+    const t =
+      lenSq === 0
+        ? 0
+        : clamp(((x - seg.x1) * dx + (y - seg.y1) * dy) / lenSq, 0, 1)
+    const projX = seg.x1 + t * dx
+    const projY = seg.y1 + t * dy
+    best = Math.min(best, Math.hypot(x - projX, y - projY))
+  }
+  return best
+}
+
+function maxVerticalLimitRight(
+  r: XYRect,
+  outline: OutlineSegments | undefined,
+) {
+  if (!outline) return Infinity
+  let limit = Infinity
+  const rTop = r.y
+  const rBottom = r.y + r.height
+  for (const seg of outline.vertical) {
+    if (seg.x1 <= r.x + r.width - EPS) continue
+    if (rBottom <= seg.minY + EPS || rTop >= seg.maxY - EPS) continue
+    limit = Math.min(limit, seg.x1 - r.x)
+  }
+  return limit
+}
+
+function maxVerticalLimitLeft(r: XYRect, outline: OutlineSegments | undefined) {
+  if (!outline) return Infinity
+  let limit = Infinity
+  const rTop = r.y
+  const rBottom = r.y + r.height
+  for (const seg of outline.vertical) {
+    if (seg.x1 >= r.x + EPS) continue
+    if (rBottom <= seg.minY + EPS || rTop >= seg.maxY - EPS) continue
+    limit = Math.min(limit, r.x - seg.x1)
+  }
+  return limit
+}
+
+function maxHorizontalLimitDown(
+  r: XYRect,
+  outline: OutlineSegments | undefined,
+) {
+  if (!outline) return Infinity
+  let limit = Infinity
+  const rLeft = r.x
+  const rRight = r.x + r.width
+  for (const seg of outline.horizontal) {
+    if (seg.y1 <= r.y + r.height - EPS) continue
+    if (rRight <= seg.minX + EPS || rLeft >= seg.maxX - EPS) continue
+    limit = Math.min(limit, seg.y1 - r.y)
+  }
+  return limit
+}
+
+function maxHorizontalLimitUp(r: XYRect, outline: OutlineSegments | undefined) {
+  if (!outline) return Infinity
+  let limit = Infinity
+  const rLeft = r.x
+  const rRight = r.x + r.width
+  for (const seg of outline.horizontal) {
+    if (seg.y1 >= r.y + EPS) continue
+    if (rRight <= seg.minX + EPS || rLeft >= seg.maxX - EPS) continue
+    limit = Math.min(limit, r.y - seg.y1)
+  }
+  return limit
+}
+
 // --- directional expansion caps (respect board + blockers + aspect) ---
 
 function maxExpandRight(
@@ -58,9 +192,13 @@ function maxExpandRight(
   bounds: XYRect,
   blockers: XYRect[],
   maxAspect: number | null | undefined,
+  outline: OutlineSegments | undefined,
 ) {
   // Start with board boundary
-  let maxWidth = bounds.x + bounds.width - r.x
+  let maxWidth = Math.min(
+    bounds.x + bounds.width - r.x,
+    maxVerticalLimitRight(r, outline),
+  )
 
   // Check all blockers that could limit rightward expansion
   for (const b of blockers) {
@@ -99,9 +237,13 @@ function maxExpandDown(
   bounds: XYRect,
   blockers: XYRect[],
   maxAspect: number | null | undefined,
+  outline: OutlineSegments | undefined,
 ) {
   // Start with board boundary
-  let maxHeight = bounds.y + bounds.height - r.y
+  let maxHeight = Math.min(
+    bounds.y + bounds.height - r.y,
+    maxHorizontalLimitDown(r, outline),
+  )
 
   // Check all blockers that could limit downward expansion
   for (const b of blockers) {
@@ -139,6 +281,7 @@ function maxExpandLeft(
   bounds: XYRect,
   blockers: XYRect[],
   maxAspect: number | null | undefined,
+  outline: OutlineSegments | undefined,
 ) {
   // Start with board boundary
   let minX = bounds.x
@@ -160,7 +303,8 @@ function maxExpandLeft(
     }
   }
 
-  let e = Math.max(0, r.x - minX)
+  let e = Math.max(0, r.x - minX, 0)
+  e = Math.min(e, maxVerticalLimitLeft(r, outline))
   if (e <= 0) return 0
 
   // Apply aspect ratio constraint
@@ -177,6 +321,7 @@ function maxExpandUp(
   bounds: XYRect,
   blockers: XYRect[],
   maxAspect: number | null | undefined,
+  outline: OutlineSegments | undefined,
 ) {
   // Start with board boundary
   let minY = bounds.y
@@ -197,7 +342,8 @@ function maxExpandUp(
     }
   }
 
-  let e = Math.max(0, r.y - minY)
+  let e = Math.max(0, r.y - minY, 0)
+  e = Math.min(e, maxHorizontalLimitUp(r, outline))
   if (e <= 0) return 0
 
   // Apply aspect ratio constraint
@@ -219,6 +365,7 @@ export function expandRectFromSeed(params: {
   initialCellRatio: number
   maxAspectRatio: number | null | undefined
   minReq: { width: number; height: number }
+  outlineSegments?: OutlineSegments
 }): XYRect | null {
   const {
     startX,
@@ -229,6 +376,7 @@ export function expandRectFromSeed(params: {
     initialCellRatio,
     maxAspectRatio,
     minReq,
+    outlineSegments,
   } = params
 
   const minSide = Math.max(1e-9, gridSize * initialCellRatio)
@@ -271,25 +419,49 @@ export function expandRectFromSeed(params: {
     let improved = true
     while (improved) {
       improved = false
-      const eR = maxExpandRight(r, bounds, blockers, maxAspectRatio)
+      const eR = maxExpandRight(
+        r,
+        bounds,
+        blockers,
+        maxAspectRatio,
+        outlineSegments,
+      )
       if (eR > 0) {
         r = { ...r, width: r.width + eR }
         improved = true
       }
 
-      const eD = maxExpandDown(r, bounds, blockers, maxAspectRatio)
+      const eD = maxExpandDown(
+        r,
+        bounds,
+        blockers,
+        maxAspectRatio,
+        outlineSegments,
+      )
       if (eD > 0) {
         r = { ...r, height: r.height + eD }
         improved = true
       }
 
-      const eL = maxExpandLeft(r, bounds, blockers, maxAspectRatio)
+      const eL = maxExpandLeft(
+        r,
+        bounds,
+        blockers,
+        maxAspectRatio,
+        outlineSegments,
+      )
       if (eL > 0) {
         r = { x: r.x - eL, y: r.y, width: r.width + eL, height: r.height }
         improved = true
       }
 
-      const eU = maxExpandUp(r, bounds, blockers, maxAspectRatio)
+      const eU = maxExpandUp(
+        r,
+        bounds,
+        blockers,
+        maxAspectRatio,
+        outlineSegments,
+      )
       if (eU > 0) {
         r = { x: r.x, y: r.y - eU, width: r.width, height: r.height + eU }
         improved = true

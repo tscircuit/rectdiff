@@ -1,4 +1,5 @@
 // lib/solvers/rectdiff/gapfill/engine/findUncoveredPoints.ts
+import { isPointInsideOutline } from "../../geometry"
 import type { LayerContext } from "../types"
 
 /**
@@ -27,6 +28,7 @@ export function findUncoveredPoints(
         y <= bounds.y + bounds.height;
         y += sampleResolution
       ) {
+        if (!isPointInsideOutline(x, y, ctx.outlineSegments)) continue
         const isCovered = allRects.some(
           (r) =>
             x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height,

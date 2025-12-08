@@ -15,6 +15,7 @@ import {
 } from "./candidates"
 import {
   EPS,
+  buildOutlineSegments,
   containsPoint,
   expandRectFromSeed,
   overlaps,
@@ -31,6 +32,10 @@ export function initState(
 ): RectDiffState {
   const { layerNames, zIndexByName } = buildZIndexMap(srj)
   const layerCount = Math.max(1, layerNames.length, srj.layerCount || 1)
+
+  const outlineSegments = srj.outline?.length
+    ? buildOutlineSegments(srj.outline)
+    : undefined
 
   const bounds: XYRect = {
     x: srj.bounds.minX,
@@ -95,6 +100,7 @@ export function initState(
     layerNames,
     layerCount,
     bounds,
+    outlineSegments,
     options,
     obstaclesByLayer,
     phase: "GRID",
@@ -234,6 +240,7 @@ export function stepGrid(state: RectDiffState): void {
       obstaclesByLayer: state.obstaclesByLayer,
       placedByLayer: state.placedByLayer,
       hardPlacedByLayer,
+      outlineSegments: state.outlineSegments,
     })
     state.totalSeedsThisGrid = state.candidates.length
     state.consumedSeedsThisGrid = 0
@@ -256,6 +263,7 @@ export function stepGrid(state: RectDiffState): void {
           obstaclesByLayer: state.obstaclesByLayer,
           placedByLayer: state.placedByLayer,
           hardPlacedByLayer,
+          outlineSegments: state.outlineSegments,
         })
         state.edgeAnalysisDone = true
         state.totalSeedsThisGrid = state.candidates.length
@@ -323,6 +331,7 @@ export function stepGrid(state: RectDiffState): void {
       initialCellRatio,
       maxAspectRatio,
       minReq: attempt.minReq,
+      outlineSegments: state.outlineSegments,
     })
     if (!rect) continue
 
@@ -378,6 +387,7 @@ export function stepExpansion(state: RectDiffState): void {
     initialCellRatio: 0,
     maxAspectRatio: null,
     minReq: { width: p.rect.width, height: p.rect.height },
+    outlineSegments: state.outlineSegments,
   })
 
   if (expanded) {

@@ -1,4 +1,5 @@
 // lib/solvers/rectdiff/gapfill/engine/calculateCoverage.ts
+import { isPointInsideOutline } from "../../geometry"
 import type { LayerContext } from "../types"
 
 /**
@@ -28,6 +29,7 @@ export function calculateCoverage(
         y <= bounds.y + bounds.height;
         y += sampleResolution
       ) {
+        if (!isPointInsideOutline(x, y, ctx.outlineSegments)) continue
         totalPoints++
 
         const isCovered = allRects.some(

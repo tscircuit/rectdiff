@@ -1,5 +1,5 @@
 // lib/solvers/rectdiff/gapfill/types.ts
-import type { XYRect, Placed3D } from "../types"
+import type { OutlineSegments, XYRect, Placed3D } from "../types"
 
 export interface GapFillOptions {
   /** Minimum width for gap-fill rectangles (can be smaller than main solver) */
@@ -32,6 +32,7 @@ export interface GapFillState {
   obstaclesByLayer: XYRect[][]
   placed: Placed3D[]
   placedByLayer: XYRect[][]
+  outlineSegments?: OutlineSegments
   options: GapFillOptions
 
   // Progress tracking
@@ -57,4 +58,5 @@ export interface LayerContext {
   layerCount: number
   obstaclesByLayer: XYRect[][]
   placedByLayer: XYRect[][]
+  outlineSegments?: OutlineSegments
 }

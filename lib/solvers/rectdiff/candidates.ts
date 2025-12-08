@@ -1,6 +1,13 @@
 // lib/solvers/rectdiff/candidates.ts
-import type { Candidate3D, XYRect } from "./types"
-import { EPS, clamp, containsPoint, distancePointToRectEdges } from "./geometry"
+import type { Candidate3D, OutlineSegments, XYRect } from "./types"
+import {
+  EPS,
+  clamp,
+  containsPoint,
+  distancePointToOutline,
+  distancePointToRectEdges,
+  isPointInsideOutline,
+} from "./geometry"
 
 /**
  * Check if a point is occupied on all layers.
@@ -34,6 +41,7 @@ export function computeCandidates3D(params: {
   obstaclesByLayer: XYRect[][]
   placedByLayer: XYRect[][]
   hardPlacedByLayer: XYRect[][]
+  outlineSegments?: OutlineSegments
 }): Candidate3D[] {
   const {
     bounds,
@@ -42,6 +50,7 @@ export function computeCandidates3D(params: {
     obstaclesByLayer,
     placedByLayer,
     hardPlacedByLayer,
+    outlineSegments,
   } = params
   const out = new Map<string, Candidate3D>() // key by (x,y)
 
@@ -68,6 +77,8 @@ export function computeCandidates3D(params: {
         })
       )
         continue
+
+      if (!isPointInsideOutline(x, y, outlineSegments)) continue
 
       // Find the best (longest) free contiguous Z span at (x,y) ignoring soft nodes.
       let bestSpan: number[] = []
@@ -97,8 +108,11 @@ export function computeCandidates3D(params: {
         ...(obstaclesByLayer[anchorZ] ?? []),
         ...(hardPlacedByLayer[anchorZ] ?? []),
       ]
+      const boardDist = outlineSegments
+        ? distancePointToOutline(x, y, outlineSegments)
+        : distancePointToRectEdges(x, y, bounds)
       const d = Math.min(
-        distancePointToRectEdges(x, y, bounds),
+        boardDist,
         ...(hardAtZ.length
           ? hardAtZ.map((b) => distancePointToRectEdges(x, y, b))
           : [Infinity]),
@@ -265,6 +279,7 @@ export function computeEdgeCandidates3D(params: {
   obstaclesByLayer: XYRect[][]
   placedByLayer: XYRect[][]
   hardPlacedByLayer: XYRect[][]
+  outlineSegments?: OutlineSegments
 }): Candidate3D[] {
   const {
     bounds,
@@ -273,6 +288,7 @@ export function computeEdgeCandidates3D(params: {
     obstaclesByLayer,
     placedByLayer,
     hardPlacedByLayer,
+    outlineSegments,
   } = params
 
   const out: Candidate3D[] = []
@@ -293,6 +309,7 @@ export function computeEdgeCandidates3D(params: {
   }
 
   function pushIfFree(x: number, y: number, z: number) {
+    if (!isPointInsideOutline(x, y, outlineSegments)) return
     if (
       x < bounds.x + EPS ||
       y < bounds.y + EPS ||
@@ -307,8 +324,11 @@ export function computeEdgeCandidates3D(params: {
       ...(obstaclesByLayer[z] ?? []),
       ...(hardPlacedByLayer[z] ?? []),
     ]
+    const boardDist = outlineSegments
+      ? distancePointToOutline(x, y, outlineSegments)
+      : distancePointToRectEdges(x, y, bounds)
     const d = Math.min(
-      distancePointToRectEdges(x, y, bounds),
+      boardDist,
       ...(hard.length
         ? hard.map((b) => distancePointToRectEdges(x, y, b))
         : [Infinity]),

@@ -3,6 +3,23 @@ import type { SimpleRouteJson } from "../../types/srj-types"
 
 export type XYRect = { x: number; y: number; width: number; height: number }
 
+export type OutlineSegment = {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+  vertical: boolean
+}
+
+export type OutlineSegments = {
+  vertical: OutlineSegment[]
+  horizontal: OutlineSegment[]
+}
+
 export type Rect3d = {
   minX: number
   minY: number
@@ -42,6 +59,7 @@ export type RectDiffState = {
   layerNames: string[]
   layerCount: number
   bounds: XYRect
+  outlineSegments?: OutlineSegments
   options: Required<
     Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">
   > & {
