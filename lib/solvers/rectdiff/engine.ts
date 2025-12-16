@@ -263,21 +263,6 @@ export function stepGrid(state: RectDiffState): void {
       state.consumedSeedsThisGrid = 0
       return
     } else {
-      if (!state.edgeAnalysisDone) {
-        const minSize = Math.min(minSingle.width, minSingle.height)
-        state.candidates = computeEdgeCandidates3D({
-          bounds: state.bounds,
-          minSize,
-          layerCount: state.layerCount,
-          obstaclesByLayer: state.obstaclesByLayer,
-          placedByLayer: state.placedByLayer,
-          hardPlacedByLayer,
-        })
-        state.edgeAnalysisDone = true
-        state.totalSeedsThisGrid = state.candidates.length
-        state.consumedSeedsThisGrid = 0
-        return
-      }
       state.phase = "EXPANSION"
       state.expansionIndex = 0
       return

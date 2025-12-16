@@ -19,6 +19,7 @@ import {
   findUncoveredPoints,
   calculateCoverage,
 } from "./rectdiff/gapfill/engine"
+import { EdgeExpansionGapFillSubSolver } from "./rectdiff/subsolvers/EdgeExpansionGapFillSubSolver"
 
 /**
  * A streaming, one-step-per-iteration solver for capacity mesh generation.
@@ -28,6 +29,7 @@ export class RectDiffSolver extends BaseSolver {
   private gridOptions: Partial<GridFill3DOptions>
   private state!: RectDiffState
   private _meshNodes: CapacityMeshNode[] = []
+  private gapFillSubSolver?: EdgeExpansionGapFillSubSolver
 
   constructor(opts: {
     simpleRouteJson: SimpleRouteJson
@@ -53,7 +55,43 @@ export class RectDiffSolver extends BaseSolver {
     } else if (this.state.phase === "EXPANSION") {
       stepExpansion(this.state)
     } else if (this.state.phase === "GAP_FILL") {
-      this.state.phase = "DONE"
+      // Initialize gap fill subsolver on first entry
+      if (!this.gapFillSubSolver) {
+        this.gapFillSubSolver = new EdgeExpansionGapFillSubSolver({
+          bounds: this.state.bounds,
+          layerCount: this.state.layerCount,
+          obstacles: this.state.obstaclesByLayer,
+          existingPlaced: this.state.placed,
+          existingPlacedByLayer: this.state.placedByLayer,
+          options: {
+            minSingle: this.state.options.minSingle,
+            minMulti: this.state.options.minMulti,
+            maxAspectRatio: this.state.options.maxAspectRatio,
+            maxMultiLayerSpan: this.state.options.maxMultiLayerSpan,
+          },
+        })
+      }
+
+      // Step the subsolver
+      if (!this.gapFillSubSolver.solved) {
+        this.gapFillSubSolver.step()
+      } else {
+        // Merge gap-fill results into main state
+        const gapFillOutput = this.gapFillSubSolver.getOutput()
+        this.state.placed.push(...gapFillOutput.newPlaced)
+
+        // Update placedByLayer
+        for (const placed of gapFillOutput.newPlaced) {
+          for (const z of placed.zLayers) {
+            if (!this.state.placedByLayer[z]) {
+              this.state.placedByLayer[z] = []
+            }
+            this.state.placedByLayer[z]!.push(placed.rect)
+          }
+        }
+
+        this.state.phase = "DONE"
+      }
     } else if (this.state.phase === "DONE") {
       // Finalize once
       if (!this.solved) {
@@ -75,7 +113,18 @@ export class RectDiffSolver extends BaseSolver {
     if (this.solved || this.state.phase === "DONE") {
       return 1
     }
-    return computeProgress(this.state)
+
+    const baseProgress = computeProgress(this.state)
+
+    // If in GAP_FILL phase, factor in subsolver progress
+    if (this.state.phase === "GAP_FILL" && this.gapFillSubSolver) {
+      const gapFillProgress = this.gapFillSubSolver.computeProgress()
+      // GAP_FILL is the last phase before DONE, so weight it appropriately
+      // Assume GRID+EXPANSION is 90%, GAP_FILL is remaining 10%
+      return 0.9 + gapFillProgress * 0.1
+    }
+
+    return baseProgress * 0.9 // Scale down to leave room for GAP_FILL
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
@@ -129,6 +178,11 @@ export class RectDiffSolver extends BaseSolver {
 
   /** Streaming visualization: board + obstacles + current placements. */
   override visualize(): GraphicsObject {
+    // If in GAP_FILL phase, delegate to subsolver visualization
+    if (this.state?.phase === "GAP_FILL" && this.gapFillSubSolver) {
+      return this.gapFillSubSolver.visualize()
+    }
+
     const rects: NonNullable<GraphicsObject["rects"]> = []
     const points: NonNullable<GraphicsObject["points"]> = []
     const lines: NonNullable<GraphicsObject["lines"]> = [] // Initialize lines array
@@ -163,9 +217,15 @@ export class RectDiffSolver extends BaseSolver {
       })
     }
 
-    // obstacles (rect & oval as bounding boxes)
+    // obstacles (rect & oval as bounding boxes) with layer information
     for (const obstacle of this.srj.obstacles ?? []) {
       if (obstacle.type === "rect" || obstacle.type === "oval") {
+        // Get layer information if available
+        const layerInfo =
+          obstacle.layers && obstacle.layers.length > 0
+            ? `\nz:${obstacle.layers.join(",")}`
+            : ""
+
         rects.push({
           center: { x: obstacle.center.x, y: obstacle.center.y },
           width: obstacle.width,
@@ -173,7 +233,7 @@ export class RectDiffSolver extends BaseSolver {
           fill: "#fee2e2",
           stroke: "#ef4444",
           layer: "obstacle",
-          label: "obstacle",
+          label: `obstacle ${layerInfo}`,
         })
       }
     }

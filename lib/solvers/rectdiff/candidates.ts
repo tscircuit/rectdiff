@@ -183,7 +183,7 @@ export function longestFreeSpanAroundZ(params: {
  */
 export function computeDefaultGridSizes(bounds: XYRect): number[] {
   const ref = Math.max(bounds.width, bounds.height)
-  return [ref / 8, ref / 16, ref / 32]
+  return [ref / 32]
 }
 
 /**
