@@ -14,11 +14,12 @@ import {
 } from "./rectdiff/engine"
 import { rectsToMeshNodes } from "./rectdiff/rectsToMeshNodes"
 import { overlaps } from "./rectdiff/geometry"
-import type { GapFillOptions } from "./rectdiff/gapfill/types"
 import {
   findUncoveredPoints,
   calculateCoverage,
 } from "./rectdiff/gapfill/engine"
+import { GapFillSubSolver } from "./rectdiff/subsolvers/GapFillSubSolver"
+import type { GapFillOptions } from "./rectdiff/gapfill/types"
 
 /**
  * A streaming, one-step-per-iteration solver for capacity mesh generation.
@@ -28,14 +29,19 @@ export class RectDiffSolver extends BaseSolver {
   private gridOptions: Partial<GridFill3DOptions>
   private state!: RectDiffState
   private _meshNodes: CapacityMeshNode[] = []
+  private gapFillOptions: Partial<GapFillOptions>
+
+  declare activeSubSolver: GapFillSubSolver | null
 
   constructor(opts: {
     simpleRouteJson: SimpleRouteJson
-    gridOptions?: Partial<GridFill3DOptions>
+    gridOptions?: Partial<GridFill3DOptions>,
+    gapFillOptions?: Partial<GapFillOptions>
   }) {
     super()
     this.srj = opts.simpleRouteJson
     this.gridOptions = opts.gridOptions ?? {}
+    this.gapFillOptions = opts.gapFillOptions ?? {}
   }
 
   override _setup() {
@@ -53,7 +59,42 @@ export class RectDiffSolver extends BaseSolver {
     } else if (this.state.phase === "EXPANSION") {
       stepExpansion(this.state)
     } else if (this.state.phase === "GAP_FILL") {
-      this.state.phase = "DONE"
+      // Initialize gap fill subsolver if needed
+      if (
+        !this.activeSubSolver ||
+        !(this.activeSubSolver instanceof GapFillSubSolver)
+      ) {
+        const minTrace = this.srj.minTraceWidth || 0.15
+        const minGapSize = Math.max(0.01, minTrace / 10)
+        const boundsSize = Math.min(
+          this.state.bounds.width,
+          this.state.bounds.height,
+        )
+
+        this.activeSubSolver = new GapFillSubSolver({
+          placed: this.state.placed,
+          options: {
+            minWidth: minGapSize,
+            minHeight: minGapSize,
+            scanResolution: Math.max(0.05, boundsSize / 100),
+            ...this.gapFillOptions,
+          },
+          layerCtx: {
+            bounds: this.state.bounds,
+            layerCount: this.state.layerCount,
+            obstaclesByLayer: this.state.obstaclesByLayer,
+            placedByLayer: this.state.placedByLayer,
+          },
+        })
+      }
+      this.activeSubSolver.step()
+      if (this.activeSubSolver.solved) {
+        const output = this.activeSubSolver.getOutput()
+        this.state.placed = output.placed
+        this.state.placedByLayer = output.placedByLayer
+        this.activeSubSolver = null
+        this.state.phase = "DONE"
+      }
     } else if (this.state.phase === "DONE") {
       // Finalize once
       if (!this.solved) {
@@ -68,6 +109,10 @@ export class RectDiffSolver extends BaseSolver {
     this.stats.phase = this.state.phase
     this.stats.gridIndex = this.state.gridIndex
     this.stats.placed = this.state.placed.length
+    if (this.activeSubSolver instanceof GapFillSubSolver) {
+      const output = this.activeSubSolver.getOutput()
+      this.stats.gapsFilled = output.filledCount
+    } 
   }
 
   /** Compute solver progress (0 to 1). */
@@ -132,6 +177,11 @@ export class RectDiffSolver extends BaseSolver {
     const rects: NonNullable<GraphicsObject["rects"]> = []
     const points: NonNullable<GraphicsObject["points"]> = []
     const lines: NonNullable<GraphicsObject["lines"]> = [] // Initialize lines array
+
+
+    if (this.activeSubSolver) {
+      return this.activeSubSolver.visualize()
+    }
 
     // Board bounds - use srj bounds which is always available
     const boardBounds = {
