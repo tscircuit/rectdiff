@@ -35,7 +35,7 @@ export class RectDiffSolver extends BaseSolver {
 
   constructor(opts: {
     simpleRouteJson: SimpleRouteJson
-    gridOptions?: Partial<GridFill3DOptions>,
+    gridOptions?: Partial<GridFill3DOptions>
     gapFillOptions?: Partial<GapFillOptions>
   }) {
     super()
@@ -112,7 +112,7 @@ export class RectDiffSolver extends BaseSolver {
     if (this.activeSubSolver instanceof GapFillSubSolver) {
       const output = this.activeSubSolver.getOutput()
       this.stats.gapsFilled = output.filledCount
-    } 
+    }
   }
 
   /** Compute solver progress (0 to 1). */
@@ -177,7 +177,6 @@ export class RectDiffSolver extends BaseSolver {
     const rects: NonNullable<GraphicsObject["rects"]> = []
     const points: NonNullable<GraphicsObject["points"]> = []
     const lines: NonNullable<GraphicsObject["lines"]> = [] // Initialize lines array
-
 
     if (this.activeSubSolver) {
       return this.activeSubSolver.visualize()
