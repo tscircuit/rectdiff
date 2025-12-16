@@ -53,6 +53,16 @@ export type EdgeExpansionGapFillOptions = {
 
 export type Phase = "PROCESSING" | "DONE"
 
+/**
+ * Internal processing sub-phases for the step expansion algorithm
+ */
+export type ProcessingPhase =
+  | "INIT_NODES" // Creating initial seed nodes for current obstacle
+  | "PLAN_ROUND" // Calculating expansion candidates for the round
+  | "CHOOSE_DIRECTION" // Selecting best expansion direction for current node
+  | "EXPAND_NODE" // Performing the actual expansion
+  | "FINALIZE_OBSTACLE" // Merging and finalizing nodes when obstacle is done
+
 export type EdgeExpansionGapFillState = {
   // Configuration
   options: EdgeExpansionGapFillOptions
@@ -67,6 +77,7 @@ export type EdgeExpansionGapFillState = {
 
   // Current state
   phase: Phase
+  processingPhase: ProcessingPhase // Internal state machine phase
   currentObstacleIndex: number // Index into edgeExpansionObstacles array
   nodes: GapFillNode[]
   currentRound: GapFillNode[]

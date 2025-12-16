@@ -4,6 +4,53 @@ import type { XYRect } from "../types"
 
 const EPS = 1e-9
 
+/**
+ * Calculate how far a node can expand in a given direction before hitting blockers.
+ *
+ * **What it does:**
+ * Determines the maximum distance a gap-fill node can expand in a specific direction
+ * (up, down, left, or right) before it would collide with obstacles, existing capacity
+ * nodes, or other gap-fill nodes. Returns the available expansion distance in millimeters.
+ *
+ * **How it works:**
+ * 1. **Collects blockers** on the same z-layers as the node:
+ *    - Existing capacity nodes from the main RectDiff solver
+ *    - Board obstacles/components
+ *    - Other gap-fill nodes currently being expanded
+ *    - Previously placed gap-fill nodes
+ *
+ * 2. **Calculates initial distance** to the board boundary in the expansion direction
+ *
+ * 3. **Checks each blocker** to see if it's in the expansion path:
+ *    - For vertical expansion (up/down): checks if blocker overlaps in x-axis
+ *    - For horizontal expansion (left/right): checks if blocker overlaps in y-axis
+ *    - If blocking, calculates distance to the blocker and takes the minimum
+ *
+ * 4. **Returns** the minimum distance (clamped to non-negative)
+ *
+ * **Usage:**
+ * Called during expansion planning to evaluate potential expansion directions.
+ * The result is then clamped by `calculateMaxExpansion()` to respect aspect ratio
+ * constraints before actually expanding the node.
+ *
+ * **Example:**
+ * ```
+ * Node at (10, 10) with size 5x2mm expanding "right"
+ * Board width: 100mm
+ * Blocker at (20, 10) with size 3x2mm
+ *
+ * Initial distance: 100 - (10 + 5) = 85mm
+ * Blocker distance: 20 - (10 + 5) = 5mm
+ * Returns: 5mm (limited by blocker, not board boundary)
+ * ```
+ *
+ * @param params.node - The gap-fill node to check expansion for
+ * @param params.direction - Direction to expand (up/down/left/right)
+ * @param ctx - State containing bounds, obstacles, and existing placements
+ * @returns Available expansion distance in millimeters (0 if blocked immediately)
+ *
+ * @internal This is an internal helper function for the edge expansion gap-fill algorithm
+ */
 export function calculateAvailableSpace(
   params: { node: GapFillNode; direction: Direction },
   ctx: EdgeExpansionGapFillState,

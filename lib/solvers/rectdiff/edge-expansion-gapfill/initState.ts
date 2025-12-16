@@ -77,6 +77,7 @@ export function initState(params: {
     existingPlaced,
     existingPlacedByLayer,
     phase: "PROCESSING",
+    processingPhase: "INIT_NODES",
     currentObstacleIndex: 0,
     nodes: [],
     currentRound: [],
