@@ -13,7 +13,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.3.5",
     "@react-hook/resize-observer": "^2.0.2",
-    "@tscircuit/solver-utils": "^0.0.3",
+    "@tscircuit/solver-utils": "^0.0.4",
     "@types/bun": "latest",
     "@types/react": "^18",
     "@types/react-dom": "^18",

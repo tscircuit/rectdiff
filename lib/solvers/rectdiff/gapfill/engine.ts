@@ -1,7 +1,4 @@
 // lib/solvers/rectdiff/gapfill/engine.ts
+// Utility functions for coverage analysis (still used by RectDiffSolver)
 export * from "./engine/calculateCoverage"
 export * from "./engine/findUncoveredPoints"
-export * from "./engine/getGapFillProgress"
-export * from "./engine/initGapFillState"
-
-export * from "./engine/stepGapFill"
