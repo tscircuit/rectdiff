@@ -128,7 +128,7 @@ export function initState(
 /**
  * Build per-layer list of "hard" placed rects (nodes spanning all layers).
  */
-function buildHardPlacedByLayer(state: RectDiffState): XYRect[][] {
+export function buildHardPlacedByLayer(state: RectDiffState): XYRect[][] {
   const out: XYRect[][] = Array.from({ length: state.layerCount }, () => [])
   for (const p of state.placed) {
     if (p.zLayers.length >= state.layerCount) {
