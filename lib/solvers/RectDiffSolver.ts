@@ -14,20 +14,26 @@ import {
 } from "./rectdiff/engine"
 import { rectsToMeshNodes } from "./rectdiff/rectsToMeshNodes"
 import { overlaps } from "./rectdiff/geometry"
-import type { GapFillOptions } from "./rectdiff/gapfill/types"
 import {
   findUncoveredPoints,
   calculateCoverage,
 } from "./rectdiff/gapfill/engine"
+import {
+  initEdgeGapFillState,
+  stepEdgeGapFill,
+} from "./rectdiff/gapfill-edge/engine"
+import type { EdgeGapFillState } from "./rectdiff/gapfill-edge/types"
+import { BasePipelineSolver } from "./BasePipelineSolver"
 
 /**
  * A streaming, one-step-per-iteration solver for capacity mesh generation.
  */
-export class RectDiffSolver extends BaseSolver {
+export class RectDiffSolver extends BasePipelineSolver {
   private srj: SimpleRouteJson
   private gridOptions: Partial<GridFill3DOptions>
   private state!: RectDiffState
   private _meshNodes: CapacityMeshNode[] = []
+  private gapFillState: EdgeGapFillState | null = null
 
   constructor(opts: {
     simpleRouteJson: SimpleRouteJson
@@ -46,28 +52,64 @@ export class RectDiffSolver extends BaseSolver {
     }
   }
 
-  /** Exactly ONE small step per call. */
-  override _step() {
-    if (this.state.phase === "GRID") {
-      stepGrid(this.state)
-    } else if (this.state.phase === "EXPANSION") {
-      stepExpansion(this.state)
-    } else if (this.state.phase === "GAP_FILL") {
+  protected getCurrentPhase(): string | null {
+    if (!this.state) {
+      return null
+    }
+    return this.state.phase === "DONE" ? null : this.state.phase
+  }
+
+  protected setPhase(phase: string | null): void {
+    if (!this.state) {
+      return
+    }
+    if (phase === null) {
       this.state.phase = "DONE"
-    } else if (this.state.phase === "DONE") {
-      // Finalize once
+      // Finalize once when done
       if (!this.solved) {
         const rects = finalizeRects(this.state)
         this._meshNodes = rectsToMeshNodes(rects)
         this.solved = true
       }
-      return
+    } else {
+      this.state.phase = phase as RectDiffState["phase"]
     }
+  }
 
+  protected stepPhase(phase: string): string | null {
+    if (!this.state) {
+      return null
+    }
+    if (phase === "GRID") {
+      stepGrid(this.state)
+      return this.state.phase
+    } else if (phase === "EXPANSION") {
+      stepExpansion(this.state)
+      return this.state.phase
+    } else if (phase === "GAP_FILL") {
+      // Initialize gap fill state if needed
+      if (!this.gapFillState) {
+        this.gapFillState = initEdgeGapFillState(this.state)
+      }
+
+      // Step the gap fill algorithm
+      const stillWorking = stepEdgeGapFill(this.gapFillState, this.state)
+      if (!stillWorking) {
+        return "DONE"
+      }
+      return "GAP_FILL"
+    }
+    return null
+  }
+
+  override _step() {
+    super._step()
     // Lightweight stats for debugger
-    this.stats.phase = this.state.phase
-    this.stats.gridIndex = this.state.gridIndex
-    this.stats.placed = this.state.placed.length
+    if (this.state) {
+      this.stats.phase = this.state.phase
+      this.stats.gridIndex = this.state.gridIndex
+      this.stats.placed = this.state.placed.length
+    }
   }
 
   /** Compute solver progress (0 to 1). */
@@ -231,6 +273,96 @@ export class RectDiffSolver extends BaseSolver {
       }
     }
 
+    // Gap fill visualization - extremely granular
+    if (this.state?.phase === "GAP_FILL" && this.gapFillState) {
+      const gf = this.gapFillState
+
+      // Highlight primary edge (thick, bright red) - shown in all stages after SELECT_EDGE
+      if (gf.primaryEdge && gf.stage !== "SELECT_EDGE") {
+        lines.push({
+          points: [gf.primaryEdge.start, gf.primaryEdge.end],
+          strokeColor: "#ef4444",
+          strokeWidth: 0.08,
+          label: "PRIMARY EDGE",
+        })
+      }
+
+      // Highlight nearby edges (orange) - shown in FIND_SEGMENTS, GENERATE_POINTS, EXPAND_FROM_POINT
+      if (
+        gf.stage === "FIND_SEGMENTS" ||
+        gf.stage === "GENERATE_POINTS" ||
+        gf.stage === "EXPAND_FROM_POINT"
+      ) {
+        for (const edge of gf.nearbyEdges) {
+          lines.push({
+            points: [edge.start, edge.end],
+            strokeColor: "#f59e0b",
+            strokeWidth: 0.04,
+            label: "nearby",
+          })
+        }
+      }
+
+      // Highlight unoccupied segments (green) - shown in GENERATE_POINTS and EXPAND_FROM_POINT
+      if (
+        gf.primaryEdge &&
+        (gf.stage === "GENERATE_POINTS" || gf.stage === "EXPAND_FROM_POINT") &&
+        gf.unoccupiedSegments.length > 0
+      ) {
+        for (const segment of gf.unoccupiedSegments) {
+          let start: { x: number; y: number }
+          let end: { x: number; y: number }
+
+          if (gf.primaryEdge.orientation === "horizontal") {
+            start = { x: segment.start, y: gf.primaryEdge.start.y }
+            end = { x: segment.end, y: gf.primaryEdge.start.y }
+          } else {
+            start = { x: gf.primaryEdge.start.x, y: segment.start }
+            end = { x: gf.primaryEdge.start.x, y: segment.end }
+          }
+
+          lines.push({
+            points: [start, end],
+            strokeColor: "#10b981",
+            strokeWidth: 0.06,
+            label: "unoccupied",
+          })
+        }
+      }
+
+      // Show expansion points (blue) - shown in EXPAND_FROM_POINT
+      if (gf.stage === "EXPAND_FROM_POINT") {
+        for (let i = 0; i < gf.expansionPoints.length; i++) {
+          const point = gf.expansionPoints[i]!
+          const isCurrent = i === gf.expansionPointIndex
+          points.push({
+            x: point.x,
+            y: point.y,
+            fill: isCurrent ? "#dc2626" : "#3b82f6",
+            stroke: isCurrent ? "#991b1b" : "#1e40af",
+            label: isCurrent
+              ? `EXPANDING\nz:${point.zLayers.join(",")}`
+              : `point\nz:${point.zLayers.join(",")}`,
+          } as any)
+        }
+
+        // Show currently expanding rectangle (yellow)
+        if (gf.currentExpandingRect) {
+          rects.push({
+            center: {
+              x: gf.currentExpandingRect.x + gf.currentExpandingRect.width / 2,
+              y: gf.currentExpandingRect.y + gf.currentExpandingRect.height / 2,
+            },
+            width: gf.currentExpandingRect.width,
+            height: gf.currentExpandingRect.height,
+            fill: "#fef3c7",
+            stroke: "#f59e0b",
+            label: "expanding",
+          })
+        }
+      }
+    }
+
     // current placements (streaming) if not yet solved
     if (this.state?.placed?.length) {
       for (const p of this.state.placed) {
@@ -249,8 +381,26 @@ export class RectDiffSolver extends BaseSolver {
       }
     }
 
+    let phaseTitle = `RectDiff (${this.state?.phase ?? "init"})`
+    if (this.state?.phase === "GAP_FILL" && this.gapFillState) {
+      const gf = this.gapFillState
+      const stageLabels: Record<string, string> = {
+        SELECT_EDGE: "Selecting Edge",
+        FIND_NEARBY: "Finding Nearby",
+        FIND_SEGMENTS: "Finding Segments",
+        GENERATE_POINTS: "Generating Points",
+        EXPAND_FROM_POINT: "Expanding",
+        DONE: "Done",
+      }
+      phaseTitle = `GapFill: ${stageLabels[gf.stage] ?? gf.stage} (edge ${gf.edgeIndex + 1}/${gf.allEdges.length}${
+        gf.expansionPoints.length > 0
+          ? `, point ${gf.expansionPointIndex + 1}/${gf.expansionPoints.length}`
+          : ""
+      })`
+    }
+
     return {
-      title: `RectDiff (${this.state?.phase ?? "init"})`,
+      title: phaseTitle,
       coordinateSystem: "cartesian",
       rects,
       points,
