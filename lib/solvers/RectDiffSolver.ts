@@ -1,5 +1,5 @@
 // lib/solvers/RectDiffSolver.ts
-import { BaseSolver } from "@tscircuit/solver-utils"
+import { BaseSolver, BasePipelineSolver } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "../types/srj-types"
 import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode } from "../types/capacity-mesh-types"

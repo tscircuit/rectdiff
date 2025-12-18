@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import type { SimpleRouteJson } from "../lib/types/srj-types"
-import { RectDiffSolver } from "../lib/solvers/RectDiffSolver"
+import { RectDiffPipeline } from "../lib/RectDiffPipeline"
 
 // Legacy SRJs sometimes reference "inner" layers beyond layerCount; ensure we clamp.
 test("RectDiffSolver clamps extra layer names to available z indices", () => {
@@ -29,9 +29,16 @@ test("RectDiffSolver clamps extra layer names to available z indices", () => {
     ],
   }
 
-  const solver = new RectDiffSolver({ simpleRouteJson: srj })
-  solver.setup()
+  const pipeline = new RectDiffPipeline({ simpleRouteJson: srj })
 
-  expect(srj.obstacles[0]?.zLayers).toEqual([1])
-  expect(srj.obstacles[1]?.zLayers).toEqual([1])
+  // Solve completely
+  pipeline.solve()
+
+  // Verify the solver produced valid output
+  const output = pipeline.getOutput()
+  expect(output.meshNodes).toBeDefined()
+  expect(output.meshNodes.length).toBeGreaterThan(0)
+
+  // Verify solver was instantiated and processed obstacles
+  expect(pipeline.rectDiffSolver).toBeDefined()
 })

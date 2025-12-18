@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test"
 import simpleRouteJson from "../../test-assets/example01.json"
-import { RectDiffSolver } from "../../lib/solvers/RectDiffSolver"
+import { RectDiffPipeline } from "../../lib/RectDiffPipeline"
 import { getSvgFromGraphicsObject } from "graphics-debug"
 
 test.skip("example01", () => {
-  const solver = new RectDiffSolver({ simpleRouteJson })
+  const solver = new RectDiffPipeline({ simpleRouteJson })
 
   solver.solve()
 
