@@ -89,7 +89,8 @@ export class GapFillSolver extends BaseSolver {
     const layerCount = input.simpleRouteJson.layerCount || 1
     const maxEdgeDistance = input.maxEdgeDistance ?? 2.0
 
-    const edges = this.extractEdges(input.placedRects)
+    const rawEdges = this.extractEdges(input.placedRects)
+    const edges = this.splitEdgesOnOverlaps(rawEdges, maxEdgeDistance)
 
     // Build spatial index for fast edge-to-edge queries
     const edgeSpatialIndex = this.buildEdgeSpatialIndex(edges, maxEdgeDistance)
@@ -138,8 +139,6 @@ export class GapFillSolver extends BaseSolver {
 
     for (const placed of rects) {
       const { rect, zLayers } = placed
-      const centerX = rect.x + rect.width / 2
-      const centerY = rect.y + rect.height / 2
 
       // Top edge (y = rect.y + rect.height)
       edges.push({
@@ -191,6 +190,126 @@ export class GapFillSolver extends BaseSolver {
     }
 
     return edges
+  }
+
+  private splitEdgesOnOverlaps(edges: RectEdge[], maxEdgeDistance: number): RectEdge[] {
+    console.log(`\n=== splitEdgesOnOverlaps START ===`)
+    console.log(`Input edges: ${edges.length}`)
+
+    const result: RectEdge[] = []
+
+    for (const edge of edges) {
+      const isHorizontal = Math.abs(edge.normal.y) > 0.5
+      const occupiedRanges: Array<{ start: number; end: number }> = []
+
+      console.log(`\nProcessing edge ${edge.side}: (${edge.x1},${edge.y1})-(${edge.x2},${edge.y2}) normal:(${edge.normal.x},${edge.normal.y})`)
+
+      for (const other of edges) {
+        if (edge === other) continue
+        if (edge.rect === other.rect) continue // Skip same rectangle's edges
+        if (!edge.zLayers.some((z) => other.zLayers.includes(z))) continue
+
+        const isOtherHorizontal = Math.abs(other.normal.y) > 0.5
+        if (isHorizontal !== isOtherHorizontal) continue
+
+        // Check if edges are actually nearby (not just parallel)
+        if (isHorizontal) {
+          const distance = Math.abs(edge.y1 - other.y1)
+          if (distance > maxEdgeDistance) continue
+        } else {
+          const distance = Math.abs(edge.x1 - other.x1)
+          if (distance > maxEdgeDistance) continue
+        }
+
+        let overlapStart: number, overlapEnd: number
+
+        if (isHorizontal) {
+          overlapStart = Math.max(edge.x1, other.x1)
+          overlapEnd = Math.min(edge.x2, other.x2)
+        } else {
+          overlapStart = Math.max(edge.y1, other.y1)
+          overlapEnd = Math.min(edge.y2, other.y2)
+        }
+
+        if (overlapStart < overlapEnd) {
+          const edgeLength = isHorizontal ? edge.x2 - edge.x1 : edge.y2 - edge.y1
+          const edgeStart = isHorizontal ? edge.x1 : edge.y1
+          const range = {
+            start: (overlapStart - edgeStart) / edgeLength,
+            end: (overlapEnd - edgeStart) / edgeLength,
+          }
+          console.log(`  Found overlap with ${other.side}: range ${range.start.toFixed(2)}-${range.end.toFixed(2)}`)
+          occupiedRanges.push(range)
+        }
+      }
+
+      if (occupiedRanges.length === 0) {
+        console.log(`  No overlaps, keeping full edge`)
+        result.push(edge)
+        continue
+      }
+
+      occupiedRanges.sort((a, b) => a.start - b.start)
+      const merged: Array<{ start: number; end: number }> = []
+      for (const range of occupiedRanges) {
+        if (merged.length === 0 || range.start > merged[merged.length - 1]!.end) {
+          merged.push(range)
+        } else {
+          merged[merged.length - 1]!.end = Math.max(
+            merged[merged.length - 1]!.end,
+            range.end,
+          )
+        }
+      }
+
+      console.log(`  Merged overlaps: ${merged.map(m => `${m.start.toFixed(2)}-${m.end.toFixed(2)}`).join(', ')}`)
+
+      let pos = 0
+      for (const occupied of merged) {
+        if (pos < occupied.start) {
+          console.log(`  Creating free segment: ${pos.toFixed(2)}-${occupied.start.toFixed(2)}`)
+          result.push(this.createEdgeSegment(edge, pos, occupied.start))
+        }
+        pos = occupied.end
+      }
+      if (pos < 1) {
+        console.log(`  Creating free segment: ${pos.toFixed(2)}-1.00`)
+        result.push(this.createEdgeSegment(edge, pos, 1))
+      }
+
+      for (const occupied of merged) {
+        console.log(`  Creating overlap segment: ${occupied.start.toFixed(2)}-${occupied.end.toFixed(2)}`)
+        result.push(this.createEdgeSegment(edge, occupied.start, occupied.end))
+      }
+    }
+
+    console.log(`\nOutput edges: ${result.length}`)
+    console.log(`=== splitEdgesOnOverlaps END ===\n`)
+    return result
+  }
+
+  private createEdgeSegment(
+    edge: RectEdge,
+    start: number,
+    end: number,
+  ): RectEdge {
+    const isHorizontal = Math.abs(edge.normal.y) > 0.5
+
+    if (isHorizontal) {
+      const length = edge.x2 - edge.x1
+      return {
+        ...edge,
+        x1: edge.x1 + start * length,
+        x2: edge.x1 + end * length,
+      }
+    } else {
+      const length = edge.y2 - edge.y1
+      return {
+        ...edge,
+        y1: edge.y1 + start * length,
+        y2: edge.y1 + end * length,
+      }
+    }
   }
 
   override _setup(): void {
@@ -261,6 +380,7 @@ export class GapFillSolver extends BaseSolver {
     )
 
     // Check only the nearby candidates (not all edges!)
+    // Collect ALL nearby parallel edges
     this.state.currentNearbyEdges = []
     for (const candidate of candidates) {
       if (
@@ -268,7 +388,6 @@ export class GapFillSolver extends BaseSolver {
         this.isNearbyParallelEdge(primaryEdge, candidate)
       ) {
         this.state.currentNearbyEdges.push(candidate)
-        break
       }
     }
     this.state.phase = "CHECK_UNOCCUPIED"
