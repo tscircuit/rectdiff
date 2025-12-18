@@ -36,6 +36,7 @@ export interface GapFillSolverInput {
   simpleRouteJson: SimpleRouteJson
   placedRects: Placed3D[]
   obstaclesByLayer: XYRect[][]
+  maxEdgeDistance?: number // Max distance to consider edges "nearby" (default: 2.0)
 }
 
 // Sub-phases for visualization
@@ -52,6 +53,7 @@ interface GapFillState {
   inputRects: Placed3D[]
   obstaclesByLayer: XYRect[][]
   layerCount: number
+  maxEdgeDistance: number
 
   edges: RectEdge[]
   edgeSpatialIndex: FlatbushIndex<RectEdge>
@@ -85,17 +87,19 @@ export class GapFillSolver extends BaseSolver {
 
   private initState(input: GapFillSolverInput): GapFillState {
     const layerCount = input.simpleRouteJson.layerCount || 1
+    const maxEdgeDistance = input.maxEdgeDistance ?? 2.0
 
     const edges = this.extractEdges(input.placedRects)
 
     // Build spatial index for fast edge-to-edge queries
-    const edgeSpatialIndex = this.buildEdgeSpatialIndex(edges)
+    const edgeSpatialIndex = this.buildEdgeSpatialIndex(edges, maxEdgeDistance)
 
     return {
       srj: input.simpleRouteJson,
       inputRects: input.placedRects,
       obstaclesByLayer: input.obstaclesByLayer,
       layerCount,
+      maxEdgeDistance,
       edges,
       edgeSpatialIndex,
       phase: "SELECT_PRIMARY_EDGE",
@@ -109,16 +113,18 @@ export class GapFillSolver extends BaseSolver {
     }
   }
 
-  private buildEdgeSpatialIndex(edges: RectEdge[]): FlatbushIndex<RectEdge> {
+  private buildEdgeSpatialIndex(
+    edges: RectEdge[],
+    maxEdgeDistance: number,
+  ): FlatbushIndex<RectEdge> {
     const index = new FlatbushIndex<RectEdge>(edges.length)
 
     for (const edge of edges) {
       // Create bounding box for edge (padded by max search distance)
-      const padding = 2.0 // Max edge distance threshold
-      const minX = Math.min(edge.x1, edge.x2) - padding
-      const minY = Math.min(edge.y1, edge.y2) - padding
-      const maxX = Math.max(edge.x1, edge.x2) + padding
-      const maxY = Math.max(edge.y1, edge.y2) + padding
+      const minX = Math.min(edge.x1, edge.x2) - maxEdgeDistance
+      const minY = Math.min(edge.y1, edge.y2) - maxEdgeDistance
+      const maxX = Math.max(edge.x1, edge.x2) + maxEdgeDistance
+      const maxY = Math.max(edge.y1, edge.y2) + maxEdgeDistance
 
       index.insert(edge, minX, minY, maxX, maxY)
     }
@@ -241,7 +247,7 @@ export class GapFillSolver extends BaseSolver {
     const primaryEdge = this.state.currentPrimaryEdge!
 
     // Query spatial index for candidate edges near this primary edge
-    const padding = 2.0 // Max distance threshold
+    const padding = this.state.maxEdgeDistance
     const minX = Math.min(primaryEdge.x1, primaryEdge.x2) - padding
     const minY = Math.min(primaryEdge.y1, primaryEdge.y2) - padding
     const maxX = Math.max(primaryEdge.x1, primaryEdge.x2) + padding
@@ -435,7 +441,7 @@ export class GapFillSolver extends BaseSolver {
     if (sharedLayers.length === 0) return false
 
     const distance = this.distanceBetweenEdges(primaryEdge, candidate)
-    if (distance > 2.0) return false // TODO: Make this configurable
+    if (distance > this.state.maxEdgeDistance) return false
 
     return true
   }
