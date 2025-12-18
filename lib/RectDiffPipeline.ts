@@ -15,6 +15,7 @@ export interface RectDiffPipelineInput {
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
   rectDiffSolver?: RectDiffSolver
   gapFillSolver?: GapFillSolver
+  override MAX_ITERATIONS: number = 100e6
 
   override pipelineDef = [
     definePipelineStep(
