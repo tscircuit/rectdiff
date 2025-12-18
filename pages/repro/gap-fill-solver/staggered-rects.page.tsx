@@ -3,6 +3,7 @@ import { SolverDebugger3d } from "../../../components/SolverDebugger3d"
 import { GapFillSolver } from "../../../lib/solvers/GapFillSolver"
 import type { SimpleRouteJson } from "../../../lib/types/srj-types"
 import type { Placed3D } from "../../../lib/solvers/rectdiff/types"
+import { GenericSolverDebugger } from "@tscircuit/solver-utils/react"
 
 export default () => {
   const simpleRouteJson: SimpleRouteJson = {
@@ -35,5 +36,5 @@ export default () => {
     [],
   )
 
-  return <SolverDebugger3d solver={solver} simpleRouteJson={simpleRouteJson} />
+  return <GenericSolverDebugger solver={solver} />
 }
