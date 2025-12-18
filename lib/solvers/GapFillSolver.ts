@@ -216,23 +216,17 @@ export class GapFillSolver extends BaseSolver {
   private stepFindNearbyEdges(): void {
     const primaryEdge = this.state.currentPrimaryEdge!
 
-    // Check one candidate edge per step
-    if (this.state.nearbyEdgeCandidateIndex < this.state.edges.length) {
-      const candidate = this.state.edges[this.state.nearbyEdgeCandidateIndex]!
-
-      // Check if this edge is nearby and parallel
+    this.state.currentNearbyEdges = []
+    for (const candidate of this.state.edges) {
       if (
         candidate !== primaryEdge &&
         this.isNearbyParallelEdge(primaryEdge, candidate)
       ) {
         this.state.currentNearbyEdges.push(candidate)
+        break
       }
-
-      this.state.nearbyEdgeCandidateIndex++
-    } else {
-      // Done finding nearby edges, move to checking unoccupied
-      this.state.phase = "CHECK_UNOCCUPIED"
     }
+    this.state.phase = "CHECK_UNOCCUPIED"
   }
 
   private stepCheckUnoccupied(): void {
@@ -338,9 +332,7 @@ export class GapFillSolver extends BaseSolver {
 
   private hasMinimumSize(candidate: Placed3D): boolean {
     const minSize = 0.01
-    return (
-      candidate.rect.width >= minSize && candidate.rect.height >= minSize
-    )
+    return candidate.rect.width >= minSize && candidate.rect.height >= minSize
   }
 
   private expandPointToRect(point: ExpansionPoint): Placed3D | null {
