@@ -2,6 +2,7 @@ import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
 import type { SimpleRouteJson } from "../types/srj-types"
 import type { Placed3D, XYRect } from "./rectdiff/types"
+import type { CapacityMeshNode } from "../types/capacity-mesh-types"
 import { FlatbushIndex } from "../data-structures/FlatbushIndex"
 
 export interface RectEdge {
@@ -732,10 +733,22 @@ export class GapFillSolver extends BaseSolver {
     return points
   }
 
-  override getOutput() {
-    return {
-      filledRects: this.state.filledRects,
-    }
+  override getOutput(): { meshNodes: CapacityMeshNode[] } {
+    const meshNodes: CapacityMeshNode[] = this.state.filledRects.map((placed, index) => ({
+      capacityMeshNodeId: `gap-fill-${index}`,
+      x: placed.rect.x,
+      y: placed.rect.y,
+      center: {
+        x: placed.rect.x + placed.rect.width / 2,
+        y: placed.rect.y + placed.rect.height / 2,
+      },
+      width: placed.rect.width,
+      height: placed.rect.height,
+      availableZ: placed.zLayers,
+      layer: placed.zLayers[0]?.toString() ?? "0",
+    }))
+
+    return { meshNodes }
   }
 
   override visualize(): GraphicsObject {

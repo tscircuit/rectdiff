@@ -72,24 +72,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
 
     const gapFillOutput = gapFillSolver.getOutput()
 
-    const gapFillMeshNodes: CapacityMeshNode[] = gapFillOutput.filledRects.map(
-      (placed, index) => ({
-        capacityMeshNodeId: `gap-fill-${index}`,
-        x: placed.rect.x,
-        y: placed.rect.y,
-        center: {
-          x: placed.rect.x + placed.rect.width / 2,
-          y: placed.rect.y + placed.rect.height / 2,
-        },
-        width: placed.rect.width,
-        height: placed.rect.height,
-        availableZ: placed.zLayers,
-        layer: placed.zLayers[0]?.toString() ?? "0",
-      }),
-    )
-
     return {
-      meshNodes: [...rectDiffOutput.meshNodes, ...gapFillMeshNodes],
+      meshNodes: [...rectDiffOutput.meshNodes, ...gapFillOutput.meshNodes],
     }
   }
 
@@ -101,21 +85,37 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
       return gapFillSolver.visualize()
     }
 
-    if (gapFillSolver?.solved && rectDiffSolver) {
-      const baseViz = rectDiffSolver.visualize()
-      const gapFillViz = gapFillSolver.visualize()
-
-      return {
-        ...baseViz,
-        title: "RectDiff Pipeline (with Gap Fill)",
-        rects: [...(baseViz.rects || []), ...(gapFillViz.rects || [])],
-        lines: [...(baseViz.lines || []), ...(gapFillViz.lines || [])],
-        points: [...(baseViz.points || []), ...(gapFillViz.points || [])],
-      }
-    }
-
     if (rectDiffSolver) {
-      return rectDiffSolver.visualize()
+      const baseViz = rectDiffSolver.visualize()
+      if (gapFillSolver?.solved) {
+        const gapFillOutput = gapFillSolver.getOutput()
+        const gapFillRects = gapFillOutput.meshNodes.map((node) => {
+          const minZ = Math.min(...node.availableZ)
+          const colors = [
+            { fill: "#dbeafe", stroke: "#3b82f6" },
+            { fill: "#fef3c7", stroke: "#f59e0b" },
+            { fill: "#d1fae5", stroke: "#10b981" },
+          ]
+          const color = colors[minZ % colors.length]!
+
+          return {
+            center: node.center,
+            width: node.width,
+            height: node.height,
+            fill: color.fill,
+            stroke: color.stroke,
+            label: `capacity node (gap fill)\nz: [${node.availableZ.join(", ")}]`,
+          }
+        })
+
+        return {
+          ...baseViz,
+          title: "RectDiff Pipeline (with Gap Fill)",
+          rects: [...(baseViz.rects || []), ...gapFillRects],
+        }
+      }
+
+      return baseViz
     }
 
     // Show board and obstacles even before solver is initialized
