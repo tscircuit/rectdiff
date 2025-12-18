@@ -34,6 +34,7 @@ export default () => {
         simpleRouteJson,
         placedRects,
         obstaclesByLayer: [[]],
+        maxEdgeDistance: 5.0,
       }),
     [],
   )

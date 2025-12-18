@@ -62,20 +62,59 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    return this.getSolver<RectDiffSolver>("rectDiffSolver")!.getOutput()
+    const rectDiffOutput =
+      this.getSolver<RectDiffSolver>("rectDiffSolver")!.getOutput()
+    const gapFillSolver = this.getSolver<GapFillSolver>("gapFillSolver")
+
+    if (!gapFillSolver) {
+      return rectDiffOutput
+    }
+
+    const gapFillOutput = gapFillSolver.getOutput()
+
+    const gapFillMeshNodes: CapacityMeshNode[] = gapFillOutput.filledRects.map(
+      (placed, index) => ({
+        capacityMeshNodeId: `gap-fill-${index}`,
+        x: placed.rect.x,
+        y: placed.rect.y,
+        center: {
+          x: placed.rect.x + placed.rect.width / 2,
+          y: placed.rect.y + placed.rect.height / 2,
+        },
+        width: placed.rect.width,
+        height: placed.rect.height,
+        availableZ: placed.zLayers,
+        layer: placed.zLayers[0]?.toString() ?? "0",
+      }),
+    )
+
+    return {
+      meshNodes: [...rectDiffOutput.meshNodes, ...gapFillMeshNodes],
+    }
   }
 
   override visualize(): GraphicsObject {
-    // Show the currently active solver's visualization
     const gapFillSolver = this.getSolver<GapFillSolver>("gapFillSolver")
+    const rectDiffSolver = this.getSolver<RectDiffSolver>("rectDiffSolver")
+
     if (gapFillSolver && !gapFillSolver.solved) {
-      // Gap fill is running, show its visualization
       return gapFillSolver.visualize()
     }
 
-    const rectDiffSolver = this.getSolver<RectDiffSolver>("rectDiffSolver")
+    if (gapFillSolver?.solved && rectDiffSolver) {
+      const baseViz = rectDiffSolver.visualize()
+      const gapFillViz = gapFillSolver.visualize()
+
+      return {
+        ...baseViz,
+        title: "RectDiff Pipeline (with Gap Fill)",
+        rects: [...(baseViz.rects || []), ...(gapFillViz.rects || [])],
+        lines: [...(baseViz.lines || []), ...(gapFillViz.lines || [])],
+        points: [...(baseViz.points || []), ...(gapFillViz.points || [])],
+      }
+    }
+
     if (rectDiffSolver) {
-      // RectDiff is running or finished, show its visualization
       return rectDiffSolver.visualize()
     }
 
