@@ -236,12 +236,10 @@ export class GapFillSolver extends BaseSolver {
   }
 
   private stepCheckUnoccupied(): void {
-    // Find all unoccupied sections at once (can be broken down further if needed)
     const primaryEdge = this.state.currentPrimaryEdge!
     this.state.currentUnoccupiedSections =
       this.findUnoccupiedSections(primaryEdge)
 
-    // Move to placing expansion points
     this.state.phase = "PLACE_EXPANSION_POINTS"
   }
 
@@ -266,12 +264,77 @@ export class GapFillSolver extends BaseSolver {
       const point =
         this.state.currentExpansionPoints[this.state.currentExpansionIndex]!
 
-      // TODO: Actually expand the point into a rectangle
-      // For now, just move to next point
+      const filledRect = this.expandPointToRect(point)
+      if (filledRect && !this.overlapsExistingFill(filledRect)) {
+        this.state.filledRects.push(filledRect)
+      }
 
       this.state.currentExpansionIndex++
     } else {
       this.moveToNextEdge()
+    }
+  }
+
+  private overlapsExistingFill(candidate: Placed3D): boolean {
+    for (const existing of this.state.filledRects) {
+      const sharedLayers = candidate.zLayers.filter((z) =>
+        existing.zLayers.includes(z),
+      )
+      if (sharedLayers.length === 0) continue
+
+      const overlapX =
+        Math.max(candidate.rect.x, existing.rect.x) <
+        Math.min(
+          candidate.rect.x + candidate.rect.width,
+          existing.rect.x + existing.rect.width,
+        )
+      const overlapY =
+        Math.max(candidate.rect.y, existing.rect.y) <
+        Math.min(
+          candidate.rect.y + candidate.rect.height,
+          existing.rect.y + existing.rect.height,
+        )
+
+      if (overlapX && overlapY) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  private expandPointToRect(point: ExpansionPoint): Placed3D | null {
+    const section = point.section
+    const edge = section.edge
+
+    const nearbyEdge = this.state.currentNearbyEdges[0]
+    if (!nearbyEdge) return null
+
+    let rect: { x: number; y: number; width: number; height: number }
+
+    if (Math.abs(edge.normal.x) > 0.5) {
+      const x1 = Math.min(edge.x1, nearbyEdge.x1)
+      const x2 = Math.max(edge.x1, nearbyEdge.x1)
+      rect = {
+        x: x1,
+        y: section.y1,
+        width: x2 - x1,
+        height: section.y2 - section.y1,
+      }
+    } else {
+      const y1 = Math.min(edge.y1, nearbyEdge.y1)
+      const y2 = Math.max(edge.y1, nearbyEdge.y1)
+      rect = {
+        x: section.x1,
+        y: y1,
+        width: section.x2 - section.x1,
+        height: y2 - y1,
+      }
+    }
+
+    return {
+      rect,
+      zLayers: [...point.zLayers],
     }
   }
 
@@ -372,7 +435,7 @@ export class GapFillSolver extends BaseSolver {
         height: placed.rect.height,
         fill: "#f3f4f6",
         stroke: "#9ca3af",
-        label: "existing",
+        label: `input rect\npos: (${placed.rect.x.toFixed(2)}, ${placed.rect.y.toFixed(2)})\nsize: ${placed.rect.width.toFixed(2)} × ${placed.rect.height.toFixed(2)}\nz: [${placed.zLayers.join(", ")}]`,
       })
     }
 
@@ -386,12 +449,18 @@ export class GapFillSolver extends BaseSolver {
         ],
         strokeColor: "#3b82f6",
         strokeWidth: 0.08,
-        label: "primary edge",
+        label: `primary edge (${e.side})\n(${e.x1.toFixed(2)}, ${e.y1.toFixed(2)}) → (${e.x2.toFixed(2)}, ${e.y2.toFixed(2)})\nnormal: (${e.normal.x}, ${e.normal.y})\nz: [${e.zLayers.join(", ")}]`,
       })
     }
 
     // Highlight nearby edges (orange)
     for (const edge of this.state.currentNearbyEdges) {
+      const distance = this.state.currentPrimaryEdge
+        ? this.distanceBetweenEdges(
+            this.state.currentPrimaryEdge,
+            edge,
+          ).toFixed(2)
+        : "?"
       lines.push({
         points: [
           { x: edge.x1, y: edge.y1 },
@@ -399,12 +468,16 @@ export class GapFillSolver extends BaseSolver {
         ],
         strokeColor: "#f97316",
         strokeWidth: 0.06,
-        label: "nearby edge",
+        label: `nearby edge (${edge.side})\n(${edge.x1.toFixed(2)}, ${edge.y1.toFixed(2)}) → (${edge.x2.toFixed(2)}, ${edge.y2.toFixed(2)})\ndist: ${distance}mm\nz: [${edge.zLayers.join(", ")}]`,
       })
     }
 
     // Highlight unoccupied sections (green)
     for (const section of this.state.currentUnoccupiedSections) {
+      const length = Math.sqrt(
+        Math.pow(section.x2 - section.x1, 2) +
+          Math.pow(section.y2 - section.y1, 2),
+      )
       lines.push({
         points: [
           { x: section.x1, y: section.y1 },
@@ -412,7 +485,7 @@ export class GapFillSolver extends BaseSolver {
         ],
         strokeColor: "#10b981",
         strokeWidth: 0.04,
-        label: "unoccupied",
+        label: `unoccupied section\n(${section.x1.toFixed(2)}, ${section.y1.toFixed(2)}) → (${section.x2.toFixed(2)}, ${section.y2.toFixed(2)})\nlength: ${length.toFixed(2)}mm\nrange: ${(section.start * 100).toFixed(0)}%-${(section.end * 100).toFixed(0)}%`,
       })
     }
 
@@ -423,7 +496,7 @@ export class GapFillSolver extends BaseSolver {
         y: point.y,
         fill: "#a855f7",
         stroke: "#7e22ce",
-        label: "expand",
+        label: `expansion point\npos: (${point.x.toFixed(2)}, ${point.y.toFixed(2)})\nz: [${point.zLayers.join(", ")}]`,
       } as any)
     }
 
@@ -438,7 +511,7 @@ export class GapFillSolver extends BaseSolver {
         height: placed.rect.height,
         fill: "#d1fae5",
         stroke: "#10b981",
-        label: "filled gap",
+        label: `filled gap\npos: (${placed.rect.x.toFixed(2)}, ${placed.rect.y.toFixed(2)})\nsize: ${placed.rect.width.toFixed(2)} × ${placed.rect.height.toFixed(2)}\nz: [${placed.zLayers.join(", ")}]`,
       })
     }
 
