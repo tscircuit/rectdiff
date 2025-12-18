@@ -14,11 +14,6 @@ import {
 } from "./rectdiff/engine"
 import { rectsToMeshNodes } from "./rectdiff/rectsToMeshNodes"
 import { overlaps } from "./rectdiff/geometry"
-import type { GapFillOptions } from "./rectdiff/gapfill/types"
-import {
-  findUncoveredPoints,
-  calculateCoverage,
-} from "./rectdiff/gapfill/engine"
 
 /**
  * A streaming, one-step-per-iteration solver for capacity mesh generation.
@@ -80,34 +75,6 @@ export class RectDiffSolver extends BaseSolver {
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
     return { meshNodes: this._meshNodes }
-  }
-
-  /** Get coverage percentage (0-1). */
-  getCoverage(sampleResolution: number = 0.05): number {
-    return calculateCoverage(
-      { sampleResolution },
-      {
-        bounds: this.state.bounds,
-        layerCount: this.state.layerCount,
-        obstaclesByLayer: this.state.obstaclesByLayer,
-        placedByLayer: this.state.placedByLayer,
-      },
-    )
-  }
-
-  /** Find uncovered points for debugging gaps. */
-  getUncoveredPoints(
-    sampleResolution: number = 0.05,
-  ): Array<{ x: number; y: number; z: number }> {
-    return findUncoveredPoints(
-      { sampleResolution },
-      {
-        bounds: this.state.bounds,
-        layerCount: this.state.layerCount,
-        obstaclesByLayer: this.state.obstaclesByLayer,
-        placedByLayer: this.state.placedByLayer,
-      },
-    )
   }
 
   /** Get color based on z layer for visualization. */
