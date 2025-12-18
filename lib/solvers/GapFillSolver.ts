@@ -13,6 +13,7 @@ export interface RectEdge {
   y2: number
   normal: { x: number; y: number }
   zLayers: number[]
+  segmentType?: "free" | "overlap" // Track if this is a free or overlap segment
 }
 
 export interface UnoccupiedSection {
@@ -268,18 +269,24 @@ export class GapFillSolver extends BaseSolver {
       for (const occupied of merged) {
         if (pos < occupied.start) {
           console.log(`  Creating free segment: ${pos.toFixed(2)}-${occupied.start.toFixed(2)}`)
-          result.push(this.createEdgeSegment(edge, pos, occupied.start))
+          const freeSegment = this.createEdgeSegment(edge, pos, occupied.start)
+          freeSegment.segmentType = "free"
+          result.push(freeSegment)
         }
         pos = occupied.end
       }
       if (pos < 1) {
         console.log(`  Creating free segment: ${pos.toFixed(2)}-1.00`)
-        result.push(this.createEdgeSegment(edge, pos, 1))
+        const freeSegment = this.createEdgeSegment(edge, pos, 1)
+        freeSegment.segmentType = "free"
+        result.push(freeSegment)
       }
 
       for (const occupied of merged) {
         console.log(`  Creating overlap segment: ${occupied.start.toFixed(2)}-${occupied.end.toFixed(2)}`)
-        result.push(this.createEdgeSegment(edge, occupied.start, occupied.end))
+        const overlapSegment = this.createEdgeSegment(edge, occupied.start, occupied.end)
+        overlapSegment.segmentType = "overlap"
+        result.push(overlapSegment)
       }
     }
 
@@ -664,66 +671,29 @@ export class GapFillSolver extends BaseSolver {
       })
     }
 
-    // Highlight primary edge (bright blue)
-    if (this.state.currentPrimaryEdge) {
-      const e = this.state.currentPrimaryEdge
-      lines.push({
-        points: [
-          { x: e.x1, y: e.y1 },
-          { x: e.x2, y: e.y2 },
-        ],
-        strokeColor: "#3b82f6",
-        strokeWidth: 0.08,
-        label: `primary edge (${e.side})\n(${e.x1.toFixed(2)}, ${e.y1.toFixed(2)}) → (${e.x2.toFixed(2)}, ${e.y2.toFixed(2)})\nnormal: (${e.normal.x}, ${e.normal.y})\nz: [${e.zLayers.join(", ")}]`,
-      })
-    }
+    // Draw ALL edges with color coding: FREE=green, OVERLAP=red, UNSPLIT=gray
+    for (const edge of this.state.edges) {
+      const color = edge.segmentType === "free"
+        ? "#10b981"  // Green for free segments
+        : edge.segmentType === "overlap"
+        ? "#ef4444"  // Red for overlap segments
+        : "#6b7280"  // Gray for unsplit edges
 
-    // Highlight nearby edges (orange)
-    for (const edge of this.state.currentNearbyEdges) {
-      const distance = this.state.currentPrimaryEdge
-        ? this.distanceBetweenEdges(
-            this.state.currentPrimaryEdge,
-            edge,
-          ).toFixed(2)
-        : "?"
+      const label = edge.segmentType
+        ? `${edge.segmentType.toUpperCase()} segment\n${edge.side}\n(${edge.x1.toFixed(2)},${edge.y1.toFixed(2)})-(${edge.x2.toFixed(2)},${edge.y2.toFixed(2)})`
+        : `edge ${edge.side}\n(${edge.x1.toFixed(2)},${edge.y1.toFixed(2)})-(${edge.x2.toFixed(2)},${edge.y2.toFixed(2)})`
+
       lines.push({
         points: [
           { x: edge.x1, y: edge.y1 },
           { x: edge.x2, y: edge.y2 },
         ],
-        strokeColor: "#f97316",
-        strokeWidth: 0.06,
-        label: `nearby edge (${edge.side})\n(${edge.x1.toFixed(2)}, ${edge.y1.toFixed(2)}) → (${edge.x2.toFixed(2)}, ${edge.y2.toFixed(2)})\ndist: ${distance}mm\nz: [${edge.zLayers.join(", ")}]`,
+        strokeColor: color,
+        strokeWidth: 0.1,
+        label,
       })
     }
 
-    // Highlight unoccupied sections (green)
-    for (const section of this.state.currentUnoccupiedSections) {
-      const length = Math.sqrt(
-        Math.pow(section.x2 - section.x1, 2) +
-          Math.pow(section.y2 - section.y1, 2),
-      )
-      lines.push({
-        points: [
-          { x: section.x1, y: section.y1 },
-          { x: section.x2, y: section.y2 },
-        ],
-        strokeColor: "#10b981",
-        strokeWidth: 0.04,
-        label: `unoccupied section\n(${section.x1.toFixed(2)}, ${section.y1.toFixed(2)}) → (${section.x2.toFixed(2)}, ${section.y2.toFixed(2)})\nlength: ${length.toFixed(2)}mm\nrange: ${(section.start * 100).toFixed(0)}%-${(section.end * 100).toFixed(0)}%`,
-      })
-    }
-
-    // Show expansion points (purple)
-    for (const point of this.state.currentExpansionPoints) {
-      points.push({
-        x: point.x,
-        y: point.y,
-        fill: "#a855f7",
-        stroke: "#7e22ce",
-        label: `expansion point\npos: (${point.x.toFixed(2)}, ${point.y.toFixed(2)})\nz: [${point.zLayers.join(", ")}]`,
-      } as any)
-    }
 
     // Draw filled rectangles (green)
     for (const placed of this.state.filledRects) {
