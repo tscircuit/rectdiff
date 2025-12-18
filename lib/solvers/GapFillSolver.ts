@@ -734,19 +734,21 @@ export class GapFillSolver extends BaseSolver {
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    const meshNodes: CapacityMeshNode[] = this.state.filledRects.map((placed, index) => ({
-      capacityMeshNodeId: `gap-fill-${index}`,
-      x: placed.rect.x,
-      y: placed.rect.y,
-      center: {
-        x: placed.rect.x + placed.rect.width / 2,
-        y: placed.rect.y + placed.rect.height / 2,
-      },
-      width: placed.rect.width,
-      height: placed.rect.height,
-      availableZ: placed.zLayers,
-      layer: placed.zLayers[0]?.toString() ?? "0",
-    }))
+    const meshNodes: CapacityMeshNode[] = this.state.filledRects.map(
+      (placed, index) => ({
+        capacityMeshNodeId: `gap-fill-${index}`,
+        x: placed.rect.x,
+        y: placed.rect.y,
+        center: {
+          x: placed.rect.x + placed.rect.width / 2,
+          y: placed.rect.y + placed.rect.height / 2,
+        },
+        width: placed.rect.width,
+        height: placed.rect.height,
+        availableZ: placed.zLayers,
+        layer: placed.zLayers[0]?.toString() ?? "0",
+      }),
+    )
 
     return { meshNodes }
   }
