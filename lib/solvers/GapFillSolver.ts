@@ -2,6 +2,7 @@ import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
 import type { SimpleRouteJson } from "../types/srj-types"
 import type { Placed3D, XYRect } from "./rectdiff/types"
+import { FlatbushIndex } from "../data-structures/FlatbushIndex"
 
 export interface RectEdge {
   rect: XYRect
@@ -53,6 +54,7 @@ interface GapFillState {
   layerCount: number
 
   edges: RectEdge[]
+  edgeSpatialIndex: FlatbushIndex<RectEdge>
 
   phase: SubPhase
   currentEdgeIndex: number
@@ -86,12 +88,16 @@ export class GapFillSolver extends BaseSolver {
 
     const edges = this.extractEdges(input.placedRects)
 
+    // Build spatial index for fast edge-to-edge queries
+    const edgeSpatialIndex = this.buildEdgeSpatialIndex(edges)
+
     return {
       srj: input.simpleRouteJson,
       inputRects: input.placedRects,
       obstaclesByLayer: input.obstaclesByLayer,
       layerCount,
       edges,
+      edgeSpatialIndex,
       phase: "SELECT_PRIMARY_EDGE",
       currentEdgeIndex: 0,
       nearbyEdgeCandidateIndex: 0,
@@ -101,6 +107,24 @@ export class GapFillSolver extends BaseSolver {
       currentExpansionIndex: 0,
       filledRects: [],
     }
+  }
+
+  private buildEdgeSpatialIndex(edges: RectEdge[]): FlatbushIndex<RectEdge> {
+    const index = new FlatbushIndex<RectEdge>(edges.length)
+
+    for (const edge of edges) {
+      // Create bounding box for edge (padded by max search distance)
+      const padding = 2.0 // Max edge distance threshold
+      const minX = Math.min(edge.x1, edge.x2) - padding
+      const minY = Math.min(edge.y1, edge.y2) - padding
+      const maxX = Math.max(edge.x1, edge.x2) + padding
+      const maxY = Math.max(edge.y1, edge.y2) + padding
+
+      index.insert(edge, minX, minY, maxX, maxY)
+    }
+
+    index.finish()
+    return index
   }
 
   private extractEdges(rects: Placed3D[]): RectEdge[] {
@@ -216,8 +240,23 @@ export class GapFillSolver extends BaseSolver {
   private stepFindNearbyEdges(): void {
     const primaryEdge = this.state.currentPrimaryEdge!
 
+    // Query spatial index for candidate edges near this primary edge
+    const padding = 2.0 // Max distance threshold
+    const minX = Math.min(primaryEdge.x1, primaryEdge.x2) - padding
+    const minY = Math.min(primaryEdge.y1, primaryEdge.y2) - padding
+    const maxX = Math.max(primaryEdge.x1, primaryEdge.x2) + padding
+    const maxY = Math.max(primaryEdge.y1, primaryEdge.y2) + padding
+
+    const candidates = this.state.edgeSpatialIndex.search(
+      minX,
+      minY,
+      maxX,
+      maxY,
+    )
+
+    // Check only the nearby candidates (not all edges!)
     this.state.currentNearbyEdges = []
-    for (const candidate of this.state.edges) {
+    for (const candidate of candidates) {
       if (
         candidate !== primaryEdge &&
         this.isNearbyParallelEdge(primaryEdge, candidate)
