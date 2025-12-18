@@ -560,7 +560,7 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   defaultWireframeOutput = false,
   style,
 }) => {
-  const [show3d, setShow3d] = useState(false)
+  const [renderMode, setRenderMode] = useState<"2d" | "3d">("2d")
   const [rebuildKey, setRebuildKey] = useState(0)
 
   const [showRoot, setShowRoot] = useState(defaultShowRoot)
@@ -610,204 +610,134 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
     return () => clearInterval(interval)
   }, [updateMeshNodes, solver])
 
-  const toggle3d = useCallback(() => setShow3d((s) => !s), [])
   const rebuild = useCallback(() => setRebuildKey((k) => k + 1), [])
 
   return (
     <>
       <div style={{ display: "grid", gap: 12, ...style }}>
-        <GenericSolverDebugger
-          solver={solver as any}
-          onSolverCompleted={handleSolverCompleted}
-        />
-
+        {/* Topbar with Render dropdown */}
         <div
           style={{
             display: "flex",
-            gap: 8,
+            gap: 12,
             alignItems: "center",
-            flexWrap: "wrap",
+            padding: "12px 16px",
+            background: "#f8fafc",
+            borderRadius: 8,
+            border: "1px solid #e2e8f0",
           }}
         >
-          <button
-            onClick={toggle3d}
-            style={{
-              padding: "8px 10px",
-              borderRadius: 6,
-              border: "1px solid #cbd5e1",
-              background: show3d ? "#1e293b" : "#2563eb",
-              color: "white",
-              cursor: "pointer",
-            }}
-          >
-            {show3d ? "Hide 3D" : "Show 3D"}
-          </button>
-          {show3d && (
-            <button
-              onClick={rebuild}
+          <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Render:</span>
+            <select
+              value={renderMode}
+              onChange={(e) => setRenderMode(e.target.value as "2d" | "3d")}
               style={{
-                padding: "8px 10px",
+                padding: "6px 12px",
                 borderRadius: 6,
                 border: "1px solid #cbd5e1",
-                background: "#0f766e",
-                color: "white",
+                background: "white",
                 cursor: "pointer",
-              }}
-              title="Rebuild 3D scene (use after changing solver params)"
-            >
-              Rebuild 3D
-            </button>
-          )}
-
-          {/* experiment-like toggles */}
-          <label
-            style={{
-              display: "inline-flex",
-              gap: 6,
-              alignItems: "center",
-              marginLeft: 8,
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showRoot}
-              onChange={(e) => setShowRoot(e.target.checked)}
-            />
-            Root
-          </label>
-          <label
-            style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
-          >
-            <input
-              type="checkbox"
-              checked={showObstacles}
-              onChange={(e) => setShowObstacles(e.target.checked)}
-            />
-            Obstacles
-          </label>
-          <label
-            style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
-          >
-            <input
-              type="checkbox"
-              checked={showOutput}
-              onChange={(e) => setShowOutput(e.target.checked)}
-            />
-            Output
-          </label>
-          <label
-            style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
-          >
-            <input
-              type="checkbox"
-              checked={wireframeOutput}
-              onChange={(e) => setWireframeOutput(e.target.checked)}
-            />
-            Wireframe Output
-          </label>
-
-          {/* Mesh opacity slider */}
-          {show3d && (
-            <label
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                marginLeft: 8,
-                fontSize: 12,
+                fontSize: 14,
               }}
             >
-              Opacity
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={meshOpacity}
-                onChange={(e) => setMeshOpacity(parseFloat(e.target.value))}
-              />
-              <span style={{ width: 32, textAlign: "right" }}>
-                {meshOpacity.toFixed(2)}
-              </span>
-            </label>
-          )}
+              <option value="2d">2D (Normal)</option>
+              <option value="3d">3D View</option>
+            </select>
+          </label>
 
-          {/* Shrink boxes option */}
-          {show3d && (
+          {renderMode === "3d" && (
             <>
+              <button
+                onClick={rebuild}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  background: "#0f766e",
+                  color: "white",
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
+                title="Rebuild 3D scene"
+              >
+                Rebuild
+              </button>
+
               <label
                 style={{
                   display: "inline-flex",
                   gap: 6,
                   alignItems: "center",
-                  fontSize: 12,
+                  fontSize: 13,
                 }}
               >
                 <input
                   type="checkbox"
-                  checked={shrinkBoxes}
-                  onChange={(e) => setShrinkBoxes(e.target.checked)}
+                  checked={showRoot}
+                  onChange={(e) => setShowRoot(e.target.checked)}
                 />
-                Shrink boxes
+                Root
               </label>
-              {shrinkBoxes && (
-                <label
-                  style={{
-                    display: "inline-flex",
-                    gap: 4,
-                    alignItems: "center",
-                    fontSize: 12,
-                  }}
-                >
-                  amt
-                  <input
-                    type="number"
-                    value={boxShrinkAmount}
-                    step={0.05}
-                    style={{ width: 60 }}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value)
-                      if (Number.isNaN(v)) return
-                      setBoxShrinkAmount(Math.max(0, v))
-                    }}
-                  />
-                </label>
-              )}
-            </>
-          )}
-
-          {/* Show borders option */}
-          {show3d && (
-            <label
-              style={{
-                display: "inline-flex",
-                gap: 6,
-                alignItems: "center",
-                fontSize: 12,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={showBorders}
-                disabled={wireframeOutput}
-                onChange={(e) => setShowBorders(e.target.checked)}
-              />
-              <span
+              <label
                 style={{
-                  opacity: wireframeOutput ? 0.5 : 1,
+                  display: "inline-flex",
+                  gap: 6,
+                  alignItems: "center",
+                  fontSize: 13,
                 }}
               >
-                Show borders
-              </span>
-            </label>
+                <input
+                  type="checkbox"
+                  checked={showObstacles}
+                  onChange={(e) => setShowObstacles(e.target.checked)}
+                />
+                Obstacles
+              </label>
+              <label
+                style={{
+                  display: "inline-flex",
+                  gap: 6,
+                  alignItems: "center",
+                  fontSize: 13,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={showOutput}
+                  onChange={(e) => setShowOutput(e.target.checked)}
+                />
+                Output
+              </label>
+              <label
+                style={{
+                  display: "inline-flex",
+                  gap: 6,
+                  alignItems: "center",
+                  fontSize: 13,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={wireframeOutput}
+                  onChange={(e) => setWireframeOutput(e.target.checked)}
+                />
+                Wireframe
+              </label>
+            </>
           )}
-
-          <div style={{ fontSize: 12, color: "#334155", marginLeft: 6 }}>
-            Drag to orbit · Wheel to zoom · Right-drag to pan
-          </div>
         </div>
 
-        {show3d && (
+        {/* Render 2D view */}
+        {renderMode === "2d" && (
+          <GenericSolverDebugger
+            solver={solver as any}
+            onSolverCompleted={handleSolverCompleted}
+          />
+        )}
+
+        {/* Render 3D view */}
+        {renderMode === "3d" && (
           <ThreeBoardView
             key={rebuildKey}
             nodes={meshNodes}

@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test"
 import boardWithCutout from "../test-assets/board-with-cutout.json"
-import { RectDiffSolver } from "../lib/solvers/RectDiffSolver"
+import { RectDiffPipeline } from "../lib/RectDiffPipeline"
 import { getSvgFromGraphicsObject } from "graphics-debug"
 
 test("board outline snapshot", async () => {
-  const solver = new RectDiffSolver({
+  const solver = new RectDiffPipeline({
     simpleRouteJson: boardWithCutout as any,
   })
 
