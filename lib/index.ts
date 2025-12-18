@@ -1,1 +1,1 @@
-export * from "./solvers/RectDiffSolver"
+export * from "./RectDiffPipeline"

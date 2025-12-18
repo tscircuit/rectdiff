@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { RectDiffSolver } from "../lib/solvers/RectDiffSolver"
+import { RectDiffPipeline } from "../lib/RectDiffPipeline"
 import type { SimpleRouteJson } from "../lib/types/srj-types"
 
 test("RectDiffSolver supports incremental stepping", () => {
@@ -20,32 +20,26 @@ test("RectDiffSolver supports incremental stepping", () => {
     minTraceWidth: 0.15,
   }
 
-  const solver = new RectDiffSolver({ simpleRouteJson })
+  const pipeline = new RectDiffPipeline({ simpleRouteJson })
 
   // Setup initializes state
-  solver.setup()
-  expect(solver.solved).toBe(false)
-  expect(solver.stats.phase).toBe("GRID")
+  pipeline.setup()
+  expect(pipeline.solved).toBe(false)
 
   // Step advances one candidate at a time
   let stepCount = 0
   const maxSteps = 1000 // safety limit
 
-  while (!solver.solved && stepCount < maxSteps) {
-    solver.step()
+  while (!pipeline.solved && stepCount < maxSteps) {
+    pipeline.step()
     stepCount++
-
-    // Progress should increase (or stay at 1.0 when done)
-    if (!solver.solved) {
-      expect(solver.stats.phase).toBeDefined()
-    }
   }
 
-  expect(solver.solved).toBe(true)
+  expect(pipeline.solved).toBe(true)
   expect(stepCount).toBeGreaterThan(0)
   expect(stepCount).toBeLessThan(maxSteps)
 
-  const output = solver.getOutput()
+  const output = pipeline.getOutput()
   expect(output.meshNodes.length).toBeGreaterThan(0)
 })
 
@@ -58,7 +52,7 @@ test("RectDiffSolver.solve() still works (backward compatibility)", () => {
     minTraceWidth: 0.1,
   }
 
-  const solver = new RectDiffSolver({ simpleRouteJson })
+  const solver = new RectDiffPipeline({ simpleRouteJson })
 
   // Old-style: just call solve()
   solver.solve()
@@ -77,7 +71,7 @@ test("RectDiffSolver exposes progress during solve", () => {
     minTraceWidth: 0.2,
   }
 
-  const solver = new RectDiffSolver({ simpleRouteJson })
+  const solver = new RectDiffPipeline({ simpleRouteJson })
   solver.setup()
 
   const progressValues: number[] = []
