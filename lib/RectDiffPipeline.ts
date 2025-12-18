@@ -4,6 +4,7 @@ import type { GridFill3DOptions } from "./solvers/rectdiff/types"
 import { RectDiffSolver } from "./solvers/RectDiffSolver"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
+import { createBaseVisualization } from "./solvers/rectdiff/visualization"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -44,13 +45,11 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
     if (solver) {
       return solver.visualize()
     }
-    // Return empty visualization if solver not initialized yet
-    return {
-      title: "RectDiff Pipeline (initializing...)",
-      coordinateSystem: "cartesian",
-      rects: [],
-      points: [],
-      lines: [],
-    }
+
+    // Show board and obstacles even before solver is initialized
+    return createBaseVisualization(
+      this.inputProblem.simpleRouteJson,
+      "RectDiff Pipeline (not started)",
+    )
   }
 }
