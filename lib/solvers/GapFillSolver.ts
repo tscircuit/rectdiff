@@ -308,6 +308,7 @@ export class GapFillSolver extends BaseSolver {
         filledRect &&
         !this.overlapsExistingFill(filledRect) &&
         !this.overlapsInputRects(filledRect) &&
+        !this.overlapsObstacles(filledRect) &&
         this.hasMinimumSize(filledRect)
       ) {
         this.state.filledRects.push(filledRect)
@@ -369,6 +370,32 @@ export class GapFillSolver extends BaseSolver {
 
       if (overlapX && overlapY) {
         return true
+      }
+    }
+
+    return false
+  }
+
+  private overlapsObstacles(candidate: Placed3D): boolean {
+    for (const z of candidate.zLayers) {
+      const obstacles = this.state.obstaclesByLayer[z] ?? []
+      for (const obstacle of obstacles) {
+        const overlapX =
+          Math.max(candidate.rect.x, obstacle.x) <
+          Math.min(
+            candidate.rect.x + candidate.rect.width,
+            obstacle.x + obstacle.width,
+          )
+        const overlapY =
+          Math.max(candidate.rect.y, obstacle.y) <
+          Math.min(
+            candidate.rect.y + candidate.rect.height,
+            obstacle.y + obstacle.height,
+          )
+
+        if (overlapX && overlapY) {
+          return true
+        }
       }
     }
 
