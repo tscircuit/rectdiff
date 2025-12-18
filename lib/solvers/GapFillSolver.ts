@@ -265,7 +265,12 @@ export class GapFillSolver extends BaseSolver {
         this.state.currentExpansionPoints[this.state.currentExpansionIndex]!
 
       const filledRect = this.expandPointToRect(point)
-      if (filledRect && !this.overlapsExistingFill(filledRect)) {
+      if (
+        filledRect &&
+        !this.overlapsExistingFill(filledRect) &&
+        !this.overlapsInputRects(filledRect) &&
+        this.hasMinimumSize(filledRect)
+      ) {
         this.state.filledRects.push(filledRect)
       }
 
@@ -303,6 +308,41 @@ export class GapFillSolver extends BaseSolver {
     return false
   }
 
+  private overlapsInputRects(candidate: Placed3D): boolean {
+    for (const input of this.state.inputRects) {
+      const sharedLayers = candidate.zLayers.filter((z) =>
+        input.zLayers.includes(z),
+      )
+      if (sharedLayers.length === 0) continue
+
+      const overlapX =
+        Math.max(candidate.rect.x, input.rect.x) <
+        Math.min(
+          candidate.rect.x + candidate.rect.width,
+          input.rect.x + input.rect.width,
+        )
+      const overlapY =
+        Math.max(candidate.rect.y, input.rect.y) <
+        Math.min(
+          candidate.rect.y + candidate.rect.height,
+          input.rect.y + input.rect.height,
+        )
+
+      if (overlapX && overlapY) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  private hasMinimumSize(candidate: Placed3D): boolean {
+    const minSize = 0.01
+    return (
+      candidate.rect.width >= minSize && candidate.rect.height >= minSize
+    )
+  }
+
   private expandPointToRect(point: ExpansionPoint): Placed3D | null {
     const section = point.section
     const edge = section.edge
@@ -313,22 +353,24 @@ export class GapFillSolver extends BaseSolver {
     let rect: { x: number; y: number; width: number; height: number }
 
     if (Math.abs(edge.normal.x) > 0.5) {
-      const x1 = Math.min(edge.x1, nearbyEdge.x1)
-      const x2 = Math.max(edge.x1, nearbyEdge.x1)
+      const leftX = edge.normal.x > 0 ? edge.x1 : nearbyEdge.x1
+      const rightX = edge.normal.x > 0 ? nearbyEdge.x1 : edge.x1
+
       rect = {
-        x: x1,
+        x: leftX,
         y: section.y1,
-        width: x2 - x1,
+        width: rightX - leftX,
         height: section.y2 - section.y1,
       }
     } else {
-      const y1 = Math.min(edge.y1, nearbyEdge.y1)
-      const y2 = Math.max(edge.y1, nearbyEdge.y1)
+      const bottomY = edge.normal.y > 0 ? edge.y1 : nearbyEdge.y1
+      const topY = edge.normal.y > 0 ? nearbyEdge.y1 : edge.y1
+
       rect = {
         x: section.x1,
-        y: y1,
+        y: bottomY,
         width: section.x2 - section.x1,
-        height: y2 - y1,
+        height: topY - bottomY,
       }
     }
 
