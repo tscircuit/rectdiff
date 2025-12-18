@@ -2,6 +2,7 @@ import { BasePipelineSolver, definePipelineStep } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "./types/srj-types"
 import type { GridFill3DOptions } from "./solvers/rectdiff/types"
 import { RectDiffSolver } from "./solvers/RectDiffSolver"
+import { GapFillSolver } from "./solvers/GapFillSolver"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { createBaseVisualization } from "./solvers/rectdiff/visualization"
@@ -13,6 +14,7 @@ export interface RectDiffPipelineInput {
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
   rectDiffSolver?: RectDiffSolver
+  gapFillSolver?: GapFillSolver
 
   override pipelineDef = [
     definePipelineStep(
@@ -30,6 +32,28 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
         },
       },
     ),
+    definePipelineStep(
+      "gapFillSolver",
+      GapFillSolver,
+      (instance) => {
+        const rectDiffSolver =
+          instance.getSolver<RectDiffSolver>("rectDiffSolver")!
+        const rectDiffState = (rectDiffSolver as any).state
+
+        return [
+          {
+            simpleRouteJson: instance.inputProblem.simpleRouteJson,
+            placedRects: rectDiffState.placed || [],
+            obstaclesByLayer: rectDiffState.obstaclesByLayer || [],
+          },
+        ]
+      },
+      {
+        onSolved: () => {
+          // Gap fill completed
+        },
+      },
+    ),
   ]
 
   override getConstructorParams() {
@@ -41,9 +65,17 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override visualize(): GraphicsObject {
-    const solver = this.getSolver<RectDiffSolver>("rectDiffSolver")
-    if (solver) {
-      return solver.visualize()
+    // Show the currently active solver's visualization
+    const gapFillSolver = this.getSolver<GapFillSolver>("gapFillSolver")
+    if (gapFillSolver && !gapFillSolver.solved) {
+      // Gap fill is running, show its visualization
+      return gapFillSolver.visualize()
+    }
+
+    const rectDiffSolver = this.getSolver<RectDiffSolver>("rectDiffSolver")
+    if (rectDiffSolver) {
+      // RectDiff is running or finished, show its visualization
+      return rectDiffSolver.visualize()
     }
 
     // Show board and obstacles even before solver is initialized
