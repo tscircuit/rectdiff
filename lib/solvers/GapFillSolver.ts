@@ -410,8 +410,7 @@ export class GapFillSolver extends BaseSolver {
       maxY,
     )
 
-    // Check only the nearby candidates (not all edges!)
-    // Collect ALL nearby parallel edges
+    // Collect nearby parallel edges
     this.state.currentNearbyEdges = []
     for (const candidate of candidates) {
       if (
@@ -421,6 +420,14 @@ export class GapFillSolver extends BaseSolver {
         this.state.currentNearbyEdges.push(candidate)
       }
     }
+
+    // Sort by distance (furthest first) to try largest fills first
+    this.state.currentNearbyEdges.sort((a, b) => {
+      const distA = this.distanceBetweenEdges(primaryEdge, a)
+      const distB = this.distanceBetweenEdges(primaryEdge, b)
+      return distB - distA
+    })
+
     this.state.phase = "CHECK_UNOCCUPIED"
   }
 
@@ -448,20 +455,23 @@ export class GapFillSolver extends BaseSolver {
       const point =
         this.state.currentExpansionPoints[this.state.currentExpansionIndex]!
 
-      const filledRect = this.expandPointToRect(point)
-      if (filledRect) {
-        const overlapsExisting = this.overlapsExistingFill(filledRect)
-        const overlapsInput = this.overlapsInputRects(filledRect)
-        const overlapsObst = this.overlapsObstacles(filledRect)
-        const hasMinSize = this.hasMinimumSize(filledRect)
+      for (const nearbyEdge of this.state.currentNearbyEdges) {
+        const filledRect = this.expandPointToRect(point, nearbyEdge)
+        if (filledRect) {
+          const overlapsExisting = this.overlapsExistingFill(filledRect)
+          const overlapsInput = this.overlapsInputRects(filledRect)
+          const overlapsObst = this.overlapsObstacles(filledRect)
+          const hasMinSize = this.hasMinimumSize(filledRect)
 
-        if (
-          !overlapsExisting &&
-          !overlapsInput &&
-          !overlapsObst &&
-          hasMinSize
-        ) {
-          this.state.filledRects.push(filledRect)
+          if (
+            !overlapsExisting &&
+            !overlapsInput &&
+            !overlapsObst &&
+            hasMinSize
+          ) {
+            this.state.filledRects.push(filledRect)
+            break
+          }
         }
       }
 
@@ -558,11 +568,11 @@ export class GapFillSolver extends BaseSolver {
     return candidate.rect.width >= minSize && candidate.rect.height >= minSize
   }
 
-  private expandPointToRect(point: ExpansionPoint): Placed3D | null {
+  private expandPointToRect(
+    point: ExpansionPoint,
+    nearbyEdge: RectEdge,
+  ): Placed3D | null {
     const edge = point.edge
-
-    const nearbyEdge = this.state.currentNearbyEdges[0]
-    if (!nearbyEdge) return null
 
     let rect: { x: number; y: number; width: number; height: number }
 
