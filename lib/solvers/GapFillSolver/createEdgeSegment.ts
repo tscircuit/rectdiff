@@ -1,10 +1,11 @@
 import type { RectEdge } from "./types"
 
-export function createEdgeSegment(
-  edge: RectEdge,
-  start: number,
-  end: number,
-): RectEdge {
+export function createEdgeSegment(params: {
+  edge: RectEdge
+  start: number
+  end: number
+}): RectEdge {
+  const { edge, start, end } = params
   const isHorizontal = Math.abs(edge.normal.y) > 0.5
 
   if (isHorizontal) {

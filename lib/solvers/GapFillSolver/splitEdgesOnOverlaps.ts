@@ -84,13 +84,17 @@ export function splitEdgesOnOverlaps(edges: RectEdge[]): RectEdge[] {
     let pos = 0
     for (const occupied of merged) {
       if (pos < occupied.start) {
-        const freeSegment = createEdgeSegment(edge, pos, occupied.start)
+        const freeSegment = createEdgeSegment({
+          edge,
+          start: pos,
+          end: occupied.start,
+        })
         result.push(freeSegment)
       }
       pos = occupied.end
     }
     if (pos < 1) {
-      const freeSegment = createEdgeSegment(edge, pos, 1)
+      const freeSegment = createEdgeSegment({ edge, start: pos, end: 1 })
       result.push(freeSegment)
     }
   }
