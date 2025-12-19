@@ -30,40 +30,33 @@ type SubPhase =
   | "EXPAND_POINT"
   | "DONE"
 
-interface GapFillSolverState {
-  srj: SimpleRouteJson
-  inputRects: Placed3D[]
-  obstaclesByLayer: XYRect[][]
-  layerCount: number
-  maxEdgeDistance: number
-  minTraceWidth: number
-
-  splitEdges: RectEdge[]
-  splitEdgeSpatialIndex: EdgeSpatialHashIndex<RectEdge>
-
-  phase: SubPhase
-  currentEdgeIndex: number
-  currentPrimaryEdge?: RectEdge
-
-  nearbyEdgeCandidateIndex: number
-  currentNearbyEdges: RectEdge[]
-
-  filledRects: Placed3D[]
-}
-
 /**
  * Gap Fill Solver - fills gaps between existing rectangles using edge analysis.
  * Processes one edge per step for visualization.
  */
 export class GapFillSolver extends BaseSolver {
-  private state!: GapFillSolverState
+  private srj: SimpleRouteJson
+  private inputRects: Placed3D[]
+  private obstaclesByLayer: XYRect[][]
+  private layerCount: number
+  private maxEdgeDistance: number
+  private minTraceWidth: number
+
+  private splitEdges: RectEdge[]
+  private splitEdgeSpatialIndex: EdgeSpatialHashIndex<RectEdge>
+
+  private phase: SubPhase
+  private currentEdgeIndex: number
+  private currentPrimaryEdge?: RectEdge
+
+  private nearbyEdgeCandidateIndex: number
+  private currentNearbyEdges: RectEdge[]
+
+  private filledRects: Placed3D[]
 
   constructor(private input: GapFillSolverInput) {
     super()
-    this.state = this.initState(input)
-  }
 
-  private initState(input: GapFillSolverInput): GapFillSolverState {
     const layerCount = input.simpleRouteJson.layerCount || 1
     const maxEdgeDistance = input.maxEdgeDistance ?? 2.0
 
@@ -75,34 +68,32 @@ export class GapFillSolver extends BaseSolver {
       maxEdgeDistance,
     )
 
-    return {
-      srj: input.simpleRouteJson,
-      inputRects: input.placedRects,
-      obstaclesByLayer: input.obstaclesByLayer,
-      layerCount,
-      maxEdgeDistance,
-      minTraceWidth: input.simpleRouteJson.minTraceWidth,
-      splitEdges,
-      splitEdgeSpatialIndex: splitEdgeSpatialIndex,
-      phase: "SELECT_PRIMARY_EDGE",
-      currentEdgeIndex: 0,
-      nearbyEdgeCandidateIndex: 0,
-      currentNearbyEdges: [],
-      filledRects: [],
-    }
+    this.srj = input.simpleRouteJson
+    this.inputRects = input.placedRects
+    this.obstaclesByLayer = input.obstaclesByLayer
+    this.layerCount = layerCount
+    this.maxEdgeDistance = maxEdgeDistance
+    this.minTraceWidth = input.simpleRouteJson.minTraceWidth
+    this.splitEdges = splitEdges
+    this.splitEdgeSpatialIndex = splitEdgeSpatialIndex
+    this.phase = "SELECT_PRIMARY_EDGE"
+    this.currentEdgeIndex = 0
+    this.nearbyEdgeCandidateIndex = 0
+    this.currentNearbyEdges = []
+    this.filledRects = []
   }
 
   override _setup(): void {
     this.stats = {
       phase: "EDGE_ANALYSIS",
       edgeIndex: 0,
-      totalEdges: this.state.splitEdges.length,
+      totalEdges: this.splitEdges.length,
       filledCount: 0,
     }
   }
 
   override _step(): void {
-    switch (this.state.phase) {
+    switch (this.phase) {
       case "SELECT_PRIMARY_EDGE":
         this.stepSelectPrimaryEdge()
         break
@@ -117,76 +108,70 @@ export class GapFillSolver extends BaseSolver {
         break
     }
 
-    this.stats.phase = this.state.phase
-    this.stats.edgeIndex = this.state.currentEdgeIndex
-    this.stats.filledCount = this.state.filledRects.length
+    this.stats.phase = this.phase
+    this.stats.edgeIndex = this.currentEdgeIndex
+    this.stats.filledCount = this.filledRects.length
   }
 
   private stepSelectPrimaryEdge(): void {
-    if (this.state.currentEdgeIndex >= this.state.splitEdges.length) {
-      this.state.phase = "DONE"
+    if (this.currentEdgeIndex >= this.splitEdges.length) {
+      this.phase = "DONE"
       return
     }
 
-    this.state.currentPrimaryEdge =
-      this.state.splitEdges[this.state.currentEdgeIndex]
-    this.state.nearbyEdgeCandidateIndex = 0
-    this.state.currentNearbyEdges = []
+    this.currentPrimaryEdge = this.splitEdges[this.currentEdgeIndex]
+    this.nearbyEdgeCandidateIndex = 0
+    this.currentNearbyEdges = []
 
-    this.state.phase = "FIND_NEARBY_EDGES"
+    this.phase = "FIND_NEARBY_EDGES"
   }
 
   private stepFindNearbyEdges(): void {
-    const primaryEdge = this.state.currentPrimaryEdge!
+    const primaryEdge = this.currentPrimaryEdge!
 
-    const padding = this.state.maxEdgeDistance
+    const padding = this.maxEdgeDistance
     const minX = Math.min(primaryEdge.x1, primaryEdge.x2) - padding
     const minY = Math.min(primaryEdge.y1, primaryEdge.y2) - padding
     const maxX = Math.max(primaryEdge.x1, primaryEdge.x2) + padding
     const maxY = Math.max(primaryEdge.y1, primaryEdge.y2) + padding
 
-    const candidates = this.state.splitEdgeSpatialIndex.search(
-      minX,
-      minY,
-      maxX,
-      maxY,
-    )
+    const candidates = this.splitEdgeSpatialIndex.search(minX, minY, maxX, maxY)
 
     // Collect nearby parallel edges
-    this.state.currentNearbyEdges = []
+    this.currentNearbyEdges = []
     for (const candidate of candidates) {
       if (
         candidate !== primaryEdge &&
         this.isNearbyParallelEdge(primaryEdge, candidate)
       ) {
-        this.state.currentNearbyEdges.push(candidate)
+        this.currentNearbyEdges.push(candidate)
       }
     }
 
-    const edgesWithDist = this.state.currentNearbyEdges.map((edge) => ({
+    const edgesWithDist = this.currentNearbyEdges.map((edge) => ({
       edge,
       distance: this.distanceBetweenEdges(primaryEdge, edge),
     }))
     edgesWithDist.sort((a, b) => b.distance - a.distance)
-    this.state.currentNearbyEdges = edgesWithDist.map((e) => e.edge)
+    this.currentNearbyEdges = edgesWithDist.map((e) => e.edge)
 
-    this.state.phase = "EXPAND_POINT"
+    this.phase = "EXPAND_POINT"
   }
 
   private stepExpandPoint(): void {
-    const primaryEdge = this.state.currentPrimaryEdge!
+    const primaryEdge = this.currentPrimaryEdge!
 
-    for (const nearbyEdge of this.state.currentNearbyEdges) {
+    for (const nearbyEdge of this.currentNearbyEdges) {
       const filledRect = this.expandEdgeToRect(primaryEdge, nearbyEdge)
       if (filledRect && this.isValidFill(filledRect)) {
-        this.state.filledRects.push(filledRect)
+        this.filledRects.push(filledRect)
         break
       }
     }
 
-    this.state.currentEdgeIndex++
-    this.state.phase = "SELECT_PRIMARY_EDGE"
-    this.state.currentNearbyEdges = []
+    this.currentEdgeIndex++
+    this.phase = "SELECT_PRIMARY_EDGE"
+    this.currentNearbyEdges = []
   }
 
   private isValidFill(candidate: Placed3D): boolean {
@@ -196,7 +181,7 @@ export class GapFillSolver extends BaseSolver {
     }
 
     // Check filled rects
-    for (const existing of this.state.filledRects) {
+    for (const existing of this.filledRects) {
       if (
         candidate.zLayers.some((z) => existing.zLayers.includes(z)) &&
         overlaps(candidate.rect, existing.rect)
@@ -206,7 +191,7 @@ export class GapFillSolver extends BaseSolver {
     }
 
     // Check input rects
-    for (const input of this.state.inputRects) {
+    for (const input of this.inputRects) {
       if (
         candidate.zLayers.some((z) => input.zLayers.includes(z)) &&
         overlaps(candidate.rect, input.rect)
@@ -217,7 +202,7 @@ export class GapFillSolver extends BaseSolver {
 
     // Check obstacles
     for (const z of candidate.zLayers) {
-      const obstacles = this.state.obstaclesByLayer[z] ?? []
+      const obstacles = this.obstaclesByLayer[z] ?? []
       for (const obstacle of obstacles) {
         if (overlaps(candidate.rect, obstacle)) {
           return false
@@ -278,11 +263,11 @@ export class GapFillSolver extends BaseSolver {
     if (sharedLayers.length === 0) return false
 
     const distance = this.distanceBetweenEdges(primaryEdge, candidate)
-    const minGap = Math.max(this.state.minTraceWidth, 0.1)
+    const minGap = Math.max(this.minTraceWidth, 0.1)
     if (distance < minGap) {
       return false
     }
-    if (distance > this.state.maxEdgeDistance) {
+    if (distance > this.maxEdgeDistance) {
       return false
     }
 
@@ -297,8 +282,8 @@ export class GapFillSolver extends BaseSolver {
   }
 
   override getOutput(): { filledRects: CapacityMeshNode[] } {
-    const filledRects: CapacityMeshNode[] = this.state.filledRects.map(
-      (placed, index) => ({
+    const filledRects: CapacityMeshNode[] = this.filledRects.map(
+      (placed: Placed3D, index: number) => ({
         capacityMeshNodeId: `gap-fill-${index}`,
         x: placed.rect.x,
         y: placed.rect.y,
@@ -318,16 +303,16 @@ export class GapFillSolver extends BaseSolver {
 
   override visualize(): GraphicsObject {
     const baseViz = visualizeBaseState(
-      this.state.inputRects,
-      this.state.obstaclesByLayer,
-      `Gap Fill (Edge ${this.state.currentEdgeIndex}/${this.state.splitEdges.length})`,
+      this.inputRects,
+      this.obstaclesByLayer,
+      `Gap Fill (Edge ${this.currentEdgeIndex}/${this.splitEdges.length})`,
     )
 
     const points: NonNullable<GraphicsObject["points"]> = []
     const lines: NonNullable<GraphicsObject["lines"]> = []
 
-    for (const edge of this.state.splitEdges) {
-      const isCurrent = edge === this.state.currentPrimaryEdge
+    for (const edge of this.splitEdges) {
+      const isCurrent = edge === this.currentPrimaryEdge
 
       lines.push({
         points: [
@@ -347,7 +332,7 @@ export class GapFillSolver extends BaseSolver {
       }
     }
 
-    for (const placed of this.state.filledRects) {
+    for (const placed of this.filledRects) {
       baseViz.rects!.push({
         center: {
           x: placed.rect.x + placed.rect.width / 2,
