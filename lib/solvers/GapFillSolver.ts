@@ -79,7 +79,10 @@ export class GapFillSolver extends BaseSolver {
     const layerCount = input.simpleRouteJson.layerCount || 1
     const maxEdgeDistance = input.maxEdgeDistance ?? 2.0
 
-    const rawEdges = this.extractEdges(input.placedRects)
+    const rawEdges = this.extractEdges(
+      input.placedRects,
+      input.obstaclesByLayer,
+    )
     const edges = this.splitEdgesOnOverlaps(rawEdges)
 
     // Build spatial index for fast edge-to-edge queries
@@ -124,13 +127,15 @@ export class GapFillSolver extends BaseSolver {
     return index
   }
 
-  private extractEdges(rects: Placed3D[]): RectEdge[] {
+  private extractEdges(
+    rects: Placed3D[],
+    obstaclesByLayer: XYRect[][],
+  ): RectEdge[] {
     const edges: RectEdge[] = []
 
     for (const placed of rects) {
       const { rect, zLayers } = placed
 
-      // Top edge (y = rect.y + rect.height)
       edges.push({
         rect,
         side: "top",
@@ -138,11 +143,10 @@ export class GapFillSolver extends BaseSolver {
         y1: rect.y + rect.height,
         x2: rect.x + rect.width,
         y2: rect.y + rect.height,
-        normal: { x: 0, y: 1 }, // Points up
+        normal: { x: 0, y: 1 },
         zLayers: [...zLayers],
       })
 
-      // Bottom edge (y = rect.y)
       edges.push({
         rect,
         side: "bottom",
@@ -150,11 +154,10 @@ export class GapFillSolver extends BaseSolver {
         y1: rect.y,
         x2: rect.x + rect.width,
         y2: rect.y,
-        normal: { x: 0, y: -1 }, // Points down
+        normal: { x: 0, y: -1 },
         zLayers: [...zLayers],
       })
 
-      // Right edge (x = rect.x + rect.width)
       edges.push({
         rect,
         side: "right",
@@ -162,11 +165,10 @@ export class GapFillSolver extends BaseSolver {
         y1: rect.y,
         x2: rect.x + rect.width,
         y2: rect.y + rect.height,
-        normal: { x: 1, y: 0 }, // Points right
+        normal: { x: 1, y: 0 },
         zLayers: [...zLayers],
       })
 
-      // Left edge (x = rect.x)
       edges.push({
         rect,
         side: "left",
@@ -174,9 +176,60 @@ export class GapFillSolver extends BaseSolver {
         y1: rect.y,
         x2: rect.x,
         y2: rect.y + rect.height,
-        normal: { x: -1, y: 0 }, // Points left
+        normal: { x: -1, y: 0 },
         zLayers: [...zLayers],
       })
+    }
+
+    for (let z = 0; z < obstaclesByLayer.length; z++) {
+      const obstacles = obstaclesByLayer[z] ?? []
+      for (const rect of obstacles) {
+        const zLayers = [z]
+
+        edges.push({
+          rect,
+          side: "top",
+          x1: rect.x,
+          y1: rect.y + rect.height,
+          x2: rect.x + rect.width,
+          y2: rect.y + rect.height,
+          normal: { x: 0, y: 1 },
+          zLayers,
+        })
+
+        edges.push({
+          rect,
+          side: "bottom",
+          x1: rect.x,
+          y1: rect.y,
+          x2: rect.x + rect.width,
+          y2: rect.y,
+          normal: { x: 0, y: -1 },
+          zLayers,
+        })
+
+        edges.push({
+          rect,
+          side: "right",
+          x1: rect.x + rect.width,
+          y1: rect.y,
+          x2: rect.x + rect.width,
+          y2: rect.y + rect.height,
+          normal: { x: 1, y: 0 },
+          zLayers,
+        })
+
+        edges.push({
+          rect,
+          side: "left",
+          x1: rect.x,
+          y1: rect.y,
+          x2: rect.x,
+          y2: rect.y + rect.height,
+          normal: { x: -1, y: 0 },
+          zLayers,
+        })
+      }
     }
 
     return edges
@@ -638,6 +691,23 @@ export class GapFillSolver extends BaseSolver {
         stroke: "#9ca3af",
         label: `input rect\npos: (${placed.rect.x.toFixed(2)}, ${placed.rect.y.toFixed(2)})\nsize: ${placed.rect.width.toFixed(2)} × ${placed.rect.height.toFixed(2)}\nz: [${placed.zLayers.join(", ")}]`,
       })
+    }
+
+    for (let z = 0; z < this.state.obstaclesByLayer.length; z++) {
+      const obstacles = this.state.obstaclesByLayer[z] ?? []
+      for (const obstacle of obstacles) {
+        rects.push({
+          center: {
+            x: obstacle.x + obstacle.width / 2,
+            y: obstacle.y + obstacle.height / 2,
+          },
+          width: obstacle.width,
+          height: obstacle.height,
+          fill: "#fee2e2",
+          stroke: "#ef4444",
+          label: `obstacle\npos: (${obstacle.x.toFixed(2)}, ${obstacle.y.toFixed(2)})\nsize: ${obstacle.width.toFixed(2)} × ${obstacle.height.toFixed(2)}\nz: ${z}`,
+        })
+      }
     }
 
     for (const edge of this.state.edges) {
