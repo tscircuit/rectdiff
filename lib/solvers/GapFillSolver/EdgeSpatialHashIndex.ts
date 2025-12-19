@@ -9,12 +9,9 @@ import { extractEdges } from "./extractEdges"
 import { splitEdgesOnOverlaps } from "./splitEdgesOnOverlaps"
 import { buildEdgeSpatialIndex } from "./buildEdgeSpatialIndex"
 import { overlaps } from "../rectdiff/geometry"
+import { visualizeBaseState } from "./visualizeBaseState"
 
 const COLOR_MAP = {
-  inputRectFill: "#f3f4f6",
-  inputRectStroke: "#9ca3af",
-  obstacleRectFill: "#fee2e2",
-  obstacleRectStroke: "#fc6e6eff",
   edgeStroke: "#10b981",
   filledGapFill: "#d1fae5",
   filledGapStroke: "#10b981",
@@ -319,40 +316,14 @@ export class EdgeSpatialHashIndex extends BaseSolver {
   }
 
   override visualize(): GraphicsObject {
-    const rects: NonNullable<GraphicsObject["rects"]> = []
+    const baseViz = visualizeBaseState(
+      this.state.inputRects,
+      this.state.obstaclesByLayer,
+      `Gap Fill (Edge ${this.state.currentEdgeIndex}/${this.state.edges.length})`,
+    )
+
     const points: NonNullable<GraphicsObject["points"]> = []
     const lines: NonNullable<GraphicsObject["lines"]> = []
-
-    for (const placed of this.state.inputRects) {
-      rects.push({
-        center: {
-          x: placed.rect.x + placed.rect.width / 2,
-          y: placed.rect.y + placed.rect.height / 2,
-        },
-        width: placed.rect.width,
-        height: placed.rect.height,
-        fill: COLOR_MAP.inputRectFill,
-        stroke: COLOR_MAP.inputRectStroke,
-        label: `input rect\npos: (${placed.rect.x.toFixed(2)}, ${placed.rect.y.toFixed(2)})\nsize: ${placed.rect.width.toFixed(2)} × ${placed.rect.height.toFixed(2)}\nz: [${placed.zLayers.join(", ")}]`,
-      })
-    }
-
-    for (let z = 0; z < this.state.obstaclesByLayer.length; z++) {
-      const obstacles = this.state.obstaclesByLayer[z] ?? []
-      for (const obstacle of obstacles) {
-        rects.push({
-          center: {
-            x: obstacle.x + obstacle.width / 2,
-            y: obstacle.y + obstacle.height / 2,
-          },
-          width: obstacle.width,
-          height: obstacle.height,
-          fill: COLOR_MAP.obstacleRectFill,
-          stroke: COLOR_MAP.obstacleRectStroke,
-          label: `obstacle\npos: (${obstacle.x.toFixed(2)}, ${obstacle.y.toFixed(2)})\nsize: ${obstacle.width.toFixed(2)} × ${obstacle.height.toFixed(2)}\nz: ${z}`,
-        })
-      }
-    }
 
     for (const edge of this.state.edges) {
       const isCurrent = edge === this.state.currentPrimaryEdge
@@ -376,7 +347,7 @@ export class EdgeSpatialHashIndex extends BaseSolver {
     }
 
     for (const placed of this.state.filledRects) {
-      rects.push({
+      baseViz.rects!.push({
         center: {
           x: placed.rect.x + placed.rect.width / 2,
           y: placed.rect.y + placed.rect.height / 2,
@@ -390,9 +361,7 @@ export class EdgeSpatialHashIndex extends BaseSolver {
     }
 
     return {
-      title: `Gap Fill (Edge ${this.state.currentEdgeIndex}/${this.state.edges.length})`,
-      coordinateSystem: "cartesian",
-      rects,
+      ...baseViz,
       points,
       lines,
     }
