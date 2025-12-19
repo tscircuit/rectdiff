@@ -456,19 +456,3 @@ export function finalizeRects(state: RectDiffState): Rect3d[] {
 
   return out
 }
-
-/**
- * Calculate rough progress number for BaseSolver.progress.
- */
-export function computeProgress(state: RectDiffState): number {
-  const grids = state.options.gridSizes.length
-  const totalSeeds = Math.max(1, state.totalSeedsThisGrid)
-  const consumedSeeds = state.consumedSeedsThisGrid
-  const placedCount = Math.max(1, state.placed.length)
-  const expansionIndex = state.expansionIndex
-
-  const gridProgress = Math.min(1, consumedSeeds / totalSeeds)
-  const expansionProgress = Math.min(1, expansionIndex / placedCount)
-
-  return Math.min(1, (gridProgress * grids + expansionProgress) / (grids + 1))
-}

@@ -60,9 +60,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    const expansionOutput = this.getStepOutput<ExpansionSolverOutput>(
-      "rectDiffExpansionSolver",
-    )
+    const expansionOutput =
+      this.getStepOutput<ExpansionSolverOutput>("expansionSolver")
 
     if (expansionOutput) {
       return { meshNodes: expansionOutput.meshNodes }

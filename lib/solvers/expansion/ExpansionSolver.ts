@@ -1,10 +1,6 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
-import {
-  computeProgress,
-  finalizeRects,
-  stepExpansion,
-} from "../rectdiff/engine"
+import { finalizeRects, stepExpansion } from "../rectdiff/engine"
 import type { Rect3d, RectDiffState } from "../rectdiff/types"
 import { rectsToMeshNodes } from "../rectdiff/rectsToMeshNodes"
 import type { GraphicsObject } from "graphics-debug"
@@ -55,18 +51,14 @@ export class ExpansionSolver extends BaseSolver {
   }
 
   computeProgress(): number {
-    return computeProgress(this.rectDiffState)
+    const placedCount = Math.max(1, this.rectDiffState.placed.length)
+    const expansionIndex = this.rectDiffState.expansionIndex
+
+    return Math.min(1, expansionIndex / placedCount)
   }
 
   override visualize(): GraphicsObject {
-    return visualizeRectDiffState(this.rectDiffState, {
-      bounds: this.rectDiffState.srj.bounds,
-      obstacles: this.rectDiffState.srj.obstacles,
-      connections: this.rectDiffState.srj.connections,
-      layerCount: this.rectDiffState.srj.layerCount,
-      minTraceWidth: this.rectDiffState.srj.minTraceWidth,
-      outline: this.rectDiffState.srj.outline,
-    } as any)
+    return visualizeRectDiffState(this.rectDiffState, this.rectDiffState.srj)
   }
 
   override getOutput(): ExpansionSolverOutput {
