@@ -1,9 +1,9 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "../../types/srj-types"
-import type { GridFill3DOptions, RectDiffState } from "./types"
-import { computeProgress, initState, stepGrid } from "./engine"
+import type { GridFill3DOptions, RectDiffState } from "../rectdiff/types"
+import { computeProgress, initState, stepGrid } from "../rectdiff/engine"
 import type { GraphicsObject } from "graphics-debug"
-import { visualizeRectDiffState } from "./visualizeRectDiffState"
+import { visualizeRectDiffState } from "../rectdiff/visualizeRectDiffState"
 
 export type GridSolverInput = {
   simpleRouteJson: SimpleRouteJson

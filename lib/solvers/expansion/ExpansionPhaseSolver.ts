@@ -1,10 +1,10 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
-import { computeProgress, finalizeRects, stepExpansion } from "./engine"
-import type { Rect3d, RectDiffState } from "./types"
-import { rectsToMeshNodes } from "./rectsToMeshNodes"
+import { computeProgress, finalizeRects, stepExpansion } from "../rectdiff/engine"
+import type { Rect3d, RectDiffState } from "../rectdiff/types"
+import { rectsToMeshNodes } from "../rectdiff/rectsToMeshNodes"
 import type { GraphicsObject } from "graphics-debug"
-import { visualizeRectDiffState } from "./visualizeRectDiffState"
+import { visualizeRectDiffState } from "../rectdiff/visualizeRectDiffState"
 
 export type ExpansionSolverInput = {
   initialState: RectDiffState
