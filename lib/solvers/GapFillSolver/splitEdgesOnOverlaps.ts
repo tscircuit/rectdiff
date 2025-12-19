@@ -1,4 +1,4 @@
-import { EdgeSpatialHashIndex } from "../../data-structures/FlatbushIndex"
+import { EdgeSpatialHashIndex } from "../../EdgeSpatialHashIndex/EdgeSpatialHashIndex"
 import type { RectEdge } from "./types"
 import { createEdgeSegment } from "./createEdgeSegment"
 
