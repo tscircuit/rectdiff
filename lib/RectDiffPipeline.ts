@@ -79,7 +79,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
     const gapFillOutput = gapFillSolver.getOutput()
 
     return {
-      meshNodes: [...rectDiffOutput.meshNodes, ...gapFillOutput.meshNodes],
+      meshNodes: [...rectDiffOutput.meshNodes, ...gapFillOutput.filledRects],
     }
   }
 
@@ -95,7 +95,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
       const baseViz = rectDiffSolver.visualize()
       if (gapFillSolver?.solved) {
         const gapFillOutput = gapFillSolver.getOutput()
-        const gapFillRects = gapFillOutput.meshNodes.map((node) => {
+        const gapFillRects = gapFillOutput.filledRects.map((node) => {
           const minZ = Math.min(...node.availableZ)
           const colors = [
             { fill: "#dbeafe", stroke: "#3b82f6" },

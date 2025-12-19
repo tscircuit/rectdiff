@@ -64,8 +64,8 @@ export class GapFillSolverRepeater extends BaseSolver {
     this.activeSubsolver._step()
   }
 
-  override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    const meshNodes: CapacityMeshNode[] = this.allFilledRects.map(
+  override getOutput(): { filledRects: CapacityMeshNode[] } {
+    const filledRects: CapacityMeshNode[] = this.allFilledRects.map(
       (placed, index) => ({
         capacityMeshNodeId: `gap-fill-${index}`,
         x: placed.rect.x,
@@ -81,7 +81,7 @@ export class GapFillSolverRepeater extends BaseSolver {
       }),
     )
 
-    return { meshNodes }
+    return { filledRects: filledRects }
   }
 
   override visualize(): GraphicsObject {
