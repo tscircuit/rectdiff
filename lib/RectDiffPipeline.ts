@@ -4,12 +4,12 @@ import type { GridFill3DOptions } from "./solvers/rectdiff/types"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { createBaseVisualization } from "./solvers/rectdiff/visualization"
-import type { GridSolverOutput } from "./solvers/gridphase/GridPhaseSolver"
-import { GridSolver } from "./solvers/gridphase/GridPhaseSolver"
+import type { GridSolverOutput } from "./solvers/grid/GridSolver"
+import { GridSolver } from "./solvers/grid/GridSolver"
 import {
   ExpansionSolver,
   type ExpansionSolverOutput,
-} from "./solvers/expansion/ExpansionPhaseSolver"
+} from "./solvers/expansion/ExpansionSolver"
 import { visualizeRectDiffState } from "./solvers/rectdiff/visualizeRectDiffState"
 
 export interface RectDiffPipelineInput {
