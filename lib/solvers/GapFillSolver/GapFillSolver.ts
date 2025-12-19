@@ -10,6 +10,9 @@ import { splitEdgesOnOverlaps } from "./splitEdgesOnOverlaps"
 import { buildEdgeSpatialIndex } from "./buildEdgeSpatialIndex"
 import { overlaps } from "../rectdiff/geometry"
 import { visualizeBaseState } from "./visualizeBaseState"
+import { expandEdgeToRect } from "./expandEdgeToRect"
+import { isNearbyParallelEdge } from "./isNearbyParallelEdge"
+import { distanceBetweenEdges } from "./distanceBetweenEdges"
 
 const COLOR_MAP = {
   edgeStroke: "#10b981",
@@ -54,7 +57,7 @@ export class GapFillSolver extends BaseSolver {
 
   private filledRects: Placed3D[]
 
-  constructor(private input: GapFillSolverInput) {
+  constructor(input: GapFillSolverInput) {
     super()
 
     const layerCount = input.simpleRouteJson.layerCount || 1
@@ -142,7 +145,12 @@ export class GapFillSolver extends BaseSolver {
     for (const candidate of candidates) {
       if (
         candidate !== primaryEdge &&
-        this.isNearbyParallelEdge(primaryEdge, candidate)
+        isNearbyParallelEdge(
+          primaryEdge,
+          candidate,
+          this.minTraceWidth,
+          this.maxEdgeDistance,
+        )
       ) {
         this.currentNearbyEdges.push(candidate)
       }
@@ -150,7 +158,7 @@ export class GapFillSolver extends BaseSolver {
 
     const edgesWithDist = this.currentNearbyEdges.map((edge) => ({
       edge,
-      distance: this.distanceBetweenEdges(primaryEdge, edge),
+      distance: distanceBetweenEdges(primaryEdge, edge),
     }))
     edgesWithDist.sort((a, b) => b.distance - a.distance)
     this.currentNearbyEdges = edgesWithDist.map((e) => e.edge)
@@ -162,7 +170,7 @@ export class GapFillSolver extends BaseSolver {
     const primaryEdge = this.currentPrimaryEdge!
 
     for (const nearbyEdge of this.currentNearbyEdges) {
-      const filledRect = this.expandEdgeToRect(primaryEdge, nearbyEdge)
+      const filledRect = expandEdgeToRect(primaryEdge, nearbyEdge)
       if (filledRect && this.isValidFill(filledRect)) {
         this.filledRects.push(filledRect)
         break
@@ -211,74 +219,6 @@ export class GapFillSolver extends BaseSolver {
     }
 
     return true
-  }
-
-  private expandEdgeToRect(
-    primaryEdge: RectEdge,
-    nearbyEdge: RectEdge,
-  ): Placed3D | null {
-    let rect: { x: number; y: number; width: number; height: number }
-
-    if (Math.abs(primaryEdge.normal.x) > 0.5) {
-      const leftX = primaryEdge.normal.x > 0 ? primaryEdge.x1 : nearbyEdge.x1
-      const rightX = primaryEdge.normal.x > 0 ? nearbyEdge.x1 : primaryEdge.x1
-
-      rect = {
-        x: leftX,
-        y: primaryEdge.y1,
-        width: rightX - leftX,
-        height: primaryEdge.y2 - primaryEdge.y1,
-      }
-    } else {
-      const bottomY = primaryEdge.normal.y > 0 ? primaryEdge.y1 : nearbyEdge.y1
-      const topY = primaryEdge.normal.y > 0 ? nearbyEdge.y1 : primaryEdge.y1
-
-      rect = {
-        x: primaryEdge.x1,
-        y: bottomY,
-        width: primaryEdge.x2 - primaryEdge.x1,
-        height: topY - bottomY,
-      }
-    }
-
-    return {
-      rect,
-      zLayers: [...primaryEdge.zLayers],
-    }
-  }
-
-  private isNearbyParallelEdge(
-    primaryEdge: RectEdge,
-    candidate: RectEdge,
-  ): boolean {
-    const dotProduct =
-      primaryEdge.normal.x * candidate.normal.x +
-      primaryEdge.normal.y * candidate.normal.y
-
-    if (dotProduct >= -0.9) return false
-
-    const sharedLayers = primaryEdge.zLayers.filter((z) =>
-      candidate.zLayers.includes(z),
-    )
-    if (sharedLayers.length === 0) return false
-
-    const distance = this.distanceBetweenEdges(primaryEdge, candidate)
-    const minGap = Math.max(this.minTraceWidth, 0.1)
-    if (distance < minGap) {
-      return false
-    }
-    if (distance > this.maxEdgeDistance) {
-      return false
-    }
-
-    return true
-  }
-
-  private distanceBetweenEdges(edge1: RectEdge, edge2: RectEdge): number {
-    if (Math.abs(edge1.normal.y) > 0.5) {
-      return Math.abs(edge1.y1 - edge2.y1)
-    }
-    return Math.abs(edge1.x1 - edge2.x1)
   }
 
   override getOutput(): { filledRects: CapacityMeshNode[] } {
