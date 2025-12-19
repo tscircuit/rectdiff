@@ -16,13 +16,6 @@ export interface RectEdge {
   zLayers: number[]
 }
 
-export interface ExpansionPoint {
-  x: number
-  y: number
-  zLayers: number[]
-  edge: RectEdge
-}
-
 export interface GapFillSolverInput {
   simpleRouteJson: SimpleRouteJson
   placedRects: Placed3D[]
@@ -33,8 +26,6 @@ export interface GapFillSolverInput {
 type SubPhase =
   | "SELECT_PRIMARY_EDGE"
   | "FIND_NEARBY_EDGES"
-  | "CHECK_UNOCCUPIED"
-  | "PLACE_EXPANSION_POINTS"
   | "EXPAND_POINT"
   | "DONE"
 
@@ -55,9 +46,6 @@ interface GapFillState {
 
   nearbyEdgeCandidateIndex: number
   currentNearbyEdges: RectEdge[]
-
-  currentExpansionPoints: ExpansionPoint[]
-  currentExpansionIndex: number
 
   filledRects: Placed3D[]
 }
@@ -99,8 +87,6 @@ export class GapFillSolver extends BaseSolver {
       currentEdgeIndex: 0,
       nearbyEdgeCandidateIndex: 0,
       currentNearbyEdges: [],
-      currentExpansionPoints: [],
-      currentExpansionIndex: 0,
       filledRects: [],
     }
   }
@@ -378,12 +364,6 @@ export class GapFillSolver extends BaseSolver {
       case "FIND_NEARBY_EDGES":
         this.stepFindNearbyEdges()
         break
-      case "CHECK_UNOCCUPIED":
-        this.stepCheckUnoccupied()
-        break
-      case "PLACE_EXPANSION_POINTS":
-        this.stepPlaceExpansionPoints()
-        break
       case "EXPAND_POINT":
         this.stepExpandPoint()
         break
@@ -445,45 +425,25 @@ export class GapFillSolver extends BaseSolver {
     edgesWithDist.sort((a, b) => b.distance - a.distance)
     this.state.currentNearbyEdges = edgesWithDist.map((e) => e.edge)
 
-    this.state.phase = "CHECK_UNOCCUPIED"
-  }
-
-  private stepCheckUnoccupied(): void {
-    this.state.phase = "PLACE_EXPANSION_POINTS"
-  }
-
-  private stepPlaceExpansionPoints(): void {
-    const primaryEdge = this.state.currentPrimaryEdge!
-    this.state.currentExpansionPoints = this.placeExpansionPoints(primaryEdge)
-    this.state.currentExpansionIndex = 0
-
-    if (this.state.currentExpansionPoints.length > 0) {
-      this.state.phase = "EXPAND_POINT"
-    } else {
-      this.moveToNextEdge()
-    }
+    this.state.phase = "EXPAND_POINT"
   }
 
   private stepExpandPoint(): void {
-    if (
-      this.state.currentExpansionIndex <
-      this.state.currentExpansionPoints.length
-    ) {
-      const point =
-        this.state.currentExpansionPoints[this.state.currentExpansionIndex]!
+    const primaryEdge = this.state.currentPrimaryEdge!
 
-      for (const nearbyEdge of this.state.currentNearbyEdges) {
-        const filledRect = this.expandPointToRect(point, nearbyEdge)
-        if (filledRect && this.isValidFill(filledRect)) {
-          this.state.filledRects.push(filledRect)
-          break
-        }
+    // Try expanding to each nearby edge (furthest first) until valid fill found
+    for (const nearbyEdge of this.state.currentNearbyEdges) {
+      const filledRect = this.expandEdgeToRect(primaryEdge, nearbyEdge)
+      if (filledRect && this.isValidFill(filledRect)) {
+        this.state.filledRects.push(filledRect)
+        break
       }
-
-      this.state.currentExpansionIndex++
-    } else {
-      this.moveToNextEdge()
     }
+
+    // Move to next edge
+    this.state.currentEdgeIndex++
+    this.state.phase = "SELECT_PRIMARY_EDGE"
+    this.state.currentNearbyEdges = []
   }
 
   private isValidFill(candidate: Placed3D): boolean {
@@ -566,47 +526,38 @@ export class GapFillSolver extends BaseSolver {
     return true
   }
 
-  private expandPointToRect(
-    point: ExpansionPoint,
+  private expandEdgeToRect(
+    primaryEdge: RectEdge,
     nearbyEdge: RectEdge,
   ): Placed3D | null {
-    const edge = point.edge
-
     let rect: { x: number; y: number; width: number; height: number }
 
-    if (Math.abs(edge.normal.x) > 0.5) {
-      const leftX = edge.normal.x > 0 ? edge.x1 : nearbyEdge.x1
-      const rightX = edge.normal.x > 0 ? nearbyEdge.x1 : edge.x1
+    if (Math.abs(primaryEdge.normal.x) > 0.5) {
+      const leftX = primaryEdge.normal.x > 0 ? primaryEdge.x1 : nearbyEdge.x1
+      const rightX = primaryEdge.normal.x > 0 ? nearbyEdge.x1 : primaryEdge.x1
 
       rect = {
         x: leftX,
-        y: edge.y1,
+        y: primaryEdge.y1,
         width: rightX - leftX,
-        height: edge.y2 - edge.y1,
+        height: primaryEdge.y2 - primaryEdge.y1,
       }
     } else {
-      const bottomY = edge.normal.y > 0 ? edge.y1 : nearbyEdge.y1
-      const topY = edge.normal.y > 0 ? nearbyEdge.y1 : edge.y1
+      const bottomY = primaryEdge.normal.y > 0 ? primaryEdge.y1 : nearbyEdge.y1
+      const topY = primaryEdge.normal.y > 0 ? nearbyEdge.y1 : primaryEdge.y1
 
       rect = {
-        x: edge.x1,
+        x: primaryEdge.x1,
         y: bottomY,
-        width: edge.x2 - edge.x1,
+        width: primaryEdge.x2 - primaryEdge.x1,
         height: topY - bottomY,
       }
     }
 
     return {
       rect,
-      zLayers: [...point.zLayers],
+      zLayers: [...primaryEdge.zLayers],
     }
-  }
-
-  private moveToNextEdge(): void {
-    this.state.currentEdgeIndex++
-    this.state.phase = "SELECT_PRIMARY_EDGE"
-    this.state.currentNearbyEdges = []
-    this.state.currentExpansionPoints = []
   }
 
   private isNearbyParallelEdge(
@@ -641,21 +592,6 @@ export class GapFillSolver extends BaseSolver {
       return Math.abs(edge1.y1 - edge2.y1)
     }
     return Math.abs(edge1.x1 - edge2.x1)
-  }
-
-  private placeExpansionPoints(edge: RectEdge): ExpansionPoint[] {
-    const offsetDistance = 0.05
-    const midX = (edge.x1 + edge.x2) / 2
-    const midY = (edge.y1 + edge.y2) / 2
-
-    return [
-      {
-        x: midX + edge.normal.x * offsetDistance,
-        y: midY + edge.normal.y * offsetDistance,
-        zLayers: [...edge.zLayers],
-        edge,
-      },
-    ]
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
