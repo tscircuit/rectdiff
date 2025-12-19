@@ -72,11 +72,13 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override visualize(): GraphicsObject {
-    const expansionOutput = this.getStepOutput<ExpansionSolverOutput>(
-      "rectDiffExpansionSolver",
-    )
+    if (this.activeSubSolver) {
+      return this.activeSubSolver.visualize()
+    }
 
-    if (expansionOutput) {
+    const expansionOutput =
+      this.getStepOutput<ExpansionSolverOutput>("expansionSolver")
+    if (this.solved && expansionOutput) {
       return visualizeRectDiffState(
         expansionOutput.rectDiffState,
         this.inputProblem.simpleRouteJson,
