@@ -12,12 +12,7 @@ test("Gap Fill: Vertical and horizontal gaps", () => {
     obstaclesByLayer: testData.obstaclesByLayer,
     maxEdgeDistance: testData.maxEdgeDistance ?? undefined,
   })
-
-  let steps = 0
-  while (!solver.solved && steps < 1000) {
-    solver._step()
-    steps++
-  }
+  solver.solve()
 
   expect(
     getSvgFromGraphicsObject(solver.visualize(), { backgroundColor: "white" }),
