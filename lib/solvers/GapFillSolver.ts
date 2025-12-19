@@ -27,10 +27,9 @@ export interface GapFillSolverInput {
   simpleRouteJson: SimpleRouteJson
   placedRects: Placed3D[]
   obstaclesByLayer: XYRect[][]
-  maxEdgeDistance?: number // Max distance to consider edges "nearby" (default: 2.0)
+  maxEdgeDistance?: number
 }
 
-// Sub-phases for visualization
 type SubPhase =
   | "SELECT_PRIMARY_EDGE"
   | "FIND_NEARBY_EDGES"
@@ -85,7 +84,6 @@ export class GapFillSolver extends BaseSolver {
     )
     const edges = this.splitEdgesOnOverlaps(rawEdges)
 
-    // Build spatial index for fast edge-to-edge queries
     const edgeSpatialIndex = this.buildEdgeSpatialIndex(edges, maxEdgeDistance)
 
     return {
@@ -114,7 +112,6 @@ export class GapFillSolver extends BaseSolver {
     const index = new FlatbushIndex<RectEdge>(edges.length)
 
     for (const edge of edges) {
-      // Create bounding box for edge (padded by max search distance)
       const minX = Math.min(edge.x1, edge.x2) - maxEdgeDistance
       const minY = Math.min(edge.y1, edge.y2) - maxEdgeDistance
       const maxX = Math.max(edge.x1, edge.x2) + maxEdgeDistance
