@@ -100,7 +100,7 @@ export class GapFillSolver extends BaseSolver {
     )
 
     const rawEdges = this.extractEdges(input.placedRects)
-    const edges = this.splitEdgesOnOverlaps(rawEdges, maxSplitDistance)
+    const edges = this.splitEdgesOnOverlaps(rawEdges)
     this.linkOverlapSegments(
       edges,
       maxEdgeDistance,
@@ -210,62 +210,59 @@ export class GapFillSolver extends BaseSolver {
 
   private splitEdgesOnOverlaps(
     edges: RectEdge[],
-    maxEdgeDistance: number,
   ): RectEdge[] {
     const result: RectEdge[] = []
+    const tolerance = 0.01
 
     for (const edge of edges) {
       const isHorizontal = Math.abs(edge.normal.y) > 0.5
-      const occupiedRanges: Array<{ start: number; end: number }> = []
+      const overlappingRanges: Array<{ start: number; end: number }> = []
 
       for (const other of edges) {
         if (edge === other) continue
-        if (edge.rect === other.rect) continue // Skip same rectangle's edges
+        if (edge.rect === other.rect) continue
         if (!edge.zLayers.some((z) => other.zLayers.includes(z))) continue
 
         const isOtherHorizontal = Math.abs(other.normal.y) > 0.5
         if (isHorizontal !== isOtherHorizontal) continue
 
-        // Check if edges are actually nearby (not just parallel)
         if (isHorizontal) {
-          const distance = Math.abs(edge.y1 - other.y1)
-          if (distance > maxEdgeDistance) continue
-        } else {
-          const distance = Math.abs(edge.x1 - other.x1)
-          if (distance > maxEdgeDistance) continue
-        }
+          if (Math.abs(edge.y1 - other.y1) > tolerance) continue
 
-        let overlapStart: number, overlapEnd: number
+          const overlapStart = Math.max(edge.x1, other.x1)
+          const overlapEnd = Math.min(edge.x2, other.x2)
 
-        if (isHorizontal) {
-          overlapStart = Math.max(edge.x1, other.x1)
-          overlapEnd = Math.min(edge.x2, other.x2)
-        } else {
-          overlapStart = Math.max(edge.y1, other.y1)
-          overlapEnd = Math.min(edge.y2, other.y2)
-        }
-
-        if (overlapStart < overlapEnd) {
-          const edgeLength = isHorizontal
-            ? edge.x2 - edge.x1
-            : edge.y2 - edge.y1
-          const edgeStart = isHorizontal ? edge.x1 : edge.y1
-          const range = {
-            start: (overlapStart - edgeStart) / edgeLength,
-            end: (overlapEnd - edgeStart) / edgeLength,
+          if (overlapStart < overlapEnd) {
+            const edgeLength = edge.x2 - edge.x1
+            overlappingRanges.push({
+              start: (overlapStart - edge.x1) / edgeLength,
+              end: (overlapEnd - edge.x1) / edgeLength,
+            })
           }
-          occupiedRanges.push(range)
+        } else {
+          if (Math.abs(edge.x1 - other.x1) > tolerance) continue
+
+          const overlapStart = Math.max(edge.y1, other.y1)
+          const overlapEnd = Math.min(edge.y2, other.y2)
+
+          if (overlapStart < overlapEnd) {
+            const edgeLength = edge.y2 - edge.y1
+            overlappingRanges.push({
+              start: (overlapStart - edge.y1) / edgeLength,
+              end: (overlapEnd - edge.y1) / edgeLength,
+            })
+          }
         }
       }
 
-      if (occupiedRanges.length === 0) {
+      if (overlappingRanges.length === 0) {
         result.push(edge)
         continue
       }
 
-      occupiedRanges.sort((a, b) => a.start - b.start)
+      overlappingRanges.sort((a, b) => a.start - b.start)
       const merged: Array<{ start: number; end: number }> = []
-      for (const range of occupiedRanges) {
+      for (const range of overlappingRanges) {
         if (
           merged.length === 0 ||
           range.start > merged[merged.length - 1]!.end
@@ -283,25 +280,13 @@ export class GapFillSolver extends BaseSolver {
       for (const occupied of merged) {
         if (pos < occupied.start) {
           const freeSegment = this.createEdgeSegment(edge, pos, occupied.start)
-          freeSegment.segmentType = "free"
           result.push(freeSegment)
         }
         pos = occupied.end
       }
       if (pos < 1) {
         const freeSegment = this.createEdgeSegment(edge, pos, 1)
-        freeSegment.segmentType = "free"
         result.push(freeSegment)
-      }
-
-      for (const occupied of merged) {
-        const overlapSegment = this.createEdgeSegment(
-          edge,
-          occupied.start,
-          occupied.end,
-        )
-        overlapSegment.segmentType = "overlap"
-        result.push(overlapSegment)
       }
     }
 
@@ -775,6 +760,8 @@ export class GapFillSolver extends BaseSolver {
 
     // Draw ALL edges with color coding: FREE=green, OVERLAP=red, UNSPLIT=gray
     for (const edge of this.state.edges) {
+      const isCurrent = edge === this.state.currentPrimaryEdge
+
       const color =
         edge.segmentType === "free"
           ? "#10b981" // Green for free segments
@@ -792,9 +779,16 @@ export class GapFillSolver extends BaseSolver {
           { x: edge.x2, y: edge.y2 },
         ],
         strokeColor: color,
-        strokeWidth: 0.1,
+        strokeWidth: isCurrent ? 0.3 : 0.1,
         label,
       })
+
+      if (isCurrent) {
+        points.push({
+          x: (edge.x1 + edge.x2) / 2,
+          y: (edge.y1 + edge.y2) / 2
+        })
+      }
     }
 
     // Draw filled rectangles (green)
