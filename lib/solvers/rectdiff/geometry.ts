@@ -10,11 +10,9 @@ export const lt = (a: number, b: number) => a < b - EPS
 export const lte = (a: number, b: number) => a < b + EPS
 
 export function overlaps(a: XYRect, b: XYRect) {
-  return !(
-    a.x + a.width <= b.x + EPS ||
-    b.x + b.width <= a.x + EPS ||
-    a.y + a.height <= b.y + EPS ||
-    b.y + b.height <= a.y + EPS
+  return (
+    Math.max(a.x, b.x) < Math.min(a.x + a.width, b.x + b.width) &&
+    Math.max(a.y, b.y) < Math.min(a.y + a.height, b.y + b.height)
   )
 }
 

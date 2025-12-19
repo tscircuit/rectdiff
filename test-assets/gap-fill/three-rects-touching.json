@@ -1,0 +1,16 @@
+{
+  "simpleRouteJson": {
+    "layerCount": 1,
+    "minTraceWidth": 0.1,
+    "bounds": { "minX": 0, "minY": 0, "maxX": 15, "maxY": 10 },
+    "connections": [],
+    "obstacles": []
+  },
+  "placedRects": [
+    { "rect": { "x": 1, "y": 1, "width": 3, "height": 8 }, "zLayers": [0] },
+    { "rect": { "x": 4, "y": 3.5, "width": 3, "height": 3 }, "zLayers": [0] },
+    { "rect": { "x": 7, "y": 1, "width": 3, "height": 8 }, "zLayers": [0] }
+  ],
+  "obstaclesByLayer": [[]],
+  "maxEdgeDistance": 5.0
+}
