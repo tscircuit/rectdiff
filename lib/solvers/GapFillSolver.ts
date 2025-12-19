@@ -236,11 +236,27 @@ export class GapFillSolver extends BaseSolver {
     const result: RectEdge[] = []
     const tolerance = 0.01
 
+    const spatialIndex = new FlatbushIndex<RectEdge>(edges.length)
+    for (const edge of edges) {
+      const minX = Math.min(edge.x1, edge.x2)
+      const minY = Math.min(edge.y1, edge.y2)
+      const maxX = Math.max(edge.x1, edge.x2)
+      const maxY = Math.max(edge.y1, edge.y2)
+      spatialIndex.insert(edge, minX, minY, maxX, maxY)
+    }
+    spatialIndex.finish()
+
     for (const edge of edges) {
       const isHorizontal = Math.abs(edge.normal.y) > 0.5
       const overlappingRanges: Array<{ start: number; end: number }> = []
 
-      for (const other of edges) {
+      const minX = Math.min(edge.x1, edge.x2)
+      const minY = Math.min(edge.y1, edge.y2)
+      const maxX = Math.max(edge.x1, edge.x2)
+      const maxY = Math.max(edge.y1, edge.y2)
+      const nearby = spatialIndex.search(minX, minY, maxX, maxY)
+
+      for (const other of nearby) {
         if (edge === other) continue
         if (edge.rect === other.rect) continue
         if (!edge.zLayers.some((z) => other.zLayers.includes(z))) continue
@@ -311,13 +327,14 @@ export class GapFillSolver extends BaseSolver {
         result.push(freeSegment)
       }
     }
-    result.sort((a, b) => {
-      const lengthA = Math.hypot(a.x2 - a.x1, a.y2 - a.y1)
-      const lengthB = Math.hypot(b.x2 - b.x1, b.y2 - b.y1)
-      return lengthB - lengthA
-    })
+    // Sort by length (largest first) - cache lengths to avoid repeated calculations
+    const edgesWithLength = result.map((edge) => ({
+      edge,
+      length: Math.abs(edge.x2 - edge.x1) + Math.abs(edge.y2 - edge.y1),
+    }))
+    edgesWithLength.sort((a, b) => b.length - a.length)
 
-    return result
+    return edgesWithLength.map((e) => e.edge)
   }
 
   private createEdgeSegment(
@@ -421,12 +438,12 @@ export class GapFillSolver extends BaseSolver {
       }
     }
 
-    // Sort by distance (furthest first) to try largest fills first
-    this.state.currentNearbyEdges.sort((a, b) => {
-      const distA = this.distanceBetweenEdges(primaryEdge, a)
-      const distB = this.distanceBetweenEdges(primaryEdge, b)
-      return distB - distA
-    })
+    const edgesWithDist = this.state.currentNearbyEdges.map((edge) => ({
+      edge,
+      distance: this.distanceBetweenEdges(primaryEdge, edge),
+    }))
+    edgesWithDist.sort((a, b) => b.distance - a.distance)
+    this.state.currentNearbyEdges = edgesWithDist.map((e) => e.edge)
 
     this.state.phase = "CHECK_UNOCCUPIED"
   }
@@ -457,21 +474,9 @@ export class GapFillSolver extends BaseSolver {
 
       for (const nearbyEdge of this.state.currentNearbyEdges) {
         const filledRect = this.expandPointToRect(point, nearbyEdge)
-        if (filledRect) {
-          const overlapsExisting = this.overlapsExistingFill(filledRect)
-          const overlapsInput = this.overlapsInputRects(filledRect)
-          const overlapsObst = this.overlapsObstacles(filledRect)
-          const hasMinSize = this.hasMinimumSize(filledRect)
-
-          if (
-            !overlapsExisting &&
-            !overlapsInput &&
-            !overlapsObst &&
-            hasMinSize
-          ) {
-            this.state.filledRects.push(filledRect)
-            break
-          }
+        if (filledRect && this.isValidFill(filledRect)) {
+          this.state.filledRects.push(filledRect)
+          break
         }
       }
 
@@ -481,63 +486,61 @@ export class GapFillSolver extends BaseSolver {
     }
   }
 
-  private overlapsExistingFill(candidate: Placed3D): boolean {
+  private isValidFill(candidate: Placed3D): boolean {
+    const minSize = 0.01
+    if (candidate.rect.width < minSize || candidate.rect.height < minSize) {
+      return false
+    }
+
     for (const existing of this.state.filledRects) {
       const sharedLayers = candidate.zLayers.filter((z) =>
         existing.zLayers.includes(z),
       )
-      if (sharedLayers.length === 0) continue
+      if (sharedLayers.length > 0) {
+        const overlapX =
+          Math.max(candidate.rect.x, existing.rect.x) <
+          Math.min(
+            candidate.rect.x + candidate.rect.width,
+            existing.rect.x + existing.rect.width,
+          )
+        const overlapY =
+          Math.max(candidate.rect.y, existing.rect.y) <
+          Math.min(
+            candidate.rect.y + candidate.rect.height,
+            existing.rect.y + existing.rect.height,
+          )
 
-      const overlapX =
-        Math.max(candidate.rect.x, existing.rect.x) <
-        Math.min(
-          candidate.rect.x + candidate.rect.width,
-          existing.rect.x + existing.rect.width,
-        )
-      const overlapY =
-        Math.max(candidate.rect.y, existing.rect.y) <
-        Math.min(
-          candidate.rect.y + candidate.rect.height,
-          existing.rect.y + existing.rect.height,
-        )
-
-      if (overlapX && overlapY) {
-        return true
+        if (overlapX && overlapY) {
+          return false
+        }
       }
     }
 
-    return false
-  }
-
-  private overlapsInputRects(candidate: Placed3D): boolean {
     for (const input of this.state.inputRects) {
       const sharedLayers = candidate.zLayers.filter((z) =>
         input.zLayers.includes(z),
       )
-      if (sharedLayers.length === 0) continue
+      if (sharedLayers.length > 0) {
+        const overlapX =
+          Math.max(candidate.rect.x, input.rect.x) <
+          Math.min(
+            candidate.rect.x + candidate.rect.width,
+            input.rect.x + input.rect.width,
+          )
+        const overlapY =
+          Math.max(candidate.rect.y, input.rect.y) <
+          Math.min(
+            candidate.rect.y + candidate.rect.height,
+            input.rect.y + input.rect.height,
+          )
 
-      const overlapX =
-        Math.max(candidate.rect.x, input.rect.x) <
-        Math.min(
-          candidate.rect.x + candidate.rect.width,
-          input.rect.x + input.rect.width,
-        )
-      const overlapY =
-        Math.max(candidate.rect.y, input.rect.y) <
-        Math.min(
-          candidate.rect.y + candidate.rect.height,
-          input.rect.y + input.rect.height,
-        )
-
-      if (overlapX && overlapY) {
-        return true
+        if (overlapX && overlapY) {
+          return false
+        }
       }
     }
 
-    return false
-  }
-
-  private overlapsObstacles(candidate: Placed3D): boolean {
+    // Check obstacles
     for (const z of candidate.zLayers) {
       const obstacles = this.state.obstaclesByLayer[z] ?? []
       for (const obstacle of obstacles) {
@@ -555,17 +558,12 @@ export class GapFillSolver extends BaseSolver {
           )
 
         if (overlapX && overlapY) {
-          return true
+          return false
         }
       }
     }
 
-    return false
-  }
-
-  private hasMinimumSize(candidate: Placed3D): boolean {
-    const minSize = 0.01
-    return candidate.rect.width >= minSize && candidate.rect.height >= minSize
+    return true
   }
 
   private expandPointToRect(
