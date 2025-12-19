@@ -3,7 +3,7 @@ import { GapFillSolver } from "../../lib/solvers/GapFillSolver/GapFillSolver"
 import type { SimpleRouteJson } from "../../lib/types/srj-types"
 import type { Placed3D } from "../../lib/solvers/rectdiff/types"
 import { getSvgFromGraphicsObject } from "graphics-debug"
-import testData from "../../lib/solvers/GapFillSolver/test-cases/multi-layer-gap.json"
+import testData from "../../test-assets/gap-fill/multi-layer-gap.json"
 
 test("Gap Fill: Multi-layer gap", () => {
   const solver = new GapFillSolver({

@@ -3,7 +3,7 @@ import { GapFillSolver } from "../../lib/solvers/GapFillSolver/GapFillSolver"
 import type { SimpleRouteJson } from "../../lib/types/srj-types"
 import type { Placed3D } from "../../lib/solvers/rectdiff/types"
 import { getSvgFromGraphicsObject } from "graphics-debug"
-import testData from "../../lib/solvers/GapFillSolver/test-cases/three-rects-tall-short-tall.json"
+import testData from "../../test-assets/gap-fill/three-rects-tall-short-tall.json"
 
 test("Gap Fill: Three rects tall short tall", () => {
   const solver = new GapFillSolver({
