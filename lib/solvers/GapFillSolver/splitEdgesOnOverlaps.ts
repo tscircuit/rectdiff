@@ -1,4 +1,4 @@
-import { FlatbushIndex } from "../../data-structures/FlatbushIndex"
+import { EdgeSpatialHashIndex } from "../../data-structures/FlatbushIndex"
 import type { RectEdge } from "./types"
 import { createEdgeSegment } from "./createEdgeSegment"
 
@@ -6,7 +6,7 @@ export function splitEdgesOnOverlaps(edges: RectEdge[]): RectEdge[] {
   const result: RectEdge[] = []
   const tolerance = 0.01
 
-  const spatialIndex = new FlatbushIndex<RectEdge>(edges.length)
+  const spatialIndex = new EdgeSpatialHashIndex<RectEdge>(edges.length)
   for (const edge of edges) {
     const minX = Math.min(edge.x1, edge.x2)
     const minY = Math.min(edge.y1, edge.y2)

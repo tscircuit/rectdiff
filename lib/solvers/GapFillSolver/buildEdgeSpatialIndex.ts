@@ -1,11 +1,11 @@
-import { FlatbushIndex } from "../../data-structures/FlatbushIndex"
+import { EdgeSpatialHashIndex } from "../../data-structures/FlatbushIndex"
 import type { RectEdge } from "./types"
 
 export function buildEdgeSpatialIndex(
   edges: RectEdge[],
   maxEdgeDistance: number,
-): FlatbushIndex<RectEdge> {
-  const index = new FlatbushIndex<RectEdge>(edges.length)
+): EdgeSpatialHashIndex<RectEdge> {
+  const index = new EdgeSpatialHashIndex<RectEdge>(edges.length)
 
   for (const edge of edges) {
     const minX = Math.min(edge.x1, edge.x2) - maxEdgeDistance

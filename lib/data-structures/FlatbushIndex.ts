@@ -7,7 +7,7 @@ export interface ISpatialIndex<T> {
   clear(): void
 }
 
-export class FlatbushIndex<T> implements ISpatialIndex<T> {
+export class EdgeSpatialHashIndex<T> implements ISpatialIndex<T> {
   private index: Flatbush
   private items: T[] = []
   private currentIndex = 0

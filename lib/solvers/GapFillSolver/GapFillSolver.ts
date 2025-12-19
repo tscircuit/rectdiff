@@ -3,7 +3,7 @@ import type { GraphicsObject } from "graphics-debug"
 import type { SimpleRouteJson } from "../../types/srj-types"
 import type { Placed3D, XYRect } from "../rectdiff/types"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
-import { FlatbushIndex } from "../../data-structures/FlatbushIndex"
+import { EdgeSpatialHashIndex } from "../../data-structures/FlatbushIndex"
 import type { RectEdge } from "./types"
 import { extractEdges } from "./extractEdges"
 import { splitEdgesOnOverlaps } from "./splitEdgesOnOverlaps"
@@ -17,7 +17,7 @@ const COLOR_MAP = {
   filledGapStroke: "#10b981",
 }
 
-export interface EdgeSpatialHashIndexInput {
+export interface GapFillSolverInput {
   simpleRouteJson: SimpleRouteJson
   placedRects: Placed3D[]
   obstaclesByLayer: XYRect[][]
@@ -30,7 +30,7 @@ type SubPhase =
   | "EXPAND_POINT"
   | "DONE"
 
-interface EdgeSpatialHashIndexState {
+interface GapFillSolverState {
   srj: SimpleRouteJson
   inputRects: Placed3D[]
   obstaclesByLayer: XYRect[][]
@@ -38,8 +38,8 @@ interface EdgeSpatialHashIndexState {
   maxEdgeDistance: number
   minTraceWidth: number
 
-  edges: RectEdge[]
-  edgeSpatialIndex: FlatbushIndex<RectEdge>
+  splitEdges: RectEdge[]
+  splitEdgeSpatialIndex: EdgeSpatialHashIndex<RectEdge>
 
   phase: SubPhase
   currentEdgeIndex: number
@@ -55,24 +55,25 @@ interface EdgeSpatialHashIndexState {
  * Gap Fill Solver - fills gaps between existing rectangles using edge analysis.
  * Processes one edge per step for visualization.
  */
-export class EdgeSpatialHashIndex extends BaseSolver {
-  private state!: EdgeSpatialHashIndexState
+export class GapFillSolver extends BaseSolver {
+  private state!: GapFillSolverState
 
-  constructor(input: EdgeSpatialHashIndexInput) {
+  constructor(private input: GapFillSolverInput) {
     super()
     this.state = this.initState(input)
   }
 
-  private initState(
-    input: EdgeSpatialHashIndexInput,
-  ): EdgeSpatialHashIndexState {
+  private initState(input: GapFillSolverInput): GapFillSolverState {
     const layerCount = input.simpleRouteJson.layerCount || 1
     const maxEdgeDistance = input.maxEdgeDistance ?? 2.0
 
-    const rawEdges = extractEdges(input.placedRects, input.obstaclesByLayer)
-    const edges = splitEdgesOnOverlaps(rawEdges)
+    const rectEdges = extractEdges(input.placedRects, input.obstaclesByLayer)
+    const splitEdges = splitEdgesOnOverlaps(rectEdges)
 
-    const edgeSpatialIndex = buildEdgeSpatialIndex(edges, maxEdgeDistance)
+    const splitEdgeSpatialIndex = buildEdgeSpatialIndex(
+      splitEdges,
+      maxEdgeDistance,
+    )
 
     return {
       srj: input.simpleRouteJson,
@@ -81,8 +82,8 @@ export class EdgeSpatialHashIndex extends BaseSolver {
       layerCount,
       maxEdgeDistance,
       minTraceWidth: input.simpleRouteJson.minTraceWidth,
-      edges,
-      edgeSpatialIndex,
+      splitEdges,
+      splitEdgeSpatialIndex: splitEdgeSpatialIndex,
       phase: "SELECT_PRIMARY_EDGE",
       currentEdgeIndex: 0,
       nearbyEdgeCandidateIndex: 0,
@@ -95,7 +96,7 @@ export class EdgeSpatialHashIndex extends BaseSolver {
     this.stats = {
       phase: "EDGE_ANALYSIS",
       edgeIndex: 0,
-      totalEdges: this.state.edges.length,
+      totalEdges: this.state.splitEdges.length,
       filledCount: 0,
     }
   }
@@ -122,13 +123,13 @@ export class EdgeSpatialHashIndex extends BaseSolver {
   }
 
   private stepSelectPrimaryEdge(): void {
-    if (this.state.currentEdgeIndex >= this.state.edges.length) {
+    if (this.state.currentEdgeIndex >= this.state.splitEdges.length) {
       this.state.phase = "DONE"
       return
     }
 
     this.state.currentPrimaryEdge =
-      this.state.edges[this.state.currentEdgeIndex]
+      this.state.splitEdges[this.state.currentEdgeIndex]
     this.state.nearbyEdgeCandidateIndex = 0
     this.state.currentNearbyEdges = []
 
@@ -144,7 +145,7 @@ export class EdgeSpatialHashIndex extends BaseSolver {
     const maxX = Math.max(primaryEdge.x1, primaryEdge.x2) + padding
     const maxY = Math.max(primaryEdge.y1, primaryEdge.y2) + padding
 
-    const candidates = this.state.edgeSpatialIndex.search(
+    const candidates = this.state.splitEdgeSpatialIndex.search(
       minX,
       minY,
       maxX,
@@ -295,8 +296,8 @@ export class EdgeSpatialHashIndex extends BaseSolver {
     return Math.abs(edge1.x1 - edge2.x1)
   }
 
-  override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    const meshNodes: CapacityMeshNode[] = this.state.filledRects.map(
+  override getOutput(): { filledRects: CapacityMeshNode[] } {
+    const filledRects: CapacityMeshNode[] = this.state.filledRects.map(
       (placed, index) => ({
         capacityMeshNodeId: `gap-fill-${index}`,
         x: placed.rect.x,
@@ -312,20 +313,20 @@ export class EdgeSpatialHashIndex extends BaseSolver {
       }),
     )
 
-    return { meshNodes }
+    return { filledRects }
   }
 
   override visualize(): GraphicsObject {
     const baseViz = visualizeBaseState(
       this.state.inputRects,
       this.state.obstaclesByLayer,
-      `Gap Fill (Edge ${this.state.currentEdgeIndex}/${this.state.edges.length})`,
+      `Gap Fill (Edge ${this.state.currentEdgeIndex}/${this.state.splitEdges.length})`,
     )
 
     const points: NonNullable<GraphicsObject["points"]> = []
     const lines: NonNullable<GraphicsObject["lines"]> = []
 
-    for (const edge of this.state.edges) {
+    for (const edge of this.state.splitEdges) {
       const isCurrent = edge === this.state.currentPrimaryEdge
 
       lines.push({

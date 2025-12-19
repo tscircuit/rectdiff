@@ -1,48 +1,41 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
-import {
-  EdgeSpatialHashIndex,
-  type EdgeSpatialHashIndexInput,
-} from "./EdgeSpatialHashIndex"
+import { GapFillSolver, type GapFillSolverInput } from "./GapFillSolver"
 import { visualizeBaseState } from "./visualizeBaseState"
 
-export interface EdgeSpatialHashIndexManagerInput
-  extends EdgeSpatialHashIndexInput {
-  repeatCount?: number
+export interface GapFillSolverRepeaterInput extends GapFillSolverInput {
+  numberOfGapFillLoops?: number
 }
 
-export class EdgeSpatialHashIndexManager extends BaseSolver {
-  private input: EdgeSpatialHashIndexManagerInput
-  private repeatCount: number
-  private currentIteration: number = 0
-  private activeSubsolver: EdgeSpatialHashIndex | null = null
+export class GapFillSolverRepeater extends BaseSolver {
+  private numberOfGapFillLoops: number
+  private currentLoop = 0
+  private activeSubsolver: GapFillSolver | null = null
   private allFilledRects: any[] = []
 
-  constructor(input: EdgeSpatialHashIndexManagerInput) {
+  constructor(private input: GapFillSolverRepeaterInput) {
     super()
-    this.input = input
-    this.repeatCount = input.repeatCount ?? 1
+    this.numberOfGapFillLoops = input.numberOfGapFillLoops ?? 1
   }
 
   override _setup(): void {
-    this.currentIteration = 0
     this.allFilledRects = []
     this.startNextIteration()
   }
 
   private startNextIteration(): void {
-    if (this.currentIteration >= this.repeatCount) {
+    if (this.currentLoop >= this.numberOfGapFillLoops) {
       this.solved = true
       return
     }
 
-    this.activeSubsolver = new EdgeSpatialHashIndex({
+    this.activeSubsolver = new GapFillSolver({
       ...this.input,
       placedRects: [...this.input.placedRects, ...this.allFilledRects],
     })
     this.activeSubsolver._setup()
-    this.currentIteration++
+    this.currentLoop++
   }
 
   override _step(): void {
@@ -54,7 +47,7 @@ export class EdgeSpatialHashIndexManager extends BaseSolver {
     if (this.activeSubsolver.solved) {
       const output = this.activeSubsolver.getOutput()
       this.allFilledRects.push(
-        ...output.meshNodes.map((node: any) => ({
+        ...output.filledRects.map((node: any) => ({
           rect: {
             x: node.x,
             y: node.y,
@@ -98,7 +91,7 @@ export class EdgeSpatialHashIndexManager extends BaseSolver {
     return visualizeBaseState(
       this.input.placedRects,
       this.input.obstaclesByLayer,
-      `Gap Fill Manager (Iteration ${this.currentIteration}/${this.repeatCount})`,
+      `Gap Fill Manager (Iteration ${this.currentLoop}/${this.numberOfGapFillLoops})`,
     )
   }
 }

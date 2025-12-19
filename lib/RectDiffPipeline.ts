@@ -2,7 +2,7 @@ import { BasePipelineSolver, definePipelineStep } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "./types/srj-types"
 import type { GridFill3DOptions } from "./solvers/rectdiff/types"
 import { RectDiffSolver } from "./solvers/RectDiffSolver"
-import { EdgeSpatialHashIndexManager } from "./solvers/GapFillSolver/EdgeSpatialHashIndexManager"
+import { GapFillSolverRepeater } from "./solvers/GapFillSolver/EdgeSpatialHashIndexManager"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { createBaseVisualization } from "./solvers/rectdiff/visualization"
@@ -18,7 +18,7 @@ export interface RectDiffPipelineInput {
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
   rectDiffSolver?: RectDiffSolver
-  gapFillSolver?: EdgeSpatialHashIndexManager
+  gapFillSolver?: GapFillSolverRepeater
   override MAX_ITERATIONS: number = 100e6
 
   override pipelineDef = [
@@ -39,7 +39,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
     ),
     definePipelineStep(
       "gapFillSolver",
-      EdgeSpatialHashIndexManager,
+      GapFillSolverRepeater,
       (instance) => {
         const rectDiffSolver =
           instance.getSolver<RectDiffSolver>("rectDiffSolver")!
@@ -70,8 +70,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
     const rectDiffOutput =
       this.getSolver<RectDiffSolver>("rectDiffSolver")!.getOutput()
-    const gapFillSolver =
-      this.getSolver<EdgeSpatialHashIndexManager>("gapFillSolver")
+    const gapFillSolver = this.getSolver<GapFillSolverRepeater>("gapFillSolver")
 
     if (!gapFillSolver) {
       return rectDiffOutput
@@ -85,8 +84,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override visualize(): GraphicsObject {
-    const gapFillSolver =
-      this.getSolver<EdgeSpatialHashIndexManager>("gapFillSolver")
+    const gapFillSolver = this.getSolver<GapFillSolverRepeater>("gapFillSolver")
     const rectDiffSolver = this.getSolver<RectDiffSolver>("rectDiffSolver")
 
     if (gapFillSolver && !gapFillSolver.solved) {
