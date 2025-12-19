@@ -113,7 +113,6 @@ export function initState(
     options,
     obstaclesByLayer,
     boardVoidRects,
-    phase: "GRID",
     gridIndex: 0,
     candidates: [],
     placed: [],
@@ -278,7 +277,6 @@ export function stepGrid(state: RectDiffState): void {
         state.consumedSeedsThisGrid = 0
         return
       }
-      state.phase = "EXPANSION"
       state.expansionIndex = 0
       return
     }
@@ -367,7 +365,7 @@ export function stepGrid(state: RectDiffState): void {
 export function stepExpansion(state: RectDiffState): void {
   if (state.expansionIndex >= state.placed.length) {
     // Transition to gap fill phase instead of done
-    state.phase = "GAP_FILL"
+
     return
   }
 
@@ -457,25 +455,4 @@ export function finalizeRects(state: RectDiffState): Rect3d[] {
   }
 
   return out
-}
-
-/**
- * Calculate rough progress number for BaseSolver.progress.
- */
-export function computeProgress(state: RectDiffState): number {
-  const grids = state.options.gridSizes.length
-  if (state.phase === "GRID") {
-    const g = state.gridIndex
-    const base = g / (grids + 1) // reserve final slice for expansion
-    const denom = Math.max(1, state.totalSeedsThisGrid)
-    const frac = denom ? state.consumedSeedsThisGrid / denom : 1
-    return Math.min(0.999, base + frac * (1 / (grids + 1)))
-  }
-  if (state.phase === "EXPANSION") {
-    const base = grids / (grids + 1)
-    const denom = Math.max(1, state.placed.length)
-    const frac = denom ? state.expansionIndex / denom : 1
-    return Math.min(0.999, base + frac * (1 / (grids + 1)))
-  }
-  return 1
 }

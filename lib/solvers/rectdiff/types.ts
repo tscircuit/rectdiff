@@ -34,8 +34,6 @@ export type Candidate3D = {
 }
 export type Placed3D = { rect: XYRect; zLayers: number[] }
 
-export type Phase = "GRID" | "EXPANSION" | "GAP_FILL" | "DONE"
-
 export type RectDiffState = {
   // static
   srj: SimpleRouteJson
@@ -52,9 +50,10 @@ export type RectDiffState = {
   boardVoidRects: XYRect[] // newly added for viz
 
   // evolving
-  phase: Phase
   gridIndex: number // index in gridSizes
+
   candidates: Candidate3D[]
+
   placed: Placed3D[]
   placedByLayer: XYRect[][]
   expansionIndex: number

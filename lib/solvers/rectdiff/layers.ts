@@ -77,8 +77,13 @@ export function obstacleZs(ob: Obstacle, zIndexByName: Map<string, number>) {
 }
 
 export function obstacleToXYRect(ob: Obstacle): XYRect | null {
-  const w = ob.width as any
-  const h = ob.height as any
-  if (typeof w !== "number" || typeof h !== "number") return null
-  return { x: ob.center.x - w / 2, y: ob.center.y - h / 2, width: w, height: h }
+  const width = ob.width
+  const height = ob.height
+  if (typeof width !== "number" || typeof height !== "number") return null
+  return {
+    x: ob.center.x - width / 2,
+    y: ob.center.y - height / 2,
+    width,
+    height,
+  }
 }

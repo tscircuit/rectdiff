@@ -1,10 +1,16 @@
 import { BasePipelineSolver, definePipelineStep } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "./types/srj-types"
 import type { GridFill3DOptions } from "./solvers/rectdiff/types"
-import { RectDiffSolver } from "./solvers/RectDiffSolver"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { createBaseVisualization } from "./solvers/rectdiff/visualization"
+import type { GridSolverOutput } from "./solvers/grid/GridSolver"
+import { GridSolver } from "./solvers/grid/GridSolver"
+import {
+  ExpansionSolver,
+  type ExpansionSolverOutput,
+} from "./solvers/expansion/ExpansionSolver"
+import { visualizeRectDiffState } from "./solvers/rectdiff/visualizeRectDiffState"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -12,21 +18,38 @@ export interface RectDiffPipelineInput {
 }
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
-  rectDiffSolver?: RectDiffSolver
+  rectDiffSolver?: ExpansionSolver
 
   override pipelineDef = [
-    definePipelineStep(
-      "rectDiffSolver",
-      RectDiffSolver,
-      (instance) => [
-        {
-          simpleRouteJson: instance.inputProblem.simpleRouteJson,
-          gridOptions: instance.inputProblem.gridOptions,
-        },
-      ],
+    definePipelineStep("gridSolver", GridSolver, (instance) => [
       {
-        onSolved: () => {
-          // RectDiff mesh generation completed
+        simpleRouteJson: instance.inputProblem.simpleRouteJson,
+        gridOptions: instance.inputProblem.gridOptions,
+      },
+    ]),
+
+    definePipelineStep(
+      "expansionSolver",
+      ExpansionSolver,
+      (instance) => {
+        const gridOutput =
+          instance.getStepOutput<GridSolverOutput>("gridSolver")
+        if (!gridOutput) {
+          throw new Error(
+            "RectDiffPipeline: gridSolver output is required before expansion",
+          )
+        }
+        return [
+          {
+            initialState: gridOutput.rectDiffState,
+          },
+        ]
+      },
+      {
+        onSolved: (instance) => {
+          const expansionSolver =
+            instance.getSolver<ExpansionSolver>("expansionSolver")
+          ;(instance as RectDiffPipeline).rectDiffSolver = expansionSolver
         },
       },
     ),
@@ -37,16 +60,30 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    return this.getSolver<RectDiffSolver>("rectDiffSolver")!.getOutput()
+    const expansionOutput =
+      this.getStepOutput<ExpansionSolverOutput>("expansionSolver")
+
+    if (expansionOutput) {
+      return { meshNodes: expansionOutput.meshNodes }
+    }
+
+    return { meshNodes: [] }
   }
 
   override visualize(): GraphicsObject {
-    const solver = this.getSolver<RectDiffSolver>("rectDiffSolver")
-    if (solver) {
-      return solver.visualize()
+    if (this.activeSubSolver) {
+      return this.activeSubSolver.visualize()
     }
 
-    // Show board and obstacles even before solver is initialized
+    const expansionOutput =
+      this.getStepOutput<ExpansionSolverOutput>("expansionSolver")
+    if (this.solved && expansionOutput) {
+      return visualizeRectDiffState(
+        expansionOutput.rectDiffState,
+        this.inputProblem.simpleRouteJson,
+      )
+    }
+
     return createBaseVisualization(
       this.inputProblem.simpleRouteJson,
       "RectDiff Pipeline (not started)",
