@@ -10,7 +10,7 @@ import { splitEdgesOnOverlaps } from "./splitEdgesOnOverlaps"
 import { buildEdgeSpatialIndex } from "./buildEdgeSpatialIndex"
 import { overlaps } from "../rectdiff/geometry"
 import { visualizeBaseState } from "./visualizeBaseState"
-import { expandEdgeToRect } from "./expandEdgeToRect"
+import { createNodeFromTwoEdges } from "./expandEdgeToRect"
 import { isNearbyParallelEdge } from "./isNearbyParallelEdge"
 import { distanceBetweenEdges } from "./distanceBetweenEdges"
 
@@ -170,7 +170,7 @@ export class GapFillSolver extends BaseSolver {
     const primaryEdge = this.currentPrimaryEdge!
 
     for (const nearbyEdge of this.currentNearbyEdges) {
-      const filledRect = expandEdgeToRect(primaryEdge, nearbyEdge)
+      const filledRect = createNodeFromTwoEdges(primaryEdge, nearbyEdge)
       if (filledRect && this.isValidFill(filledRect)) {
         this.filledRects.push(filledRect)
         break

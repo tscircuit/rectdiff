@@ -1,7 +1,7 @@
 import type { Placed3D } from "../rectdiff/types"
 import type { RectEdge } from "./types"
 
-export function expandEdgeToRect(
+export function createNodeFromTwoEdges(
   primaryEdge: RectEdge,
   nearbyEdge: RectEdge,
 ): Placed3D | null {
