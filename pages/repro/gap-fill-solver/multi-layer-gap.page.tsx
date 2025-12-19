@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { GapFillSolver } from "../../../lib/solvers/GapFillSolver"
+import { EdgeSpatialHashIndex } from "../../../lib/solvers/GapFillSolver/EdgeSpatialHashIndex"
 import type { SimpleRouteJson } from "../../../lib/types/srj-types"
 import type { Placed3D } from "../../../lib/solvers/rectdiff/types"
 import { GenericSolverDebugger } from "@tscircuit/solver-utils/react"
@@ -37,7 +37,7 @@ export default () => {
 
   const solver = useMemo(
     () =>
-      new GapFillSolver({
+      new EdgeSpatialHashIndex({
         simpleRouteJson,
         placedRects,
         obstaclesByLayer: [[], []],

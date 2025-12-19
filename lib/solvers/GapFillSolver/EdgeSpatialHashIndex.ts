@@ -1,9 +1,9 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
-import type { SimpleRouteJson } from "../types/srj-types"
-import type { Placed3D, XYRect } from "./rectdiff/types"
-import type { CapacityMeshNode } from "../types/capacity-mesh-types"
-import { FlatbushIndex } from "../data-structures/FlatbushIndex"
+import type { SimpleRouteJson } from "../../types/srj-types"
+import type { Placed3D, XYRect } from "../rectdiff/types"
+import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
+import { FlatbushIndex } from "../../data-structures/FlatbushIndex"
 
 export interface RectEdge {
   rect: XYRect
@@ -16,7 +16,7 @@ export interface RectEdge {
   zLayers: number[]
 }
 
-export interface GapFillSolverInput {
+export interface EdgeSpatialHashIndexInput {
   simpleRouteJson: SimpleRouteJson
   placedRects: Placed3D[]
   obstaclesByLayer: XYRect[][]
@@ -29,7 +29,7 @@ type SubPhase =
   | "EXPAND_POINT"
   | "DONE"
 
-interface GapFillState {
+interface EdgeSpatialHashIndexState {
   srj: SimpleRouteJson
   inputRects: Placed3D[]
   obstaclesByLayer: XYRect[][]
@@ -54,15 +54,17 @@ interface GapFillState {
  * Gap Fill Solver - fills gaps between existing rectangles using edge analysis.
  * Processes one edge per step for visualization.
  */
-export class GapFillSolver extends BaseSolver {
-  private state!: GapFillState
+export class EdgeSpatialHashIndex extends BaseSolver {
+  private state!: EdgeSpatialHashIndexState
 
-  constructor(input: GapFillSolverInput) {
+  constructor(input: EdgeSpatialHashIndexInput) {
     super()
     this.state = this.initState(input)
   }
 
-  private initState(input: GapFillSolverInput): GapFillState {
+  private initState(
+    input: EdgeSpatialHashIndexInput,
+  ): EdgeSpatialHashIndexState {
     const layerCount = input.simpleRouteJson.layerCount || 1
     const maxEdgeDistance = input.maxEdgeDistance ?? 2.0
 
@@ -313,7 +315,6 @@ export class GapFillSolver extends BaseSolver {
         result.push(freeSegment)
       }
     }
-    // Sort by length (largest first) - cache lengths to avoid repeated calculations
     const edgesWithLength = result.map((edge) => ({
       edge,
       length: Math.abs(edge.x2 - edge.x1) + Math.abs(edge.y2 - edge.y1),
@@ -431,7 +432,6 @@ export class GapFillSolver extends BaseSolver {
   private stepExpandPoint(): void {
     const primaryEdge = this.state.currentPrimaryEdge!
 
-    // Try expanding to each nearby edge (furthest first) until valid fill found
     for (const nearbyEdge of this.state.currentNearbyEdges) {
       const filledRect = this.expandEdgeToRect(primaryEdge, nearbyEdge)
       if (filledRect && this.isValidFill(filledRect)) {
@@ -440,7 +440,6 @@ export class GapFillSolver extends BaseSolver {
       }
     }
 
-    // Move to next edge
     this.state.currentEdgeIndex++
     this.state.phase = "SELECT_PRIMARY_EDGE"
     this.state.currentNearbyEdges = []
@@ -568,7 +567,7 @@ export class GapFillSolver extends BaseSolver {
       primaryEdge.normal.x * candidate.normal.x +
       primaryEdge.normal.y * candidate.normal.y
 
-    if (dotProduct >= -0.9) return false // Not opposite (not facing)
+    if (dotProduct >= -0.9) return false
 
     const sharedLayers = primaryEdge.zLayers.filter((z) =>
       candidate.zLayers.includes(z),
@@ -619,7 +618,6 @@ export class GapFillSolver extends BaseSolver {
     const points: NonNullable<GraphicsObject["points"]> = []
     const lines: NonNullable<GraphicsObject["lines"]> = []
 
-    // Draw input rectangles (light gray)
     for (const placed of this.state.inputRects) {
       rects.push({
         center: {
@@ -672,7 +670,6 @@ export class GapFillSolver extends BaseSolver {
       }
     }
 
-    // Draw filled rectangles (green)
     for (const placed of this.state.filledRects) {
       rects.push({
         center: {
