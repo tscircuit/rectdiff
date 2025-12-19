@@ -3,7 +3,7 @@ import { GapFillSolver } from "../../../lib/solvers/GapFillSolver/GapFillSolver"
 import type { SimpleRouteJson } from "../../../lib/types/srj-types"
 import type { Placed3D } from "../../../lib/solvers/rectdiff/types"
 import { GenericSolverDebugger } from "@tscircuit/solver-utils/react"
-import testData from "../../../lib/solvers/GapFillSolver/test-cases/three-rects-touching.json"
+import testData from "../../../test-assets/gap-fill/three-rects-touching.json"
 
 export default () => {
   const solver = useMemo(
