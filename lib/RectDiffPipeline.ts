@@ -46,6 +46,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
             simpleRouteJson: instance.inputProblem.simpleRouteJson,
             placedRects: rectDiffState.placed || [],
             obstaclesByLayer: rectDiffState.obstaclesByLayer || [],
+            maxEdgeDistance: 10,
           },
         ]
       },
