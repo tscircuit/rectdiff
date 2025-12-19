@@ -8,6 +8,7 @@ import type { RectEdge } from "./types"
 import { extractEdges } from "./extractEdges"
 import { splitEdgesOnOverlaps } from "./splitEdgesOnOverlaps"
 import { buildEdgeSpatialIndex } from "./buildEdgeSpatialIndex"
+import { overlaps } from "../rectdiff/geometry"
 
 const COLOR_MAP = {
   inputRectFill: "#f3f4f6",
@@ -196,51 +197,23 @@ export class EdgeSpatialHashIndex extends BaseSolver {
       return false
     }
 
+    // Check filled rects
     for (const existing of this.state.filledRects) {
-      const sharedLayers = candidate.zLayers.filter((z) =>
-        existing.zLayers.includes(z),
-      )
-      if (sharedLayers.length > 0) {
-        const overlapX =
-          Math.max(candidate.rect.x, existing.rect.x) <
-          Math.min(
-            candidate.rect.x + candidate.rect.width,
-            existing.rect.x + existing.rect.width,
-          )
-        const overlapY =
-          Math.max(candidate.rect.y, existing.rect.y) <
-          Math.min(
-            candidate.rect.y + candidate.rect.height,
-            existing.rect.y + existing.rect.height,
-          )
-
-        if (overlapX && overlapY) {
-          return false
-        }
+      if (
+        candidate.zLayers.some((z) => existing.zLayers.includes(z)) &&
+        overlaps(candidate.rect, existing.rect)
+      ) {
+        return false
       }
     }
 
+    // Check input rects
     for (const input of this.state.inputRects) {
-      const sharedLayers = candidate.zLayers.filter((z) =>
-        input.zLayers.includes(z),
-      )
-      if (sharedLayers.length > 0) {
-        const overlapX =
-          Math.max(candidate.rect.x, input.rect.x) <
-          Math.min(
-            candidate.rect.x + candidate.rect.width,
-            input.rect.x + input.rect.width,
-          )
-        const overlapY =
-          Math.max(candidate.rect.y, input.rect.y) <
-          Math.min(
-            candidate.rect.y + candidate.rect.height,
-            input.rect.y + input.rect.height,
-          )
-
-        if (overlapX && overlapY) {
-          return false
-        }
+      if (
+        candidate.zLayers.some((z) => input.zLayers.includes(z)) &&
+        overlaps(candidate.rect, input.rect)
+      ) {
+        return false
       }
     }
 
@@ -248,20 +221,7 @@ export class EdgeSpatialHashIndex extends BaseSolver {
     for (const z of candidate.zLayers) {
       const obstacles = this.state.obstaclesByLayer[z] ?? []
       for (const obstacle of obstacles) {
-        const overlapX =
-          Math.max(candidate.rect.x, obstacle.x) <
-          Math.min(
-            candidate.rect.x + candidate.rect.width,
-            obstacle.x + obstacle.width,
-          )
-        const overlapY =
-          Math.max(candidate.rect.y, obstacle.y) <
-          Math.min(
-            candidate.rect.y + candidate.rect.height,
-            obstacle.y + obstacle.height,
-          )
-
-        if (overlapX && overlapY) {
+        if (overlaps(candidate.rect, obstacle)) {
           return false
         }
       }
