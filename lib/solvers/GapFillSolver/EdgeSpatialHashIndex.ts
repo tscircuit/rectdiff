@@ -4,6 +4,10 @@ import type { SimpleRouteJson } from "../../types/srj-types"
 import type { Placed3D, XYRect } from "../rectdiff/types"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import { FlatbushIndex } from "../../data-structures/FlatbushIndex"
+import type { RectEdge } from "./types"
+import { extractEdges } from "./extractEdges"
+import { splitEdgesOnOverlaps } from "./splitEdgesOnOverlaps"
+import { buildEdgeSpatialIndex } from "./buildEdgeSpatialIndex"
 
 const COLOR_MAP = {
   inputRectFill: "#f3f4f6",
@@ -13,17 +17,6 @@ const COLOR_MAP = {
   edgeStroke: "#10b981",
   filledGapFill: "#d1fae5",
   filledGapStroke: "#10b981",
-}
-
-export interface RectEdge {
-  rect: XYRect
-  side: "top" | "bottom" | "left" | "right"
-  x1: number
-  y1: number
-  x2: number
-  y2: number
-  normal: { x: number; y: number }
-  zLayers: number[]
 }
 
 export interface EdgeSpatialHashIndexInput {
@@ -78,13 +71,10 @@ export class EdgeSpatialHashIndex extends BaseSolver {
     const layerCount = input.simpleRouteJson.layerCount || 1
     const maxEdgeDistance = input.maxEdgeDistance ?? 2.0
 
-    const rawEdges = this.extractEdges(
-      input.placedRects,
-      input.obstaclesByLayer,
-    )
-    const edges = this.splitEdgesOnOverlaps(rawEdges)
+    const rawEdges = extractEdges(input.placedRects, input.obstaclesByLayer)
+    const edges = splitEdgesOnOverlaps(rawEdges)
 
-    const edgeSpatialIndex = this.buildEdgeSpatialIndex(edges, maxEdgeDistance)
+    const edgeSpatialIndex = buildEdgeSpatialIndex(edges, maxEdgeDistance)
 
     return {
       srj: input.simpleRouteJson,
@@ -100,261 +90,6 @@ export class EdgeSpatialHashIndex extends BaseSolver {
       nearbyEdgeCandidateIndex: 0,
       currentNearbyEdges: [],
       filledRects: [],
-    }
-  }
-
-  private buildEdgeSpatialIndex(
-    edges: RectEdge[],
-    maxEdgeDistance: number,
-  ): FlatbushIndex<RectEdge> {
-    const index = new FlatbushIndex<RectEdge>(edges.length)
-
-    for (const edge of edges) {
-      const minX = Math.min(edge.x1, edge.x2) - maxEdgeDistance
-      const minY = Math.min(edge.y1, edge.y2) - maxEdgeDistance
-      const maxX = Math.max(edge.x1, edge.x2) + maxEdgeDistance
-      const maxY = Math.max(edge.y1, edge.y2) + maxEdgeDistance
-
-      index.insert(edge, minX, minY, maxX, maxY)
-    }
-
-    index.finish()
-    return index
-  }
-
-  private extractEdges(
-    rects: Placed3D[],
-    obstaclesByLayer: XYRect[][],
-  ): RectEdge[] {
-    const edges: RectEdge[] = []
-
-    for (const placed of rects) {
-      const { rect, zLayers } = placed
-
-      edges.push({
-        rect,
-        side: "top",
-        x1: rect.x,
-        y1: rect.y + rect.height,
-        x2: rect.x + rect.width,
-        y2: rect.y + rect.height,
-        normal: { x: 0, y: 1 },
-        zLayers: [...zLayers],
-      })
-
-      edges.push({
-        rect,
-        side: "bottom",
-        x1: rect.x,
-        y1: rect.y,
-        x2: rect.x + rect.width,
-        y2: rect.y,
-        normal: { x: 0, y: -1 },
-        zLayers: [...zLayers],
-      })
-
-      edges.push({
-        rect,
-        side: "right",
-        x1: rect.x + rect.width,
-        y1: rect.y,
-        x2: rect.x + rect.width,
-        y2: rect.y + rect.height,
-        normal: { x: 1, y: 0 },
-        zLayers: [...zLayers],
-      })
-
-      edges.push({
-        rect,
-        side: "left",
-        x1: rect.x,
-        y1: rect.y,
-        x2: rect.x,
-        y2: rect.y + rect.height,
-        normal: { x: -1, y: 0 },
-        zLayers: [...zLayers],
-      })
-    }
-
-    for (let z = 0; z < obstaclesByLayer.length; z++) {
-      const obstacles = obstaclesByLayer[z] ?? []
-      for (const rect of obstacles) {
-        const zLayers = [z]
-
-        edges.push({
-          rect,
-          side: "top",
-          x1: rect.x,
-          y1: rect.y + rect.height,
-          x2: rect.x + rect.width,
-          y2: rect.y + rect.height,
-          normal: { x: 0, y: 1 },
-          zLayers,
-        })
-
-        edges.push({
-          rect,
-          side: "bottom",
-          x1: rect.x,
-          y1: rect.y,
-          x2: rect.x + rect.width,
-          y2: rect.y,
-          normal: { x: 0, y: -1 },
-          zLayers,
-        })
-
-        edges.push({
-          rect,
-          side: "right",
-          x1: rect.x + rect.width,
-          y1: rect.y,
-          x2: rect.x + rect.width,
-          y2: rect.y + rect.height,
-          normal: { x: 1, y: 0 },
-          zLayers,
-        })
-
-        edges.push({
-          rect,
-          side: "left",
-          x1: rect.x,
-          y1: rect.y,
-          x2: rect.x,
-          y2: rect.y + rect.height,
-          normal: { x: -1, y: 0 },
-          zLayers,
-        })
-      }
-    }
-
-    return edges
-  }
-
-  private splitEdgesOnOverlaps(edges: RectEdge[]): RectEdge[] {
-    const result: RectEdge[] = []
-    const tolerance = 0.01
-
-    const spatialIndex = new FlatbushIndex<RectEdge>(edges.length)
-    for (const edge of edges) {
-      const minX = Math.min(edge.x1, edge.x2)
-      const minY = Math.min(edge.y1, edge.y2)
-      const maxX = Math.max(edge.x1, edge.x2)
-      const maxY = Math.max(edge.y1, edge.y2)
-      spatialIndex.insert(edge, minX, minY, maxX, maxY)
-    }
-    spatialIndex.finish()
-
-    for (const edge of edges) {
-      const isHorizontal = Math.abs(edge.normal.y) > 0.5
-      const overlappingRanges: Array<{ start: number; end: number }> = []
-
-      const minX = Math.min(edge.x1, edge.x2)
-      const minY = Math.min(edge.y1, edge.y2)
-      const maxX = Math.max(edge.x1, edge.x2)
-      const maxY = Math.max(edge.y1, edge.y2)
-      const nearby = spatialIndex.search(minX, minY, maxX, maxY)
-
-      for (const other of nearby) {
-        if (edge === other) continue
-        if (edge.rect === other.rect) continue
-        if (!edge.zLayers.some((z) => other.zLayers.includes(z))) continue
-
-        const isOtherHorizontal = Math.abs(other.normal.y) > 0.5
-        if (isHorizontal !== isOtherHorizontal) continue
-
-        if (isHorizontal) {
-          if (Math.abs(edge.y1 - other.y1) > tolerance) continue
-
-          const overlapStart = Math.max(edge.x1, other.x1)
-          const overlapEnd = Math.min(edge.x2, other.x2)
-
-          if (overlapStart < overlapEnd) {
-            const edgeLength = edge.x2 - edge.x1
-            overlappingRanges.push({
-              start: (overlapStart - edge.x1) / edgeLength,
-              end: (overlapEnd - edge.x1) / edgeLength,
-            })
-          }
-        } else {
-          if (Math.abs(edge.x1 - other.x1) > tolerance) continue
-
-          const overlapStart = Math.max(edge.y1, other.y1)
-          const overlapEnd = Math.min(edge.y2, other.y2)
-
-          if (overlapStart < overlapEnd) {
-            const edgeLength = edge.y2 - edge.y1
-            overlappingRanges.push({
-              start: (overlapStart - edge.y1) / edgeLength,
-              end: (overlapEnd - edge.y1) / edgeLength,
-            })
-          }
-        }
-      }
-
-      if (overlappingRanges.length === 0) {
-        result.push(edge)
-        continue
-      }
-
-      overlappingRanges.sort((a, b) => a.start - b.start)
-      const merged: Array<{ start: number; end: number }> = []
-      for (const range of overlappingRanges) {
-        if (
-          merged.length === 0 ||
-          range.start > merged[merged.length - 1]!.end
-        ) {
-          merged.push(range)
-        } else {
-          merged[merged.length - 1]!.end = Math.max(
-            merged[merged.length - 1]!.end,
-            range.end,
-          )
-        }
-      }
-
-      let pos = 0
-      for (const occupied of merged) {
-        if (pos < occupied.start) {
-          const freeSegment = this.createEdgeSegment(edge, pos, occupied.start)
-          result.push(freeSegment)
-        }
-        pos = occupied.end
-      }
-      if (pos < 1) {
-        const freeSegment = this.createEdgeSegment(edge, pos, 1)
-        result.push(freeSegment)
-      }
-    }
-    const edgesWithLength = result.map((edge) => ({
-      edge,
-      length: Math.abs(edge.x2 - edge.x1) + Math.abs(edge.y2 - edge.y1),
-    }))
-    edgesWithLength.sort((a, b) => b.length - a.length)
-
-    return edgesWithLength.map((e) => e.edge)
-  }
-
-  private createEdgeSegment(
-    edge: RectEdge,
-    start: number,
-    end: number,
-  ): RectEdge {
-    const isHorizontal = Math.abs(edge.normal.y) > 0.5
-
-    if (isHorizontal) {
-      const length = edge.x2 - edge.x1
-      return {
-        ...edge,
-        x1: edge.x1 + start * length,
-        x2: edge.x1 + end * length,
-      }
-    } else {
-      const length = edge.y2 - edge.y1
-      return {
-        ...edge,
-        y1: edge.y1 + start * length,
-        y2: edge.y1 + end * length,
-      }
     }
   }
 
