@@ -10,6 +10,10 @@ import { createBaseVisualization } from "./solvers/rectdiff/visualization"
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
+  /** Maximum distance between edges to consider for gap filling (default: 10) */
+  gapFillMaxEdgeDistance?: number
+  /** Number of gap fill iterations to run (default: 3) */
+  gapFillIterations?: number
 }
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
@@ -46,8 +50,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
             simpleRouteJson: instance.inputProblem.simpleRouteJson,
             placedRects: rectDiffState.placed || [],
             obstaclesByLayer: rectDiffState.obstaclesByLayer || [],
-            maxEdgeDistance: 10,
-            repeatCount: 3,
+            maxEdgeDistance: instance.inputProblem.gapFillMaxEdgeDistance ?? 10,
+            repeatCount: instance.inputProblem.gapFillIterations ?? 3,
           },
         ]
       },
