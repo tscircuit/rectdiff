@@ -261,6 +261,11 @@ export class GapFillSolver extends BaseSolver {
         result.push(freeSegment)
       }
     }
+    result.sort((a, b) => {
+      const lengthA = Math.hypot(a.x2 - a.x1, a.y2 - a.y1)
+      const lengthB = Math.hypot(b.x2 - b.x1, b.y2 - b.y1)
+      return lengthB - lengthA
+    })
 
     return result
   }
