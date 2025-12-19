@@ -14,25 +14,13 @@ export interface RectEdge {
   y2: number
   normal: { x: number; y: number }
   zLayers: number[]
-  segmentType?: "free" | "overlap" // Track if this is a free or overlap segment
-  pairedEdges?: RectEdge[]
-}
-
-export interface UnoccupiedSection {
-  edge: RectEdge
-  start: number // 0 to 1 along edge
-  end: number // 0 to 1 along edge
-  x1: number
-  y1: number
-  x2: number
-  y2: number
 }
 
 export interface ExpansionPoint {
   x: number
   y: number
   zLayers: number[]
-  section: UnoccupiedSection
+  edge: RectEdge
 }
 
 export interface GapFillSolverInput {
@@ -69,8 +57,6 @@ interface GapFillState {
   nearbyEdgeCandidateIndex: number
   currentNearbyEdges: RectEdge[]
 
-  currentUnoccupiedSections: UnoccupiedSection[]
-
   currentExpansionPoints: ExpansionPoint[]
   currentExpansionIndex: number
 
@@ -93,19 +79,8 @@ export class GapFillSolver extends BaseSolver {
     const layerCount = input.simpleRouteJson.layerCount || 1
     const maxEdgeDistance = input.maxEdgeDistance ?? 2.0
 
-    // For splitting, use a smaller distance to only split on directly adjacent edges
-    const maxSplitDistance = Math.max(
-      input.simpleRouteJson.minTraceWidth * 2,
-      0.5,
-    )
-
     const rawEdges = this.extractEdges(input.placedRects)
     const edges = this.splitEdgesOnOverlaps(rawEdges)
-    this.linkOverlapSegments(
-      edges,
-      maxEdgeDistance,
-      input.simpleRouteJson.minTraceWidth,
-    )
 
     // Build spatial index for fast edge-to-edge queries
     const edgeSpatialIndex = this.buildEdgeSpatialIndex(edges, maxEdgeDistance)
@@ -123,7 +98,6 @@ export class GapFillSolver extends BaseSolver {
       currentEdgeIndex: 0,
       nearbyEdgeCandidateIndex: 0,
       currentNearbyEdges: [],
-      currentUnoccupiedSections: [],
       currentExpansionPoints: [],
       currentExpansionIndex: 0,
       filledRects: [],
@@ -208,9 +182,7 @@ export class GapFillSolver extends BaseSolver {
     return edges
   }
 
-  private splitEdgesOnOverlaps(
-    edges: RectEdge[],
-  ): RectEdge[] {
+  private splitEdgesOnOverlaps(edges: RectEdge[]): RectEdge[] {
     const result: RectEdge[] = []
     const tolerance = 0.01
 
@@ -317,62 +289,6 @@ export class GapFillSolver extends BaseSolver {
     }
   }
 
-  private linkOverlapSegments(
-    edges: RectEdge[],
-    maxEdgeDistance: number,
-    minTraceWidth: number,
-  ): void {
-    const overlapSegments = edges.filter((e) => e.segmentType === "overlap")
-
-    for (const segment of overlapSegments) {
-      const isHorizontal = Math.abs(segment.normal.y) > 0.5
-      const paired: RectEdge[] = []
-
-      for (const other of overlapSegments) {
-        if (segment === other) continue
-        if (segment.rect === other.rect) continue
-        if (!segment.zLayers.some((z) => other.zLayers.includes(z))) continue
-
-        const isOtherHorizontal = Math.abs(other.normal.y) > 0.5
-        if (isHorizontal !== isOtherHorizontal) continue
-
-        // Check opposite normals (facing each other)
-        const dotProduct =
-          segment.normal.x * other.normal.x + segment.normal.y * other.normal.y
-        if (dotProduct >= -0.9) continue
-
-        // Check distance
-        const distance = isHorizontal
-          ? Math.abs(segment.y1 - other.y1)
-          : Math.abs(segment.x1 - other.x1)
-
-        // Exclude touching edges (distance = 0) - no gap to fill
-        const minGap = Math.max(minTraceWidth, 0.1)
-        if (distance < minGap) continue
-
-        if (distance > maxEdgeDistance) continue
-
-        // Check overlapping ranges
-        let overlapStart: number, overlapEnd: number
-        if (isHorizontal) {
-          overlapStart = Math.max(segment.x1, other.x1)
-          overlapEnd = Math.min(segment.x2, other.x2)
-        } else {
-          overlapStart = Math.max(segment.y1, other.y1)
-          overlapEnd = Math.min(segment.y2, other.y2)
-        }
-
-        if (overlapStart < overlapEnd) {
-          paired.push(other)
-        }
-      }
-
-      if (paired.length > 0) {
-        segment.pairedEdges = paired
-      }
-    }
-  }
-
   override _setup(): void {
     this.stats = {
       phase: "EDGE_ANALYSIS",
@@ -426,14 +342,6 @@ export class GapFillSolver extends BaseSolver {
   private stepFindNearbyEdges(): void {
     const primaryEdge = this.state.currentPrimaryEdge!
 
-    // For overlap segments, use paired edges directly
-    if (primaryEdge.pairedEdges && primaryEdge.pairedEdges.length > 0) {
-      this.state.currentNearbyEdges = primaryEdge.pairedEdges
-      this.state.phase = "CHECK_UNOCCUPIED"
-      return
-    }
-
-    // For free segments, use spatial search
     const padding = this.state.maxEdgeDistance
     const minX = Math.min(primaryEdge.x1, primaryEdge.x2) - padding
     const minY = Math.min(primaryEdge.y1, primaryEdge.y2) - padding
@@ -462,17 +370,12 @@ export class GapFillSolver extends BaseSolver {
   }
 
   private stepCheckUnoccupied(): void {
-    const primaryEdge = this.state.currentPrimaryEdge!
-    this.state.currentUnoccupiedSections =
-      this.findUnoccupiedSections(primaryEdge)
-
     this.state.phase = "PLACE_EXPANSION_POINTS"
   }
 
   private stepPlaceExpansionPoints(): void {
-    this.state.currentExpansionPoints = this.placeExpansionPoints(
-      this.state.currentUnoccupiedSections,
-    )
+    const primaryEdge = this.state.currentPrimaryEdge!
+    this.state.currentExpansionPoints = this.placeExpansionPoints(primaryEdge)
     this.state.currentExpansionIndex = 0
 
     if (this.state.currentExpansionPoints.length > 0) {
@@ -601,8 +504,7 @@ export class GapFillSolver extends BaseSolver {
   }
 
   private expandPointToRect(point: ExpansionPoint): Placed3D | null {
-    const section = point.section
-    const edge = section.edge
+    const edge = point.edge
 
     const nearbyEdge = this.state.currentNearbyEdges[0]
     if (!nearbyEdge) return null
@@ -615,18 +517,18 @@ export class GapFillSolver extends BaseSolver {
 
       rect = {
         x: leftX,
-        y: section.y1,
+        y: edge.y1,
         width: rightX - leftX,
-        height: section.y2 - section.y1,
+        height: edge.y2 - edge.y1,
       }
     } else {
       const bottomY = edge.normal.y > 0 ? edge.y1 : nearbyEdge.y1
       const topY = edge.normal.y > 0 ? nearbyEdge.y1 : edge.y1
 
       rect = {
-        x: section.x1,
+        x: edge.x1,
         y: bottomY,
-        width: section.x2 - section.x1,
+        width: edge.x2 - edge.x1,
         height: topY - bottomY,
       }
     }
@@ -641,7 +543,6 @@ export class GapFillSolver extends BaseSolver {
     this.state.currentEdgeIndex++
     this.state.phase = "SELECT_PRIMARY_EDGE"
     this.state.currentNearbyEdges = []
-    this.state.currentUnoccupiedSections = []
     this.state.currentExpansionPoints = []
   }
 
@@ -679,43 +580,19 @@ export class GapFillSolver extends BaseSolver {
     return Math.abs(edge1.x1 - edge2.x1)
   }
 
-  private findUnoccupiedSections(edge: RectEdge): UnoccupiedSection[] {
-    // TODO: Implement - check which parts of the edge have free space
-    // For now, return the entire edge as one section
+  private placeExpansionPoints(edge: RectEdge): ExpansionPoint[] {
+    const offsetDistance = 0.05
+    const midX = (edge.x1 + edge.x2) / 2
+    const midY = (edge.y1 + edge.y2) / 2
+
     return [
       {
-        edge,
-        start: 0,
-        end: 1,
-        x1: edge.x1,
-        y1: edge.y1,
-        x2: edge.x2,
-        y2: edge.y2,
-      },
-    ]
-  }
-
-  private placeExpansionPoints(
-    sections: UnoccupiedSection[],
-  ): ExpansionPoint[] {
-    const points: ExpansionPoint[] = []
-
-    for (const section of sections) {
-      const edge = section.edge
-
-      const offsetDistance = 0.05
-      const midX = (section.x1 + section.x2) / 2
-      const midY = (section.y1 + section.y2) / 2
-
-      points.push({
         x: midX + edge.normal.x * offsetDistance,
         y: midY + edge.normal.y * offsetDistance,
         zLayers: [...edge.zLayers],
-        section,
-      })
-    }
-
-    return points
+        edge,
+      },
+    ]
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
@@ -758,35 +635,23 @@ export class GapFillSolver extends BaseSolver {
       })
     }
 
-    // Draw ALL edges with color coding: FREE=green, OVERLAP=red, UNSPLIT=gray
     for (const edge of this.state.edges) {
       const isCurrent = edge === this.state.currentPrimaryEdge
-
-      const color =
-        edge.segmentType === "free"
-          ? "#10b981" // Green for free segments
-          : edge.segmentType === "overlap"
-            ? "#ef4444" // Red for overlap segments
-            : "#6b7280" // Gray for unsplit edges
-
-      const label = edge.segmentType
-        ? `${edge.segmentType.toUpperCase()} segment\n${edge.side}\n(${edge.x1.toFixed(2)},${edge.y1.toFixed(2)})-(${edge.x2.toFixed(2)},${edge.y2.toFixed(2)})`
-        : `edge ${edge.side}\n(${edge.x1.toFixed(2)},${edge.y1.toFixed(2)})-(${edge.x2.toFixed(2)},${edge.y2.toFixed(2)})`
 
       lines.push({
         points: [
           { x: edge.x1, y: edge.y1 },
           { x: edge.x2, y: edge.y2 },
         ],
-        strokeColor: color,
-        strokeWidth: isCurrent ? 0.3 : 0.1,
-        label,
+        strokeColor: "#10b981",
+        strokeWidth: isCurrent ? 0.2 : 0.1,
+        label: `${edge.side}\n(${edge.x1.toFixed(2)},${edge.y1.toFixed(2)})-(${edge.x2.toFixed(2)},${edge.y2.toFixed(2)})`,
       })
 
       if (isCurrent) {
         points.push({
           x: (edge.x1 + edge.x2) / 2,
-          y: (edge.y1 + edge.y2) / 2
+          y: (edge.y1 + edge.y2) / 2,
         })
       }
     }
