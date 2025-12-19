@@ -5,6 +5,16 @@ import type { Placed3D, XYRect } from "../rectdiff/types"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import { FlatbushIndex } from "../../data-structures/FlatbushIndex"
 
+const COLOR_MAP = {
+  inputRectFill: "#f3f4f6",
+  inputRectStroke: "#9ca3af",
+  obstacleRectFill: "#fee2e2",
+  obstacleRectStroke: "#fc6e6eff",
+  edgeStroke: "#10b981",
+  filledGapFill: "#d1fae5",
+  filledGapStroke: "#10b981",
+}
+
 export interface RectEdge {
   rect: XYRect
   side: "top" | "bottom" | "left" | "right"
@@ -626,8 +636,8 @@ export class EdgeSpatialHashIndex extends BaseSolver {
         },
         width: placed.rect.width,
         height: placed.rect.height,
-        fill: "#f3f4f6",
-        stroke: "#9ca3af",
+        fill: COLOR_MAP.inputRectFill,
+        stroke: COLOR_MAP.inputRectStroke,
         label: `input rect\npos: (${placed.rect.x.toFixed(2)}, ${placed.rect.y.toFixed(2)})\nsize: ${placed.rect.width.toFixed(2)} × ${placed.rect.height.toFixed(2)}\nz: [${placed.zLayers.join(", ")}]`,
       })
     }
@@ -642,8 +652,8 @@ export class EdgeSpatialHashIndex extends BaseSolver {
           },
           width: obstacle.width,
           height: obstacle.height,
-          fill: "#fee2e2",
-          stroke: "#ef4444",
+          fill: COLOR_MAP.obstacleRectFill,
+          stroke: COLOR_MAP.obstacleRectStroke,
           label: `obstacle\npos: (${obstacle.x.toFixed(2)}, ${obstacle.y.toFixed(2)})\nsize: ${obstacle.width.toFixed(2)} × ${obstacle.height.toFixed(2)}\nz: ${z}`,
         })
       }
@@ -657,7 +667,7 @@ export class EdgeSpatialHashIndex extends BaseSolver {
           { x: edge.x1, y: edge.y1 },
           { x: edge.x2, y: edge.y2 },
         ],
-        strokeColor: "#10b981",
+        strokeColor: COLOR_MAP.edgeStroke,
         strokeWidth: isCurrent ? 0.2 : 0.1,
         label: `${edge.side}\n(${edge.x1.toFixed(2)},${edge.y1.toFixed(2)})-(${edge.x2.toFixed(2)},${edge.y2.toFixed(2)})`,
       })
@@ -678,8 +688,8 @@ export class EdgeSpatialHashIndex extends BaseSolver {
         },
         width: placed.rect.width,
         height: placed.rect.height,
-        fill: "#d1fae5",
-        stroke: "#10b981",
+        fill: COLOR_MAP.filledGapFill,
+        stroke: COLOR_MAP.filledGapStroke,
         label: `filled gap\npos: (${placed.rect.x.toFixed(2)}, ${placed.rect.y.toFixed(2)})\nsize: ${placed.rect.width.toFixed(2)} × ${placed.rect.height.toFixed(2)}\nz: [${placed.zLayers.join(", ")}]`,
       })
     }
