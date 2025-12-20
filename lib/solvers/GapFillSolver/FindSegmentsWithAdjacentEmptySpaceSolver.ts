@@ -11,6 +11,7 @@ export interface SegmentWithAdjacentEmptySpace {
   parent: CapacityMeshNode
   start: { x: number; y: number }
   end: { x: number; y: number }
+  z: number
   facingDirection: "x+" | "x-" | "y+" | "y-"
 }
 
@@ -65,18 +66,21 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
           ;[start, end] = [end, start]
         }
 
-        this.unprocessedEdges.push({
-          parent: node,
-          start,
-          end,
-          facingDirection: edge.facingDirection,
-        })
+        for (const z of node.availableZ) {
+          this.unprocessedEdges.push({
+            parent: node,
+            start,
+            end,
+            facingDirection: edge.facingDirection,
+            z,
+          })
+        }
       }
     }
     this.allEdges = [...this.unprocessedEdges]
 
-    this.edgeSpatialIndex = new Flatbush(this.unprocessedEdges.length)
-    for (const edge of this.unprocessedEdges) {
+    this.edgeSpatialIndex = new Flatbush(this.allEdges.length)
+    for (const edge of this.allEdges) {
       this.edgeSpatialIndex.add(
         edge.start.x,
         edge.start.y,
@@ -104,7 +108,9 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
       candidateEdge.end.y + EPS,
     )
 
-    const overlappingEdges = nearbyEdges.map((i) => this.allEdges[i]!)
+    const overlappingEdges = nearbyEdges
+      .map((i) => this.allEdges[i]!)
+      .filter((e) => e.z === candidateEdge.z)
     this.lastOverlappingEdges = overlappingEdges
 
     const uncoveredSegments = projectToUncoveredSegments(
@@ -116,10 +122,10 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
   }
 
   override getOutput(): {
-    edgesWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace>
+    segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace>
   } {
     return {
-      edgesWithAdjacentEmptySpace: [], // TODO
+      segmentsWithAdjacentEmptySpace: this.segmentsWithAdjacentEmptySpace,
     }
   }
 
