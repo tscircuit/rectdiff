@@ -7,17 +7,16 @@ import type { SimpleRouteJson } from "lib/types/srj-types"
 import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
 import { FindSegmentsWithAdjacentEmptySpaceSolver } from "./FindSegmentsWithAdjacentEmptySpaceSolver"
 import { ExpandEdgesToEmptySpaceSolver } from "./ExpandEdgesToEmptySpaceSolver"
-import { constructInputNodesFromSimpleRouteJson } from "./constructInputNodesFromSimpleRouteJson"
 
 export class GapFillSolverPipeline extends BasePipelineSolver<{
   meshNodes: CapacityMeshNode[]
 }> {
-  findEdgesWithAdjacentEmptySpaceSolver?: FindSegmentsWithAdjacentEmptySpaceSolver
+  findSegmentsWithAdjacentEmptySpaceSolver?: FindSegmentsWithAdjacentEmptySpaceSolver
   expandEdgesToEmptySpaceSolver?: ExpandEdgesToEmptySpaceSolver
 
   override pipelineDef: PipelineStep<any>[] = [
     definePipelineStep(
-      "findEdgesWithAdjacentEmptySpace",
+      "findSegmentsWithAdjacentEmptySpaceSolver",
       FindSegmentsWithAdjacentEmptySpaceSolver,
       (gapFillPipeline) => [
         {
@@ -36,9 +35,9 @@ export class GapFillSolverPipeline extends BasePipelineSolver<{
       (gapFillPipeline: GapFillSolverPipeline) => [
         {
           inputMeshNodes: gapFillPipeline.inputProblem.meshNodes,
-          edgesWithAdjacentEmptySpace:
-            gapFillPipeline.findEdgesWithAdjacentEmptySpaceSolver!.getOutput()
-              .edgesWithAdjacentEmptySpace,
+          segmentsWithAdjacentEmptySpace:
+            gapFillPipeline.findSegmentsWithAdjacentEmptySpaceSolver!.getOutput()
+              .segmentsWithAdjacentEmptySpace,
         },
       ],
       {
