@@ -5,6 +5,7 @@ import { RectDiffSolver } from "./solvers/RectDiffSolver"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { createBaseVisualization } from "./solvers/rectdiff/visualization"
+import { GapFillSolverPipeline } from "./solvers/GapFillSolver/GapFillSolverPipeline"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -18,10 +19,10 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
     definePipelineStep(
       "rectDiffSolver",
       RectDiffSolver,
-      (instance) => [
+      (rectDiffPipeline) => [
         {
-          simpleRouteJson: instance.inputProblem.simpleRouteJson,
-          gridOptions: instance.inputProblem.gridOptions,
+          simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
+          gridOptions: rectDiffPipeline.inputProblem.gridOptions,
         },
       ],
       {
@@ -30,6 +31,16 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
         },
       },
     ),
+    definePipelineStep(
+      "gapFillSolver",
+      GapFillSolverPipeline,
+      (rectDiffPipeline: RectDiffPipeline) => [
+        {
+          meshNodes:
+            rectDiffPipeline.rectDiffSolver?.getOutput().meshNodes ?? [],
+        },
+      ],
+    ),
   ]
 
   override getConstructorParams() {
@@ -37,19 +48,6 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    return this.getSolver<RectDiffSolver>("rectDiffSolver")!.getOutput()
-  }
-
-  override visualize(): GraphicsObject {
-    const solver = this.getSolver<RectDiffSolver>("rectDiffSolver")
-    if (solver) {
-      return solver.visualize()
-    }
-
-    // Show board and obstacles even before solver is initialized
-    return createBaseVisualization(
-      this.inputProblem.simpleRouteJson,
-      "RectDiff Pipeline (not started)",
-    )
+    return this.rectDiffSolver!.getOutput()
   }
 }
