@@ -109,10 +109,11 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
         .filter(
           (n) => n.capacityMeshNodeId !== segment.parent.capacityMeshNodeId,
         )
+
       searchDistance *= 4
     }
 
-    if (!collidingNodes) {
+    if (!collidingNodes || collidingNodes.length === 0) {
       // TODO, this means we need to expand the node to the boundary
       return
     }
@@ -159,7 +160,17 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
       },
     }
     this.lastExpandedSegment = expandedSegment
+
+    if (nodeWidth < EPS || nodeHeight < EPS) {
+      // Node is too small, skipping
+      return
+    }
+
     this.expandedSegments.push(expandedSegment)
+    this.rectSpatialIndex.insert({
+      ...expandedSegment.newNode,
+      ...nodeBounds,
+    })
   }
 
   override getOutput() {
@@ -237,13 +248,13 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
         x: this.lastSearchCorner1.x,
         y: this.lastSearchCorner1.y,
         color: "rgba(0, 0, 255, 0.5)",
-        label: "searchCorner1",
+        label: ["searchCorner1", `z=${this.lastSegment?.z}`].join("\n"),
       })
       graphics.points.push({
         x: this.lastSearchCorner2.x,
         y: this.lastSearchCorner2.y,
         color: "rgba(0, 0, 255, 0.5)",
-        label: "searchCorner2",
+        label: ["searchCorner2", `z=${this.lastSegment?.z}`].join("\n"),
       })
     }
 
