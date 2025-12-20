@@ -202,10 +202,14 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     //   })
     // }
 
-    for (const segment of this.expandedSegments) {
-      graphics.lines.push({
-        points: [segment.segment.start, segment.segment.end],
-        strokeColor: "rgba(0, 255, 0, 0.5)",
+    for (const { newNode } of this.expandedSegments) {
+      graphics.rects.push({
+        center: newNode.center,
+        width: newNode.width,
+        height: newNode.height,
+        fill: "green",
+        label: `expandedSegment (z=${newNode.availableZ.join(",")})`,
+        layer: `z${newNode.availableZ.join(",")}`,
       })
     }
 
@@ -224,8 +228,7 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
         },
         width: this.lastSearchBounds.maxX - this.lastSearchBounds.minX,
         height: this.lastSearchBounds.maxY - this.lastSearchBounds.minY,
-        fill: "rgba(0, 0, 255, 0.5)",
-        label: `searchBounds (z=${this.lastSegment?.z})`,
+        fill: "rgba(0, 0, 255, 0.25)",
       })
     }
 
@@ -241,6 +244,16 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
         y: this.lastSearchCorner2.y,
         color: "rgba(0, 0, 255, 0.5)",
         label: "searchCorner2",
+      })
+    }
+
+    if (this.lastExpandedSegment) {
+      graphics.rects.push({
+        center: this.lastExpandedSegment.newNode.center,
+        width: this.lastExpandedSegment.newNode.width,
+        height: this.lastExpandedSegment.newNode.height,
+        fill: "purple",
+        label: `expandedSegment (z=${this.lastExpandedSegment.segment.z})`,
       })
     }
 
