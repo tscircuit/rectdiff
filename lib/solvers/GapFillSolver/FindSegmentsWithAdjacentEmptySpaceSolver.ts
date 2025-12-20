@@ -175,24 +175,6 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
         points: [this.lastCandidateEdge.start, this.lastCandidateEdge.end],
         strokeColor: "blue",
       })
-      if (this.lastUncoveredSegments) {
-        const mp = midpoint(
-          this.lastCandidateEdge.start,
-          this.lastCandidateEdge.end,
-        )
-        graphics.texts.push({
-          text: `Uncovered segments: ${this.lastUncoveredSegments.length}`,
-          x: mp.x,
-          y: mp.y,
-          fontSize: 0.5,
-          anchorSide: {
-            "x+": "left",
-            "x-": "right",
-            "y+": "top",
-            "y-": "bottom",
-          }[this.lastCandidateEdge.facingDirection] as NinePointAnchor,
-        })
-      }
     }
 
     if (this.lastOverlappingEdges) {
