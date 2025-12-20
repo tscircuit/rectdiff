@@ -1,4 +1,8 @@
-import { BasePipelineSolver, definePipelineStep } from "@tscircuit/solver-utils"
+import {
+  BasePipelineSolver,
+  definePipelineStep,
+  type PipelineStep,
+} from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "./types/srj-types"
 import type { GridFill3DOptions } from "./solvers/rectdiff/types"
 import { RectDiffSolver } from "./solvers/RectDiffSolver"
@@ -15,7 +19,7 @@ export interface RectDiffPipelineInput {
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
   rectDiffSolver?: RectDiffSolver
 
-  override pipelineDef = [
+  override pipelineDef: PipelineStep<any>[] = [
     definePipelineStep(
       "rectDiffSolver",
       RectDiffSolver,
