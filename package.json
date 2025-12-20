@@ -16,6 +16,7 @@
     "@tscircuit/math-utils": "^0.0.29",
     "@tscircuit/solver-utils": "^0.0.8",
     "@types/bun": "latest",
+    "@types/rbush": "^4.0.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/three": "^0.181.0",

@@ -39,3 +39,10 @@ export const EDGES = [
     endY: 0.5,
   },
 ] as const
+
+export const EDGE_MAP = {
+  "x-": EDGES.find((e) => e.facingDirection === "x-")!,
+  "x+": EDGES.find((e) => e.facingDirection === "x+")!,
+  "y-": EDGES.find((e) => e.facingDirection === "y-")!,
+  "y+": EDGES.find((e) => e.facingDirection === "y+")!,
+} as const

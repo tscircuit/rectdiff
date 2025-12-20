@@ -86,6 +86,7 @@ export function projectToUncoveredSegments(
         facingDirection: primaryEdge.facingDirection,
         start,
         end,
+        z: primaryEdge.z,
       }
     })
 }
