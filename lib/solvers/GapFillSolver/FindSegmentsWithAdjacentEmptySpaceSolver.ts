@@ -94,6 +94,9 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
   override _step() {
     if (this.unprocessedEdges.length === 0) {
       this.solved = true
+      this.lastCandidateEdge = null
+      this.lastOverlappingEdges = null
+      this.lastUncoveredSegments = null
       return
     }
 
