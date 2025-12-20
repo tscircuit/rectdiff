@@ -1,10 +1,15 @@
-import { BasePipelineSolver, definePipelineStep } from "@tscircuit/solver-utils"
+import {
+  BasePipelineSolver,
+  definePipelineStep,
+  type PipelineStep,
+} from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "./types/srj-types"
 import type { GridFill3DOptions } from "./solvers/rectdiff/types"
 import { RectDiffSolver } from "./solvers/RectDiffSolver"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { createBaseVisualization } from "./solvers/rectdiff/visualization"
+import { GapFillSolverPipeline } from "./solvers/GapFillSolver/GapFillSolverPipeline"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -13,15 +18,16 @@ export interface RectDiffPipelineInput {
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
   rectDiffSolver?: RectDiffSolver
+  gapFillSolver?: GapFillSolverPipeline
 
-  override pipelineDef = [
+  override pipelineDef: PipelineStep<any>[] = [
     definePipelineStep(
       "rectDiffSolver",
       RectDiffSolver,
-      (instance) => [
+      (rectDiffPipeline) => [
         {
-          simpleRouteJson: instance.inputProblem.simpleRouteJson,
-          gridOptions: instance.inputProblem.gridOptions,
+          simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
+          gridOptions: rectDiffPipeline.inputProblem.gridOptions,
         },
       ],
       {
@@ -30,6 +36,16 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
         },
       },
     ),
+    definePipelineStep(
+      "gapFillSolver",
+      GapFillSolverPipeline,
+      (rectDiffPipeline: RectDiffPipeline) => [
+        {
+          meshNodes:
+            rectDiffPipeline.rectDiffSolver?.getOutput().meshNodes ?? [],
+        },
+      ],
+    ),
   ]
 
   override getConstructorParams() {
@@ -37,19 +53,69 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    return this.getSolver<RectDiffSolver>("rectDiffSolver")!.getOutput()
+    const gapFillOutput = this.gapFillSolver?.getOutput()
+    if (gapFillOutput) {
+      return { meshNodes: gapFillOutput.outputNodes }
+    }
+    return this.rectDiffSolver!.getOutput()
   }
 
-  override visualize(): GraphicsObject {
-    const solver = this.getSolver<RectDiffSolver>("rectDiffSolver")
-    if (solver) {
-      return solver.visualize()
+  override initialVisualize(): GraphicsObject {
+    console.log("RectDiffPipeline - initialVisualize")
+    const graphics = createBaseVisualization(
+      this.inputProblem.simpleRouteJson,
+      "RectDiffPipeline - Initial",
+    )
+
+    // Show initial mesh nodes from rectDiffSolver if available
+    const initialNodes = this.rectDiffSolver?.getOutput().meshNodes ?? []
+    for (const node of initialNodes) {
+      graphics.rects!.push({
+        center: node.center,
+        width: node.width,
+        height: node.height,
+        stroke: "rgba(0, 0, 0, 0.3)",
+        fill: "rgba(100, 100, 100, 0.1)",
+        layer: `z${node.availableZ.join(",")}`,
+        label: [
+          `node ${node.capacityMeshNodeId}`,
+          `z:${node.availableZ.join(",")}`,
+        ].join("\n"),
+      })
     }
 
-    // Show board and obstacles even before solver is initialized
-    return createBaseVisualization(
+    return graphics
+  }
+
+  override finalVisualize(): GraphicsObject {
+    const graphics = createBaseVisualization(
       this.inputProblem.simpleRouteJson,
-      "RectDiff Pipeline (not started)",
+      "RectDiffPipeline - Final",
     )
+
+    const { meshNodes: outputNodes } = this.getOutput()
+    const initialNodeIds = new Set(
+      (this.rectDiffSolver?.getOutput().meshNodes ?? []).map(
+        (n) => n.capacityMeshNodeId,
+      ),
+    )
+
+    for (const node of outputNodes) {
+      const isExpanded = !initialNodeIds.has(node.capacityMeshNodeId)
+      graphics.rects!.push({
+        center: node.center,
+        width: node.width,
+        height: node.height,
+        stroke: isExpanded ? "rgba(0, 128, 0, 0.8)" : "rgba(0, 0, 0, 0.3)",
+        fill: isExpanded ? "rgba(0, 200, 0, 0.3)" : "rgba(100, 100, 100, 0.1)",
+        layer: `z${node.availableZ.join(",")}`,
+        label: [
+          `${isExpanded ? "[expanded] " : ""}node ${node.capacityMeshNodeId}`,
+          `z:${node.availableZ.join(",")}`,
+        ].join("\n"),
+      })
+    }
+
+    return graphics
   }
 }
