@@ -211,6 +211,7 @@ export class RectDiffSolver extends BaseSolver {
           height: p.rect.height,
           fill: colors.fill,
           stroke: colors.stroke,
+          layer: `z${p.zLayers.join(",")}`,
           label: `free\nz:${p.zLayers.join(",")}`,
         })
       }
