@@ -10,6 +10,33 @@ import { rectsToMeshNodes } from "../rectdiff/rectsToMeshNodes"
 import type { XYRect, Candidate3D, Placed3D, Phase } from "../rectdiff/types"
 import type { SimpleRouteJson } from "../../types/srj-types"
 
+export type RectDiffExpansionSolverSnapshot = {
+  srj: SimpleRouteJson
+  layerNames: string[]
+  layerCount: number
+  bounds: XYRect
+  options: {
+    gridSizes: number[]
+    // the engine only uses gridSizes here, other options are ignored
+    [key: string]: any
+  }
+  obstaclesByLayer: XYRect[][]
+  boardVoidRects: XYRect[]
+  phase: Phase
+  gridIndex: number
+  candidates: Candidate3D[]
+  placed: Placed3D[]
+  placedByLayer: XYRect[][]
+  expansionIndex: number
+  edgeAnalysisDone: boolean
+  totalSeedsThisGrid: number
+  consumedSeedsThisGrid: number
+}
+
+export type RectDiffExpansionSolverInput = {
+  initialSnapshot: RectDiffExpansionSolverSnapshot
+}
+
 /**
  * Second phase of RectDiff: expand placed rects to their maximal extents.
  *
@@ -41,10 +68,10 @@ export class RectDiffExpansionSolver extends BaseSolver {
 
   private _meshNodes: CapacityMeshNode[] = []
 
-  constructor(input: { initialSnapshot: any }) {
+  constructor(private input: RectDiffExpansionSolverInput) {
     super()
     // Copy engine snapshot fields directly onto this solver instance
-    Object.assign(this, input.initialSnapshot)
+    Object.assign(this, this.input.initialSnapshot)
   }
 
   override _setup() {

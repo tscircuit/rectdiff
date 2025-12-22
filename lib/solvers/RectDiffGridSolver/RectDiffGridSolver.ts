@@ -18,6 +18,11 @@ import {
 import { overlaps } from "../rectdiff/geometry"
 import { computeDefaultGridSizes } from "../rectdiff/candidates"
 
+export type RectDiffGridSolverInput = {
+  simpleRouteJson: SimpleRouteJson
+  gridOptions?: Partial<GridFill3DOptions>
+}
+
 /**
  * First phase of RectDiff: grid-based seeding and placement.
  *
@@ -26,12 +31,8 @@ import { computeDefaultGridSizes } from "../rectdiff/candidates"
  * transitions away from "GRID" (i.e. when EXPANSION should begin).
  */
 export class RectDiffGridSolver extends BaseSolver {
-  private input: {
-    simpleRouteJson: SimpleRouteJson
-    gridOptions?: Partial<GridFill3DOptions>
-  }
-
   // Engine fields (mirrors initState / engine.ts)
+
   private srj!: SimpleRouteJson
   private layerNames!: string[]
   private layerCount!: number
@@ -54,12 +55,8 @@ export class RectDiffGridSolver extends BaseSolver {
   private totalSeedsThisGrid!: number
   private consumedSeedsThisGrid!: number
 
-  constructor(input: {
-    simpleRouteJson: SimpleRouteJson
-    gridOptions?: Partial<GridFill3DOptions>
-  }) {
+  constructor(private input: RectDiffGridSolverInput) {
     super()
-    this.input = input
   }
 
   override _setup() {
