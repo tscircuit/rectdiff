@@ -31,7 +31,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<{
       },
     ),
     definePipelineStep(
-      "expandEdgesToEmptySpace",
+      "expandEdgesToEmptySpaceSolver",
       ExpandEdgesToEmptySpaceSolver,
       (gapFillPipeline: GapFillSolverPipeline) => [
         {
