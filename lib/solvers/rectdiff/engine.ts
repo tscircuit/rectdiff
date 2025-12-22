@@ -7,10 +7,8 @@ import type {
   Candidate3D,
   Phase,
 } from "./types"
-import type { SimpleRouteJson } from "../../types/srj-types"
 import {
   computeCandidates3D,
-  computeDefaultGridSizes,
   computeEdgeCandidates3D,
   longestFreeSpanAroundZ,
 } from "./candidates"
@@ -21,8 +19,6 @@ import {
   overlaps,
   subtractRect2D,
 } from "./geometry"
-import { computeInverseRects } from "./geometry/computeInverseRects"
-import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
 
 /**
  * Build per-layer list of "hard" placed rects (nodes spanning all layers).

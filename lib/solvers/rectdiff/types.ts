@@ -1,6 +1,4 @@
 // lib/solvers/rectdiff/types.ts
-import type { SimpleRouteJson } from "../../types/srj-types"
-
 export type XYRect = { x: number; y: number; width: number; height: number }
 
 export type Rect3d = {
