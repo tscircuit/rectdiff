@@ -27,13 +27,13 @@ import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
 /**
  * Build per-layer list of "hard" placed rects (nodes spanning all layers).
  */
-function buildHardPlacedByLayer(state: {
+function buildHardPlacedByLayer(params: {
   layerCount: number
   placed: Placed3D[]
 }): XYRect[][] {
-  const out: XYRect[][] = Array.from({ length: state.layerCount }, () => [])
-  for (const p of state.placed) {
-    if (p.zLayers.length >= state.layerCount) {
+  const out: XYRect[][] = Array.from({ length: params.layerCount }, () => [])
+  for (const p of params.placed) {
+    if (p.zLayers.length >= params.layerCount) {
       for (const z of p.zLayers) out[z]!.push(p.rect)
     }
   }
@@ -44,16 +44,16 @@ function buildHardPlacedByLayer(state: {
  * Check if a point is occupied on ALL layers.
  */
 function isFullyOccupiedAtPoint(
-  state: {
+  params: {
     layerCount: number
     obstaclesByLayer: XYRect[][]
     placedByLayer: XYRect[][]
   },
   point: { x: number; y: number },
 ): boolean {
-  for (let z = 0; z < state.layerCount; z++) {
-    const obs = state.obstaclesByLayer[z] ?? []
-    const placed = state.placedByLayer[z] ?? []
+  for (let z = 0; z < params.layerCount; z++) {
+    const obs = params.obstaclesByLayer[z] ?? []
+    const placed = params.placedByLayer[z] ?? []
     const occ =
       obs.some((b) => containsPoint(b, point.x, point.y)) ||
       placed.some((b) => containsPoint(b, point.x, point.y))
@@ -66,7 +66,7 @@ function isFullyOccupiedAtPoint(
  * Shrink/split any soft (non-full-stack) nodes overlapped by the newcomer.
  */
 function resizeSoftOverlaps(
-  state: {
+  params: {
     layerCount: number
     placed: Placed3D[]
     placedByLayer: XYRect[][]
@@ -74,16 +74,16 @@ function resizeSoftOverlaps(
   },
   newIndex: number,
 ) {
-  const newcomer = state.placed[newIndex]!
+  const newcomer = params.placed[newIndex]!
   const { rect: newR, zLayers: newZs } = newcomer
-  const layerCount = state.layerCount
+  const layerCount = params.layerCount
 
   const removeIdx: number[] = []
-  const toAdd: typeof state.placed = []
+  const toAdd: typeof params.placed = []
 
-  for (let i = 0; i < state.placed.length; i++) {
+  for (let i = 0; i < params.placed.length; i++) {
     if (i === newIndex) continue
-    const old = state.placed[i]!
+    const old = params.placed[i]!
     // Protect full-stack nodes
     if (old.zLayers.length >= layerCount) continue
 
@@ -104,12 +104,12 @@ function resizeSoftOverlaps(
 
     // Re-add carved pieces for affected layers, dropping tiny slivers
     const minW = Math.min(
-      state.options.minSingle.width,
-      state.options.minMulti.width,
+      params.options.minSingle.width,
+      params.options.minMulti.width,
     )
     const minH = Math.min(
-      state.options.minSingle.height,
-      state.options.minMulti.height,
+      params.options.minSingle.height,
+      params.options.minMulti.height,
     )
     for (const p of parts) {
       if (p.width + EPS >= minW && p.height + EPS >= minH) {
@@ -122,9 +122,9 @@ function resizeSoftOverlaps(
   removeIdx
     .sort((a, b) => b - a)
     .forEach((idx) => {
-      const rem = state.placed.splice(idx, 1)[0]!
+      const rem = params.placed.splice(idx, 1)[0]!
       for (const z of rem.zLayers) {
-        const arr = state.placedByLayer[z]!
+        const arr = params.placedByLayer[z]!
         const j = arr.findIndex((r) => r === rem.rect)
         if (j >= 0) arr.splice(j, 1)
       }
@@ -132,15 +132,15 @@ function resizeSoftOverlaps(
 
   // Add replacements
   for (const p of toAdd) {
-    state.placed.push(p)
-    for (const z of p.zLayers) state.placedByLayer[z]!.push(p.rect)
+    params.placed.push(p)
+    for (const z of p.zLayers) params.placedByLayer[z]!.push(p.rect)
   }
 }
 
 /**
  * One micro-step during the GRID phase: handle exactly one candidate.
  */
-export function stepGrid(state: {
+export function stepGrid(params: {
   options: Required<
     Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">
   > & {
@@ -168,68 +168,68 @@ export function stepGrid(state: {
     minMulti,
     preferMultiLayer,
     maxMultiLayerSpan,
-  } = state.options
-  const grid = gridSizes[state.gridIndex]!
+  } = params.options
+  const grid = gridSizes[params.gridIndex]!
 
   // Build hard-placed map once per micro-step (cheap)
-  const hardPlacedByLayer = buildHardPlacedByLayer(state)
+  const hardPlacedByLayer = buildHardPlacedByLayer(params)
 
   // Ensure candidates exist for this grid
-  if (state.candidates.length === 0 && state.consumedSeedsThisGrid === 0) {
-    state.candidates = computeCandidates3D({
-      bounds: state.bounds,
+  if (params.candidates.length === 0 && params.consumedSeedsThisGrid === 0) {
+    params.candidates = computeCandidates3D({
+      bounds: params.bounds,
       gridSize: grid,
-      layerCount: state.layerCount,
-      obstaclesByLayer: state.obstaclesByLayer,
-      placedByLayer: state.placedByLayer,
+      layerCount: params.layerCount,
+      obstaclesByLayer: params.obstaclesByLayer,
+      placedByLayer: params.placedByLayer,
       hardPlacedByLayer,
     })
-    state.totalSeedsThisGrid = state.candidates.length
-    state.consumedSeedsThisGrid = 0
+    params.totalSeedsThisGrid = params.candidates.length
+    params.consumedSeedsThisGrid = 0
   }
 
   // If no candidates remain, advance grid or run edge pass or switch phase
-  if (state.candidates.length === 0) {
-    if (state.gridIndex + 1 < gridSizes.length) {
-      state.gridIndex += 1
-      state.totalSeedsThisGrid = 0
-      state.consumedSeedsThisGrid = 0
+  if (params.candidates.length === 0) {
+    if (params.gridIndex + 1 < gridSizes.length) {
+      params.gridIndex += 1
+      params.totalSeedsThisGrid = 0
+      params.consumedSeedsThisGrid = 0
       return
     } else {
-      if (!state.edgeAnalysisDone) {
+      if (!params.edgeAnalysisDone) {
         const minSize = Math.min(minSingle.width, minSingle.height)
-        state.candidates = computeEdgeCandidates3D({
-          bounds: state.bounds,
+        params.candidates = computeEdgeCandidates3D({
+          bounds: params.bounds,
           minSize,
-          layerCount: state.layerCount,
-          obstaclesByLayer: state.obstaclesByLayer,
-          placedByLayer: state.placedByLayer,
+          layerCount: params.layerCount,
+          obstaclesByLayer: params.obstaclesByLayer,
+          placedByLayer: params.placedByLayer,
           hardPlacedByLayer,
         })
-        state.edgeAnalysisDone = true
-        state.totalSeedsThisGrid = state.candidates.length
-        state.consumedSeedsThisGrid = 0
+        params.edgeAnalysisDone = true
+        params.totalSeedsThisGrid = params.candidates.length
+        params.consumedSeedsThisGrid = 0
         return
       }
-      state.phase = "EXPANSION"
-      state.expansionIndex = 0
+      params.phase = "EXPANSION"
+      params.expansionIndex = 0
       return
     }
   }
 
   // Consume exactly one candidate
-  const cand = state.candidates.shift()!
-  state.consumedSeedsThisGrid += 1
+  const cand = params.candidates.shift()!
+  params.consumedSeedsThisGrid += 1
 
   // Evaluate attempts — multi-layer span first (computed ignoring soft nodes)
   const span = longestFreeSpanAroundZ({
     x: cand.x,
     y: cand.y,
     z: cand.z,
-    layerCount: state.layerCount,
+    layerCount: params.layerCount,
     minSpan: minMulti.minLayers,
     maxSpan: maxMultiLayerSpan,
-    obstaclesByLayer: state.obstaclesByLayer,
+    obstaclesByLayer: params.obstaclesByLayer,
     placedByLayer: hardPlacedByLayer,
   })
 
@@ -258,8 +258,8 @@ export function stepGrid(state: {
     // HARD blockers only: obstacles on those layers + full-stack nodes
     const hardBlockers: XYRect[] = []
     for (const z of attempt.layers) {
-      if (state.obstaclesByLayer[z])
-        hardBlockers.push(...state.obstaclesByLayer[z]!)
+      if (params.obstaclesByLayer[z])
+        hardBlockers.push(...params.obstaclesByLayer[z]!)
       if (hardPlacedByLayer[z]) hardBlockers.push(...hardPlacedByLayer[z]!)
     }
 
@@ -267,7 +267,7 @@ export function stepGrid(state: {
       startX: cand.x,
       startY: cand.y,
       gridSize: grid,
-      bounds: state.bounds,
+      bounds: params.bounds,
       blockers: hardBlockers,
       initialCellRatio,
       maxAspectRatio,
@@ -277,15 +277,15 @@ export function stepGrid(state: {
 
     // Place the new node
     const placed: Placed3D = { rect, zLayers: [...attempt.layers] }
-    const newIndex = state.placed.push(placed) - 1
-    for (const z of attempt.layers) state.placedByLayer[z]!.push(rect)
+    const newIndex = params.placed.push(placed) - 1
+    for (const z of attempt.layers) params.placedByLayer[z]!.push(rect)
 
     // New: carve overlapped soft nodes
-    resizeSoftOverlaps(state, newIndex)
+    resizeSoftOverlaps(params, newIndex)
 
     // New: relax candidate culling — only drop seeds that became fully occupied
-    state.candidates = state.candidates.filter(
-      (c) => !isFullyOccupiedAtPoint(state, { x: c.x, y: c.y }),
+    params.candidates = params.candidates.filter(
+      (c) => !isFullyOccupiedAtPoint(params, { x: c.x, y: c.y }),
     )
 
     return // processed one candidate
@@ -297,7 +297,7 @@ export function stepGrid(state: {
 /**
  * One micro-step during the EXPANSION phase: expand exactly one placed rect.
  */
-export function stepExpansion(state: {
+export function stepExpansion(params: {
   expansionIndex: number
   placed: Placed3D[]
   options: { gridSizes: number[] }
@@ -307,22 +307,23 @@ export function stepExpansion(state: {
   placedByLayer: XYRect[][]
   phase: Phase
 }): void {
-  if (state.expansionIndex >= state.placed.length) {
+  if (params.expansionIndex >= params.placed.length) {
     // Transition to gap fill phase instead of done
-    state.phase = "GAP_FILL"
+    params.phase = "GAP_FILL"
     return
   }
 
-  const idx = state.expansionIndex
-  const p = state.placed[idx]!
-  const lastGrid = state.options.gridSizes[state.options.gridSizes.length - 1]!
+  const idx = params.expansionIndex
+  const p = params.placed[idx]!
+  const lastGrid =
+    params.options.gridSizes[params.options.gridSizes.length - 1]!
 
-  const hardPlacedByLayer = buildHardPlacedByLayer(state)
+  const hardPlacedByLayer = buildHardPlacedByLayer(params)
 
   // HARD blockers only: obstacles on p.zLayers + full-stack nodes
   const hardBlockers: XYRect[] = []
   for (const z of p.zLayers) {
-    hardBlockers.push(...(state.obstaclesByLayer[z] ?? []))
+    hardBlockers.push(...(params.obstaclesByLayer[z] ?? []))
     hardBlockers.push(...(hardPlacedByLayer[z] ?? []))
   }
 
@@ -331,7 +332,7 @@ export function stepExpansion(state: {
     startX: p.rect.x + p.rect.width / 2,
     startY: p.rect.y + p.rect.height / 2,
     gridSize: lastGrid,
-    bounds: state.bounds,
+    bounds: params.bounds,
     blockers: hardBlockers,
     initialCellRatio: 0,
     maxAspectRatio: null,
@@ -340,30 +341,30 @@ export function stepExpansion(state: {
 
   if (expanded) {
     // Update placement + per-layer index (replace old rect object)
-    state.placed[idx] = { rect: expanded, zLayers: p.zLayers }
+    params.placed[idx] = { rect: expanded, zLayers: p.zLayers }
     for (const z of p.zLayers) {
-      const arr = state.placedByLayer[z]!
+      const arr = params.placedByLayer[z]!
       const j = arr.findIndex((r) => r === oldRect)
       if (j >= 0) arr[j] = expanded
     }
 
     // Carve overlapped soft neighbors (respect full-stack nodes)
-    resizeSoftOverlaps(state, idx)
+    resizeSoftOverlaps(params, idx)
   }
 
-  state.expansionIndex += 1
+  params.expansionIndex += 1
 }
 
 /**
  * Finalize placed rectangles into output format.
  */
-export function finalizeRects(state: {
+export function finalizeRects(params: {
   placed: Placed3D[]
   obstaclesByLayer: XYRect[][]
   boardVoidRects: XYRect[]
 }): Rect3d[] {
   // Convert all placed (free space) nodes to output format
-  const out: Rect3d[] = state.placed.map((p) => ({
+  const out: Rect3d[] = params.placed.map((p) => ({
     minX: p.rect.x,
     minY: p.rect.y,
     maxX: p.rect.x + p.rect.width,
@@ -379,7 +380,7 @@ export function finalizeRects(state: {
    */
   const layersByObstacleRect = new Map<XYRect, number[]>()
 
-  state.obstaclesByLayer.forEach((layerObs, z) => {
+  params.obstaclesByLayer.forEach((layerObs, z) => {
     for (const rect of layerObs) {
       const layerIndices = layersByObstacleRect.get(rect) ?? []
       layerIndices.push(z)
@@ -388,7 +389,7 @@ export function finalizeRects(state: {
   })
 
   // Append obstacle nodes to the output
-  const voidSet = new Set(state.boardVoidRects || [])
+  const voidSet = new Set(params.boardVoidRects || [])
   for (const [rect, layerIndices] of layersByObstacleRect.entries()) {
     if (voidSet.has(rect)) continue // Skip void rects
 
@@ -408,7 +409,7 @@ export function finalizeRects(state: {
 /**
  * Calculate rough progress number for BaseSolver.progress.
  */
-export function computeProgress(state: {
+export function computeProgress(params: {
   options: { gridSizes: number[] }
   phase: Phase
   gridIndex: number
@@ -417,18 +418,18 @@ export function computeProgress(state: {
   placed: Placed3D[]
   expansionIndex: number
 }): number {
-  const grids = state.options.gridSizes.length
-  if (state.phase === "GRID") {
-    const g = state.gridIndex
+  const grids = params.options.gridSizes.length
+  if (params.phase === "GRID") {
+    const g = params.gridIndex
     const base = g / (grids + 1) // reserve final slice for expansion
-    const denom = Math.max(1, state.totalSeedsThisGrid)
-    const frac = denom ? state.consumedSeedsThisGrid / denom : 1
+    const denom = Math.max(1, params.totalSeedsThisGrid)
+    const frac = denom ? params.consumedSeedsThisGrid / denom : 1
     return Math.min(0.999, base + frac * (1 / (grids + 1)))
   }
-  if (state.phase === "EXPANSION") {
+  if (params.phase === "EXPANSION") {
     const base = grids / (grids + 1)
-    const denom = Math.max(1, state.placed.length)
-    const frac = denom ? state.expansionIndex / denom : 1
+    const denom = Math.max(1, params.placed.length)
+    const frac = denom ? params.expansionIndex / denom : 1
     return Math.min(0.999, base + frac * (1 / (grids + 1)))
   }
   return 1
