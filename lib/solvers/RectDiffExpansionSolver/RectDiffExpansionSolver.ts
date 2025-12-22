@@ -1,0 +1,133 @@
+import { BaseSolver } from "@tscircuit/solver-utils"
+import type { GraphicsObject } from "graphics-debug"
+import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
+import {
+  finalizeRects,
+  stepExpansion,
+  computeProgress,
+} from "../rectdiff/engine"
+import { rectsToMeshNodes } from "../rectdiff/rectsToMeshNodes"
+import type { XYRect, Candidate3D, Placed3D, Phase } from "../rectdiff/types"
+import type { SimpleRouteJson } from "../../types/srj-types"
+
+/**
+ * Second phase of RectDiff: expand placed rects to their maximal extents.
+ *
+ * This solver takes the intermediate data produced by RectDiffGridSolver
+ * and runs the EXPANSION phase, then finalizes to capacity mesh nodes.
+ */
+export class RectDiffExpansionSolver extends BaseSolver {
+  // Engine fields (same shape used by rectdiff/engine.ts)
+  private srj!: SimpleRouteJson
+  private layerNames!: string[]
+  private layerCount!: number
+  private bounds!: XYRect
+  private options!: {
+    gridSizes: number[]
+    // the engine only uses gridSizes here, other options are ignored
+    [key: string]: any
+  }
+  private obstaclesByLayer!: XYRect[][]
+  private boardVoidRects!: XYRect[]
+  private phase!: Phase
+  private gridIndex!: number
+  private candidates!: Candidate3D[]
+  private placed!: Placed3D[]
+  private placedByLayer!: XYRect[][]
+  private expansionIndex!: number
+  private edgeAnalysisDone!: boolean
+  private totalSeedsThisGrid!: number
+  private consumedSeedsThisGrid!: number
+
+  private _meshNodes: CapacityMeshNode[] = []
+
+  constructor(input: { initialSnapshot: any }) {
+    super()
+    // Copy engine snapshot fields directly onto this solver instance
+    Object.assign(this, input.initialSnapshot)
+  }
+
+  override _setup() {
+    // Ensure we are in the EXPANSION phase; the grid solver should
+    // have transitioned to this phase before handing off.
+    if (this.phase !== "EXPANSION") {
+      this.solved = true
+      return
+    }
+
+    this.stats = {
+      phase: this.phase,
+      gridIndex: this.gridIndex,
+    }
+  }
+
+  override _step() {
+    if (this.solved) return
+
+    if (this.phase === "EXPANSION") {
+      stepExpansion(this as any)
+
+      this.stats.phase = this.phase
+      this.stats.gridIndex = this.gridIndex
+      this.stats.placed = this.placed.length
+
+      if (this.phase !== "EXPANSION") {
+        this.finalizeIfNeeded()
+      }
+
+      return
+    }
+
+    // GAP_FILL / DONE style phases: there is no internal gap-fill logic here,
+    // so once we reach a post-expansion phase we finalize exactly once.
+    this.finalizeIfNeeded()
+  }
+
+  private finalizeIfNeeded() {
+    if (this.solved) return
+
+    const rects = finalizeRects(this as any)
+    this._meshNodes = rectsToMeshNodes(rects)
+    this.solved = true
+  }
+
+  computeProgress(): number {
+    if (this.solved) return 1
+    return computeProgress(this as any)
+  }
+
+  override getOutput(): { meshNodes: CapacityMeshNode[] } {
+    if (!this.solved && this._meshNodes.length === 0) {
+      this.finalizeIfNeeded()
+    }
+    return { meshNodes: this._meshNodes }
+  }
+
+  /** Simple visualization of expanded placements. */
+  override visualize(): GraphicsObject {
+    const rects: NonNullable<GraphicsObject["rects"]> = []
+
+    for (const placement of this.placed ?? []) {
+      rects.push({
+        center: {
+          x: placement.rect.x + placement.rect.width / 2,
+          y: placement.rect.y + placement.rect.height / 2,
+        },
+        width: placement.rect.width,
+        height: placement.rect.height,
+        stroke: "rgba(37, 99, 235, 0.9)",
+        fill: "rgba(191, 219, 254, 0.5)",
+        layer: `z${placement.zLayers.join(",")}`,
+        label: `expanded\nz:${placement.zLayers.join(",")}`,
+      })
+    }
+
+    return {
+      title: `RectDiff Expansion (${this.phase})`,
+      coordinateSystem: "cartesian",
+      rects,
+      points: [],
+      lines: [],
+    }
+  }
+}

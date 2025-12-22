@@ -3,8 +3,9 @@ import type {
   GridFill3DOptions,
   Placed3D,
   Rect3d,
-  RectDiffState,
   XYRect,
+  Candidate3D,
+  Phase,
 } from "./types"
 import type { SimpleRouteJson } from "../../types/srj-types"
 import {
@@ -24,111 +25,12 @@ import { computeInverseRects } from "./geometry/computeInverseRects"
 import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
 
 /**
- * Initialize the RectDiff solver state from SimpleRouteJson.
- */
-export function initState(
-  srj: SimpleRouteJson,
-  opts: Partial<GridFill3DOptions>,
-): RectDiffState {
-  const { layerNames, zIndexByName } = buildZIndexMap(srj)
-  const layerCount = Math.max(1, layerNames.length, srj.layerCount || 1)
-
-  const bounds: XYRect = {
-    x: srj.bounds.minX,
-    y: srj.bounds.minY,
-    width: srj.bounds.maxX - srj.bounds.minX,
-    height: srj.bounds.maxY - srj.bounds.minY,
-  }
-
-  // Obstacles per layer
-  const obstaclesByLayer: XYRect[][] = Array.from(
-    { length: layerCount },
-    () => [],
-  )
-
-  // Compute void rects from outline if present
-  let boardVoidRects: XYRect[] = []
-  if (srj.outline && srj.outline.length > 2) {
-    boardVoidRects = computeInverseRects(bounds, srj.outline)
-    // Add void rects as obstacles to ALL layers
-    for (const voidR of boardVoidRects) {
-      for (let z = 0; z < layerCount; z++) {
-        obstaclesByLayer[z]!.push(voidR)
-      }
-    }
-  }
-
-  for (const obstacle of srj.obstacles ?? []) {
-    const rect = obstacleToXYRect(obstacle)
-    if (!rect) continue
-    const zLayers = obstacleZs(obstacle, zIndexByName)
-    const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
-    if (invalidZs.length) {
-      throw new Error(
-        `RectDiffSolver: obstacle uses z-layer indices ${invalidZs.join(
-          ",",
-        )} outside 0-${layerCount - 1}`,
-      )
-    }
-    // Persist normalized zLayers back onto the shared SRJ so downstream solvers see them.
-    if ((!obstacle.zLayers || obstacle.zLayers.length === 0) && zLayers.length)
-      obstacle.zLayers = zLayers
-    for (const z of zLayers) obstaclesByLayer[z]!.push(rect)
-  }
-
-  const trace = Math.max(0.01, srj.minTraceWidth || 0.15)
-  const defaults: Required<
-    Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">
-  > & {
-    gridSizes: number[]
-    maxMultiLayerSpan: number | undefined
-  } = {
-    gridSizes: computeDefaultGridSizes(bounds),
-    initialCellRatio: 0.2,
-    maxAspectRatio: 3,
-    minSingle: { width: 2 * trace, height: 2 * trace },
-    minMulti: {
-      width: 4 * trace,
-      height: 4 * trace,
-      minLayers: Math.min(2, Math.max(1, srj.layerCount || 1)),
-    },
-    preferMultiLayer: true,
-    maxMultiLayerSpan: undefined,
-  }
-
-  const options = {
-    ...defaults,
-    ...opts,
-    gridSizes: opts.gridSizes ?? defaults.gridSizes,
-  }
-
-  const placedByLayer: XYRect[][] = Array.from({ length: layerCount }, () => [])
-
-  // Begin at the **first** grid level; candidates computed lazily on first step
-  return {
-    srj,
-    layerNames,
-    layerCount,
-    bounds,
-    options,
-    obstaclesByLayer,
-    boardVoidRects,
-    phase: "GRID",
-    gridIndex: 0,
-    candidates: [],
-    placed: [],
-    placedByLayer,
-    expansionIndex: 0,
-    edgeAnalysisDone: false,
-    totalSeedsThisGrid: 0,
-    consumedSeedsThisGrid: 0,
-  }
-}
-
-/**
  * Build per-layer list of "hard" placed rects (nodes spanning all layers).
  */
-function buildHardPlacedByLayer(state: RectDiffState): XYRect[][] {
+function buildHardPlacedByLayer(state: {
+  layerCount: number
+  placed: Placed3D[]
+}): XYRect[][] {
   const out: XYRect[][] = Array.from({ length: state.layerCount }, () => [])
   for (const p of state.placed) {
     if (p.zLayers.length >= state.layerCount) {
@@ -142,7 +44,11 @@ function buildHardPlacedByLayer(state: RectDiffState): XYRect[][] {
  * Check if a point is occupied on ALL layers.
  */
 function isFullyOccupiedAtPoint(
-  state: RectDiffState,
+  state: {
+    layerCount: number
+    obstaclesByLayer: XYRect[][]
+    placedByLayer: XYRect[][]
+  },
   point: { x: number; y: number },
 ): boolean {
   for (let z = 0; z < state.layerCount; z++) {
@@ -159,7 +65,15 @@ function isFullyOccupiedAtPoint(
 /**
  * Shrink/split any soft (non-full-stack) nodes overlapped by the newcomer.
  */
-function resizeSoftOverlaps(state: RectDiffState, newIndex: number) {
+function resizeSoftOverlaps(
+  state: {
+    layerCount: number
+    placed: Placed3D[]
+    placedByLayer: XYRect[][]
+    options: any
+  },
+  newIndex: number,
+) {
   const newcomer = state.placed[newIndex]!
   const { rect: newR, zLayers: newZs } = newcomer
   const layerCount = state.layerCount
@@ -226,7 +140,26 @@ function resizeSoftOverlaps(state: RectDiffState, newIndex: number) {
 /**
  * One micro-step during the GRID phase: handle exactly one candidate.
  */
-export function stepGrid(state: RectDiffState): void {
+export function stepGrid(state: {
+  options: Required<
+    Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">
+  > & {
+    gridSizes: number[]
+    maxMultiLayerSpan: number | undefined
+  }
+  gridIndex: number
+  candidates: Candidate3D[]
+  consumedSeedsThisGrid: number
+  totalSeedsThisGrid: number
+  bounds: XYRect
+  layerCount: number
+  obstaclesByLayer: XYRect[][]
+  placedByLayer: XYRect[][]
+  edgeAnalysisDone: boolean
+  phase: Phase
+  placed: Placed3D[]
+  expansionIndex: number
+}): void {
   const {
     gridSizes,
     initialCellRatio,
@@ -364,7 +297,16 @@ export function stepGrid(state: RectDiffState): void {
 /**
  * One micro-step during the EXPANSION phase: expand exactly one placed rect.
  */
-export function stepExpansion(state: RectDiffState): void {
+export function stepExpansion(state: {
+  expansionIndex: number
+  placed: Placed3D[]
+  options: { gridSizes: number[] }
+  obstaclesByLayer: XYRect[][]
+  bounds: XYRect
+  layerCount: number
+  placedByLayer: XYRect[][]
+  phase: Phase
+}): void {
   if (state.expansionIndex >= state.placed.length) {
     // Transition to gap fill phase instead of done
     state.phase = "GAP_FILL"
@@ -415,7 +357,11 @@ export function stepExpansion(state: RectDiffState): void {
 /**
  * Finalize placed rectangles into output format.
  */
-export function finalizeRects(state: RectDiffState): Rect3d[] {
+export function finalizeRects(state: {
+  placed: Placed3D[]
+  obstaclesByLayer: XYRect[][]
+  boardVoidRects: XYRect[]
+}): Rect3d[] {
   // Convert all placed (free space) nodes to output format
   const out: Rect3d[] = state.placed.map((p) => ({
     minX: p.rect.x,
@@ -462,7 +408,15 @@ export function finalizeRects(state: RectDiffState): Rect3d[] {
 /**
  * Calculate rough progress number for BaseSolver.progress.
  */
-export function computeProgress(state: RectDiffState): number {
+export function computeProgress(state: {
+  options: { gridSizes: number[] }
+  phase: Phase
+  gridIndex: number
+  totalSeedsThisGrid: number
+  consumedSeedsThisGrid: number
+  placed: Placed3D[]
+  expansionIndex: number
+}): number {
   const grids = state.options.gridSizes.length
   if (state.phase === "GRID") {
     const g = state.gridIndex
