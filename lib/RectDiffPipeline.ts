@@ -32,11 +32,6 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           gridOptions: rectDiffPipeline.inputProblem.gridOptions,
         },
       ],
-      {
-        onSolved: () => {
-          // Grid phase completed
-        },
-      },
     ),
     definePipelineStep(
       "rectDiffExpansionSolver",
@@ -46,11 +41,6 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           initialSnapshot: rectDiffPipeline.rectDiffGridSolver!.getOutput(),
         },
       ],
-      {
-        onSolved: () => {
-          // Expansion phase completed
-        },
-      },
     ),
     definePipelineStep(
       "gapFillSolver",
