@@ -13,8 +13,8 @@ export function isFullyOccupiedAtPoint(
     const obs = params.obstaclesByLayer[z] ?? []
     const placed = params.placedByLayer[z] ?? []
     const occ =
-      obs.some((b) => containsPoint(b, point.x, point.y)) ||
-      placed.some((b) => containsPoint(b, point.x, point.y))
+      obs.some((b) => containsPoint(b, point)) ||
+      placed.some((b) => containsPoint(b, point))
     if (!occ) return false
   }
   return true

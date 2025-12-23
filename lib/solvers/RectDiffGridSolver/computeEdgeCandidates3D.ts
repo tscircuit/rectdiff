@@ -96,21 +96,22 @@ export function computeEdgeCandidates3D(params: {
   // Use small inset from edges for placement
   const δ = Math.max(minSize * 0.15, EPS * 3)
   const dedup = new Set<string>()
-  const key = (x: number, y: number, z: number) =>
-    `${z}|${x.toFixed(6)}|${y.toFixed(6)}`
+  const key = (p: { x: number; y: number; z: number }) =>
+    `${p.z}|${p.x.toFixed(6)}|${p.y.toFixed(6)}`
 
-  function fullyOcc(x: number, y: number) {
+  function fullyOcc(p: { x: number; y: number }) {
     return isFullyOccupiedAtPoint(
       {
         layerCount,
         obstaclesByLayer,
         placedByLayer,
       },
-      { x, y },
+      p,
     )
   }
 
-  function pushIfFree(x: number, y: number, z: number) {
+  function pushIfFree(p: { x: number; y: number; z: number }) {
+    const { x, y, z } = p
     if (
       x < bounds.x + EPS ||
       y < bounds.y + EPS ||
@@ -118,7 +119,7 @@ export function computeEdgeCandidates3D(params: {
       y > bounds.y + bounds.height - EPS
     )
       return
-    if (fullyOcc(x, y)) return // new rule: only drop if truly impossible
+    if (fullyOcc({ x, y })) return // new rule: only drop if truly impossible
 
     // Distance uses obstacles + hard nodes (soft nodes ignored for ranking)
     const hard = [
@@ -126,13 +127,13 @@ export function computeEdgeCandidates3D(params: {
       ...(hardPlacedByLayer[z] ?? []),
     ]
     const d = Math.min(
-      distancePointToRectEdges(x, y, bounds),
+      distancePointToRectEdges({ x, y }, bounds),
       ...(hard.length
-        ? hard.map((b) => distancePointToRectEdges(x, y, b))
+        ? hard.map((b) => distancePointToRectEdges({ x, y }, b))
         : [Infinity]),
     )
 
-    const k = key(x, y, z)
+    const k = key({ x, y, z })
     if (dedup.has(k)) return
     dedup.add(k)
 
@@ -166,7 +167,7 @@ export function computeEdgeCandidates3D(params: {
       { x: bounds.x + bounds.width - δ, y: bounds.y + bounds.height - δ }, // bottom-right
     ]
     for (const corner of corners) {
-      pushIfFree(corner.x, corner.y, z)
+      pushIfFree({ x: corner.x, y: corner.y, z })
     }
 
     // Top edge (y = bounds.y + δ)
@@ -188,10 +189,10 @@ export function computeEdgeCandidates3D(params: {
       const segLen = seg.end - seg.start
       if (segLen >= minSize) {
         // Seed center and a few strategic points
-        pushIfFree(seg.center, topY, z)
+        pushIfFree({ x: seg.center, y: topY, z })
         if (segLen > minSize * 1.5) {
-          pushIfFree(seg.start + minSize * 0.4, topY, z)
-          pushIfFree(seg.end - minSize * 0.4, topY, z)
+          pushIfFree({ x: seg.start + minSize * 0.4, y: topY, z })
+          pushIfFree({ x: seg.end - minSize * 0.4, y: topY, z })
         }
       }
     }
@@ -213,10 +214,10 @@ export function computeEdgeCandidates3D(params: {
     for (const seg of bottomUncovered) {
       const segLen = seg.end - seg.start
       if (segLen >= minSize) {
-        pushIfFree(seg.center, bottomY, z)
+        pushIfFree({ x: seg.center, y: bottomY, z })
         if (segLen > minSize * 1.5) {
-          pushIfFree(seg.start + minSize * 0.4, bottomY, z)
-          pushIfFree(seg.end - minSize * 0.4, bottomY, z)
+          pushIfFree({ x: seg.start + minSize * 0.4, y: bottomY, z })
+          pushIfFree({ x: seg.end - minSize * 0.4, y: bottomY, z })
         }
       }
     }
@@ -238,10 +239,10 @@ export function computeEdgeCandidates3D(params: {
     for (const seg of leftUncovered) {
       const segLen = seg.end - seg.start
       if (segLen >= minSize) {
-        pushIfFree(leftX, seg.center, z)
+        pushIfFree({ x: leftX, y: seg.center, z })
         if (segLen > minSize * 1.5) {
-          pushIfFree(leftX, seg.start + minSize * 0.4, z)
-          pushIfFree(leftX, seg.end - minSize * 0.4, z)
+          pushIfFree({ x: leftX, y: seg.start + minSize * 0.4, z })
+          pushIfFree({ x: leftX, y: seg.end - minSize * 0.4, z })
         }
       }
     }
@@ -263,10 +264,10 @@ export function computeEdgeCandidates3D(params: {
     for (const seg of rightUncovered) {
       const segLen = seg.end - seg.start
       if (segLen >= minSize) {
-        pushIfFree(rightX, seg.center, z)
+        pushIfFree({ x: rightX, y: seg.center, z })
         if (segLen > minSize * 1.5) {
-          pushIfFree(rightX, seg.start + minSize * 0.4, z)
-          pushIfFree(rightX, seg.end - minSize * 0.4, z)
+          pushIfFree({ x: rightX, y: seg.start + minSize * 0.4, z })
+          pushIfFree({ x: rightX, y: seg.end - minSize * 0.4, z })
         }
       }
     }
@@ -291,7 +292,7 @@ export function computeEdgeCandidates3D(params: {
           minSegmentLength: minSize * 0.5,
         })
         for (const seg of obLeftUncovered) {
-          pushIfFree(obLeftX, seg.center, z)
+          pushIfFree({ x: obLeftX, y: seg.center, z })
         }
       }
 
@@ -316,7 +317,7 @@ export function computeEdgeCandidates3D(params: {
           minSegmentLength: minSize * 0.5,
         })
         for (const seg of obRightUncovered) {
-          pushIfFree(obRightX, seg.center, z)
+          pushIfFree({ x: obRightX, y: seg.center, z })
         }
       }
 
@@ -338,7 +339,7 @@ export function computeEdgeCandidates3D(params: {
           minSegmentLength: minSize * 0.5,
         })
         for (const seg of obTopUncovered) {
-          pushIfFree(seg.center, obTopY, z)
+          pushIfFree({ x: seg.center, y: obTopY, z })
         }
       }
 
@@ -364,7 +365,7 @@ export function computeEdgeCandidates3D(params: {
           minSegmentLength: minSize * 0.5,
         })
         for (const seg of obBottomUncovered) {
-          pushIfFree(seg.center, obBottomY, z)
+          pushIfFree({ x: seg.center, y: obBottomY, z })
         }
       }
     }

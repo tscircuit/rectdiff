@@ -1,7 +1,7 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
-import { expandRectFromSeed } from "../../utils/rectdiff-geometry"
+import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
 import { finalizeRects } from "../../utils/finalizeRects"
 import { buildHardPlacedByLayer } from "../../utils/buildHardPlacedByLayer"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"

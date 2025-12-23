@@ -78,9 +78,9 @@ export function computeCandidates3D(params: {
         ...(hardPlacedByLayer[anchorZ] ?? []),
       ]
       const d = Math.min(
-        distancePointToRectEdges(x, y, bounds),
+        distancePointToRectEdges({ x, y }, bounds),
         ...(hardAtZ.length
-          ? hardAtZ.map((b) => distancePointToRectEdges(x, y, b))
+          ? hardAtZ.map((b) => distancePointToRectEdges({ x, y }, b))
           : [Infinity]),
       )
 

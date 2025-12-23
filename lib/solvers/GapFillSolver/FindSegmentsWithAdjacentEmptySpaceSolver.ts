@@ -158,8 +158,7 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
       graphics.lines.push({
         points: visuallyOffsetLine(
           [unprocessedEdge.start, unprocessedEdge.end],
-          unprocessedEdge.facingDirection,
-          -0.1,
+          { dir: unprocessedEdge.facingDirection, amt: -0.1 },
         ),
         strokeColor: "rgba(0, 0, 255, 0.5)",
         strokeDash: "5 5",
@@ -185,8 +184,7 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
         graphics.lines.push({
           points: visuallyOffsetLine(
             [edge.start, edge.end],
-            edge.facingDirection,
-            0.05,
+            { dir: edge.facingDirection, amt: 0.05 },
           ),
           strokeColor: "red",
           strokeDash: "2 2",
@@ -199,8 +197,7 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
         graphics.lines.push({
           points: visuallyOffsetLine(
             [edge.start, edge.end],
-            edge.facingDirection,
-            -0.05,
+            { dir: edge.facingDirection, amt: -0.05 },
           ),
           strokeColor: "green",
           strokeDash: "2 2",

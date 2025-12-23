@@ -30,7 +30,7 @@ export function longestFreeSpanAroundZ(params: {
       ...(obstaclesByLayer[layer] ?? []),
       ...(placedByLayer[layer] ?? []),
     ]
-    return !blockers.some((b) => containsPoint(b, x, y))
+    return !blockers.some((b) => containsPoint(b, { x, y }))
   }
   let lo = z
   let hi = z
