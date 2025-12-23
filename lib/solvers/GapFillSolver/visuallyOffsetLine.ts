@@ -21,9 +21,12 @@ const OFFSET_DIR_MAP = {
  */
 export const visuallyOffsetLine = (
   line: Array<{ x: number; y: number }>,
-  dir: "x-" | "x+" | "y-" | "y+",
-  amt: number,
+  options: {
+    dir: "x-" | "x+" | "y-" | "y+"
+    amt: number
+  },
 ) => {
+  const { dir, amt } = options
   const offset = OFFSET_DIR_MAP[dir]
   return line.map((p) => ({
     x: p.x + offset.x * amt,

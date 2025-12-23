@@ -1,5 +1,6 @@
 import type { GraphicsObject } from "graphics-debug"
-import type { SimpleRouteJson } from "../../types/srj-types"
+import type { SimpleRouteJson } from "./types/srj-types"
+import type { XYRect } from "./rectdiff-types"
 
 /**
  * Create basic visualization showing board bounds/outline and obstacles.

@@ -1,6 +1,4 @@
 // lib/solvers/rectdiff/types.ts
-import type { SimpleRouteJson } from "../../types/srj-types"
-
 export type XYRect = { x: number; y: number; width: number; height: number }
 
 export type Rect3d = {
@@ -33,35 +31,3 @@ export type Candidate3D = {
   isEdgeSeed?: boolean
 }
 export type Placed3D = { rect: XYRect; zLayers: number[] }
-
-export type Phase = "GRID" | "EXPANSION" | "GAP_FILL" | "DONE"
-
-export type RectDiffState = {
-  // static
-  srj: SimpleRouteJson
-  layerNames: string[]
-  layerCount: number
-  bounds: XYRect
-  options: Required<
-    Omit<GridFill3DOptions, "gridSizes" | "maxMultiLayerSpan">
-  > & {
-    gridSizes: number[]
-    maxMultiLayerSpan: number | undefined
-  }
-  obstaclesByLayer: XYRect[][]
-  boardVoidRects: XYRect[] // newly added for viz
-
-  // evolving
-  phase: Phase
-  gridIndex: number // index in gridSizes
-  candidates: Candidate3D[]
-  placed: Placed3D[]
-  placedByLayer: XYRect[][]
-  expansionIndex: number
-  /** Whether we've already run the edge-analysis seeding pass. */
-  edgeAnalysisDone: boolean
-
-  // progress bookkeeping
-  totalSeedsThisGrid: number
-  consumedSeedsThisGrid: number
-}

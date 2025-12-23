@@ -41,5 +41,5 @@ test("RectDiffSolver maps obstacle layers to numeric zLayers", () => {
 
   // Verify obstacles were processed correctly
   // The internal solver should have mapped layer names to z indices
-  expect(pipeline.rectDiffSolver).toBeDefined()
+  expect(pipeline.rectDiffGridSolverPipeline).toBeDefined()
 })

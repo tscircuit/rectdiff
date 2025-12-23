@@ -4,12 +4,12 @@ import {
   type PipelineStep,
 } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "./types/srj-types"
-import type { GridFill3DOptions } from "./solvers/rectdiff/types"
-import { RectDiffSolver } from "./solvers/RectDiffSolver"
+import type { GridFill3DOptions } from "./rectdiff-types"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
-import { createBaseVisualization } from "./solvers/rectdiff/visualization"
 import { GapFillSolverPipeline } from "./solvers/GapFillSolver/GapFillSolverPipeline"
+import { RectDiffGridSolverPipeline } from "./solvers/RectDiffGridSolverPipeline/RectDiffGridSolverPipeline"
+import { createBaseVisualization } from "./rectdiff-visualization"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -17,24 +17,19 @@ export interface RectDiffPipelineInput {
 }
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
-  rectDiffSolver?: RectDiffSolver
+  rectDiffGridSolverPipeline?: RectDiffGridSolverPipeline
   gapFillSolver?: GapFillSolverPipeline
 
   override pipelineDef: PipelineStep<any>[] = [
     definePipelineStep(
-      "rectDiffSolver",
-      RectDiffSolver,
-      (rectDiffPipeline) => [
+      "rectDiffGridSolverPipeline",
+      RectDiffGridSolverPipeline,
+      (rectDiffPipeline: RectDiffPipeline) => [
         {
           simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
           gridOptions: rectDiffPipeline.inputProblem.gridOptions,
         },
       ],
-      {
-        onSolved: () => {
-          // RectDiff mesh generation completed
-        },
-      },
     ),
     definePipelineStep(
       "gapFillSolver",
@@ -42,7 +37,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
       (rectDiffPipeline: RectDiffPipeline) => [
         {
           meshNodes:
-            rectDiffPipeline.rectDiffSolver?.getOutput().meshNodes ?? [],
+            rectDiffPipeline.rectDiffGridSolverPipeline?.getOutput()
+              .meshNodes ?? [],
         },
       ],
     ),
@@ -57,7 +53,10 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
     if (gapFillOutput) {
       return { meshNodes: gapFillOutput.outputNodes }
     }
-    return this.rectDiffSolver!.getOutput()
+    if (this.rectDiffGridSolverPipeline) {
+      return this.rectDiffGridSolverPipeline.getOutput()
+    }
+    return { meshNodes: [] }
   }
 
   override initialVisualize(): GraphicsObject {
@@ -67,8 +66,10 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
       "RectDiffPipeline - Initial",
     )
 
-    // Show initial mesh nodes from rectDiffSolver if available
-    const initialNodes = this.rectDiffSolver?.getOutput().meshNodes ?? []
+    // Show initial mesh nodes from grid pipeline if available
+    const initialNodes =
+      this.rectDiffGridSolverPipeline?.getOutput().meshNodes ?? []
+
     for (const node of initialNodes) {
       graphics.rects!.push({
         center: node.center,
@@ -95,7 +96,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
 
     const { meshNodes: outputNodes } = this.getOutput()
     const initialNodeIds = new Set(
-      (this.rectDiffSolver?.getOutput().meshNodes ?? []).map(
+      (this.rectDiffGridSolverPipeline?.getOutput().meshNodes ?? []).map(
         (n) => n.capacityMeshNodeId,
       ),
     )
