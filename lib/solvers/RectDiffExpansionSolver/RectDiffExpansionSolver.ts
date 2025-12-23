@@ -38,7 +38,7 @@ export type RectDiffExpansionSolverInput = {
 /**
  * Second phase of RectDiff: expand placed rects to their maximal extents.
  *
- * This solver takes the intermediate data produced by RectDiffGridSolver
+ * This solver takes the intermediate data produced by RectDiffSeedingSolver
  * and runs the EXPANSION phase, then finalizes to capacity mesh nodes.
  */
 export class RectDiffExpansionSolver extends BaseSolver {

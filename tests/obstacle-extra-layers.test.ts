@@ -40,5 +40,5 @@ test("RectDiffSolver clamps extra layer names to available z indices", () => {
   expect(output.meshNodes.length).toBeGreaterThan(0)
 
   // Verify solver was instantiated and processed obstacles
-  expect(pipeline.rectDiffGridSolver).toBeDefined()
+  expect(pipeline.rectDiffGridSolverPipeline).toBeDefined()
 })

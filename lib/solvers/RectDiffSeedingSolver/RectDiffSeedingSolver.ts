@@ -19,7 +19,7 @@ import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 
-export type RectDiffGridSolverInput = {
+export type RectDiffSeedingSolverInput = {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
 }
@@ -30,7 +30,7 @@ export type RectDiffGridSolverInput = {
  * This solver is responsible for walking all grid sizes and producing
  * an initial set of placed rectangles.
  */
-export class RectDiffGridSolver extends BaseSolver {
+export class RectDiffSeedingSolver extends BaseSolver {
   // Engine fields (mirrors initState / engine.ts)
 
   private srj!: SimpleRouteJson
@@ -54,7 +54,7 @@ export class RectDiffGridSolver extends BaseSolver {
   private totalSeedsThisGrid!: number
   private consumedSeedsThisGrid!: number
 
-  constructor(private input: RectDiffGridSolverInput) {
+  constructor(private input: RectDiffSeedingSolverInput) {
     super()
   }
 
