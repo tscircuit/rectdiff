@@ -6,7 +6,7 @@ import { finalizeRects } from "../../utils/finalizeRects"
 import { buildHardPlacedByLayer } from "../../utils/buildHardPlacedByLayer"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { rectsToMeshNodes } from "./rectsToMeshNodes"
-import type { XYRect, Candidate3D, Placed3D, Phase } from "../../rectdiff-types"
+import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
 import type { SimpleRouteJson } from "../../types/srj-types"
 
 export type RectDiffExpansionSolverSnapshot = {
@@ -21,7 +21,6 @@ export type RectDiffExpansionSolverSnapshot = {
   }
   obstaclesByLayer: XYRect[][]
   boardVoidRects: XYRect[]
-  phase: Phase
   gridIndex: number
   candidates: Candidate3D[]
   placed: Placed3D[]
@@ -55,7 +54,6 @@ export class RectDiffExpansionSolver extends BaseSolver {
   }
   private obstaclesByLayer!: XYRect[][]
   private boardVoidRects!: XYRect[]
-  private phase!: Phase
   private gridIndex!: number
   private candidates!: Candidate3D[]
   private placed!: Placed3D[]
@@ -74,15 +72,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
   }
 
   override _setup() {
-    // Ensure we are in the EXPANSION phase; the grid solver should
-    // have transitioned to this phase before handing off.
-    if (this.phase !== "EXPANSION") {
-      this.solved = true
-      return
-    }
-
     this.stats = {
-      phase: this.phase,
       gridIndex: this.gridIndex,
     }
   }
@@ -90,29 +80,18 @@ export class RectDiffExpansionSolver extends BaseSolver {
   override _step() {
     if (this.solved) return
 
-    if (this.phase === "EXPANSION") {
-      this._stepExpansion()
+    this._stepExpansion()
 
-      this.stats.phase = this.phase
-      this.stats.gridIndex = this.gridIndex
-      this.stats.placed = this.placed.length
+    this.stats.gridIndex = this.gridIndex
+    this.stats.placed = this.placed.length
 
-      if (this.phase !== "EXPANSION") {
-        this.finalizeIfNeeded()
-      }
-
-      return
+    if (this.expansionIndex >= this.placed.length) {
+      this.finalizeIfNeeded()
     }
-
-    // GAP_FILL / DONE style phases: there is no internal gap-fill logic here,
-    // so once we reach a post-expansion phase we finalize exactly once.
-    this.finalizeIfNeeded()
   }
 
   private _stepExpansion(): void {
     if (this.expansionIndex >= this.placed.length) {
-      // Transition to gap fill phase instead of done
-      this.phase = "GAP_FILL"
       return
     }
 
@@ -183,13 +162,10 @@ export class RectDiffExpansionSolver extends BaseSolver {
   computeProgress(): number {
     if (this.solved) return 1
     const grids = this.options.gridSizes.length
-    if (this.phase === "EXPANSION") {
-      const base = grids / (grids + 1)
-      const denom = Math.max(1, this.placed.length)
-      const frac = denom ? this.expansionIndex / denom : 1
-      return Math.min(0.999, base + frac * (1 / (grids + 1)))
-    }
-    return 1
+    const base = grids / (grids + 1)
+    const denom = Math.max(1, this.placed.length)
+    const frac = denom ? this.expansionIndex / denom : 1
+    return Math.min(0.999, base + frac * (1 / (grids + 1)))
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
@@ -219,7 +195,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
     }
 
     return {
-      title: `RectDiff Expansion (${this.phase})`,
+      title: "RectDiff Expansion",
       coordinateSystem: "cartesian",
       rects,
       points: [],

@@ -6,7 +6,6 @@ import type {
   Candidate3D,
   Placed3D,
   XYRect,
-  Phase,
 } from "../../rectdiff-types"
 import { computeInverseRects } from "./computeInverseRects"
 import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
@@ -28,8 +27,7 @@ export type RectDiffGridSolverInput = {
  * First phase of RectDiff: grid-based seeding and placement.
  *
  * This solver is responsible for walking all grid sizes and producing
- * an initial set of placed rectangles. It stops once the phase
- * transitions away from "GRID" (i.e. when EXPANSION should begin).
+ * an initial set of placed rectangles.
  */
 export class RectDiffGridSolver extends BaseSolver {
   // Engine fields (mirrors initState / engine.ts)
@@ -46,7 +44,6 @@ export class RectDiffGridSolver extends BaseSolver {
   }
   private obstaclesByLayer!: XYRect[][]
   private boardVoidRects!: XYRect[]
-  private phase!: Phase
   private gridIndex!: number
   private candidates!: Candidate3D[]
   private placed!: Placed3D[]
@@ -151,7 +148,6 @@ export class RectDiffGridSolver extends BaseSolver {
     this.options = options
     this.obstaclesByLayer = obstaclesByLayer
     this.boardVoidRects = boardVoidRects
-    this.phase = "GRID"
     this.gridIndex = 0
     this.candidates = []
     this.placed = []
@@ -162,27 +158,16 @@ export class RectDiffGridSolver extends BaseSolver {
     this.consumedSeedsThisGrid = 0
 
     this.stats = {
-      phase: this.phase,
       gridIndex: this.gridIndex,
     }
   }
 
   /** Exactly ONE grid candidate step per call. */
   override _step() {
-    if (this.phase !== "GRID") {
-      this.solved = true
-      return
-    }
-
     this._stepGrid()
 
-    this.stats.phase = this.phase
     this.stats.gridIndex = this.gridIndex
     this.stats.placed = this.placed.length
-
-    if (this.phase !== "GRID") {
-      this.solved = true
-    }
   }
 
   /**
@@ -243,7 +228,7 @@ export class RectDiffGridSolver extends BaseSolver {
           this.consumedSeedsThisGrid = 0
           return
         }
-        this.phase = "EXPANSION"
+        this.solved = true
         this.expansionIndex = 0
         return
       }
@@ -344,7 +329,7 @@ export class RectDiffGridSolver extends BaseSolver {
 
   /** Compute solver progress (0 to 1) during GRID phase. */
   computeProgress(): number {
-    if (this.solved || this.phase !== "GRID") {
+    if (this.solved) {
       return 1
     }
     const grids = this.options.gridSizes.length
@@ -368,7 +353,6 @@ export class RectDiffGridSolver extends BaseSolver {
       options: this.options,
       obstaclesByLayer: this.obstaclesByLayer,
       boardVoidRects: this.boardVoidRects,
-      phase: this.phase,
       gridIndex: this.gridIndex,
       candidates: this.candidates,
       placed: this.placed,
@@ -521,7 +505,7 @@ export class RectDiffGridSolver extends BaseSolver {
     }
 
     return {
-      title: `RectDiff Grid (${this.phase ?? "init"})`,
+      title: "RectDiff Grid",
       coordinateSystem: "cartesian",
       rects,
       points,

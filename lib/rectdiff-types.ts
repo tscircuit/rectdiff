@@ -31,5 +31,3 @@ export type Candidate3D = {
   isEdgeSeed?: boolean
 }
 export type Placed3D = { rect: XYRect; zLayers: number[] }
-
-export type Phase = "GRID" | "EXPANSION" | "GAP_FILL" | "DONE"
