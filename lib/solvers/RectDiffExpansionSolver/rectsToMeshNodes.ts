@@ -1,4 +1,3 @@
-// lib/solvers/rectdiff/rectsToMeshNodes.ts
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import type { Rect3d } from "../../rectdiff-types"
 

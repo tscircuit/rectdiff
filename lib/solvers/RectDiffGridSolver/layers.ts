@@ -1,4 +1,3 @@
-// lib/solvers/rectdiff/layers.ts
 import type { SimpleRouteJson } from "../../types/srj-types"
 import type { XYRect } from "../../rectdiff-types"
 

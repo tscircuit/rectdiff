@@ -1,4 +1,3 @@
-// lib/solvers/rectdiff/geometry.ts
 import type { XYRect } from "../rectdiff-types"
 
 export const EPS = 1e-9
