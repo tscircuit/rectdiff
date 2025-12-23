@@ -18,7 +18,7 @@ export const makeCapacityMeshNodeWithLayerInfo = (
       width: node.width,
       height: node.height,
       layer: `z${key}`,
-      stroke: colors.stroke,
+      stroke: "black",
       fill: node._containsObstacle ? "red" : colors.fill,
       label: "node",
     }
