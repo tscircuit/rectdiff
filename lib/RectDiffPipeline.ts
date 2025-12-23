@@ -37,8 +37,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
       (rectDiffPipeline: RectDiffPipeline) => [
         {
           meshNodes:
-            rectDiffPipeline.rectDiffGridSolverPipeline?.getOutput().meshNodes ??
-            [],
+            rectDiffPipeline.rectDiffGridSolverPipeline?.getOutput()
+              .meshNodes ?? [],
         },
       ],
     ),
