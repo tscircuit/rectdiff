@@ -4,13 +4,13 @@ import {
   type PipelineStep,
 } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "./types/srj-types"
-import type { GridFill3DOptions } from "./solvers/rectdiff/types"
+import type { GridFill3DOptions } from "./rectdiff-types"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { GapFillSolverPipeline } from "./solvers/GapFillSolver/GapFillSolverPipeline"
 import { RectDiffGridSolver } from "./solvers/RectDiffGridSolver/RectDiffGridSolver"
 import { RectDiffExpansionSolver } from "./solvers/RectDiffExpansionSolver/RectDiffExpansionSolver"
-import { createBaseVisualization } from "./solvers/rectdiff/visualization"
+import { createBaseVisualization } from "./rectdiff-visualization"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson

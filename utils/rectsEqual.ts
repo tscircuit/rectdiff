@@ -1,6 +1,6 @@
 // utils/rectsEqual.ts
-import type { XYRect } from "../lib/solvers/rectdiff/types"
-import { EPS } from "../lib/solvers/rectdiff/geometry"
+import type { XYRect } from "../lib/rectdiff-types"
+import { EPS } from "../lib/utils/rectdiff-geometry"
 
 /**
  * Checks if two rectangles are equal within a small tolerance (EPS).

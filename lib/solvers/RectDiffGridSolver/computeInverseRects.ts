@@ -1,6 +1,10 @@
-import type { XYRect } from "../types"
+import type { XYRect } from "../../rectdiff-types"
+import {
+  containsPoint,
+  subtractRect2D,
+  EPS,
+} from "../../utils/rectdiff-geometry"
 import { isPointInPolygon } from "./isPointInPolygon"
-import { EPS } from "../geometry" // Import EPS from common geometry file
 
 /**
  * Decompose the empty space inside 'bounds' but outside 'polygon' into rectangles.

@@ -1,6 +1,8 @@
 // lib/solvers/rectdiff/layers.ts
-import type { SimpleRouteJson, Obstacle } from "../../types/srj-types"
-import type { XYRect } from "./types"
+import type { SimpleRouteJson } from "../../types/srj-types"
+import type { XYRect } from "../../rectdiff-types"
+
+type Obstacle = NonNullable<SimpleRouteJson["obstacles"]>[number]
 
 function layerSortKey(n: string) {
   const L = n.toLowerCase()

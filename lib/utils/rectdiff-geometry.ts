@@ -1,5 +1,5 @@
 // lib/solvers/rectdiff/geometry.ts
-import type { XYRect } from "./types"
+import type { XYRect } from "../rectdiff-types"
 
 export const EPS = 1e-9
 export const clamp = (v: number, lo: number, hi: number) =>

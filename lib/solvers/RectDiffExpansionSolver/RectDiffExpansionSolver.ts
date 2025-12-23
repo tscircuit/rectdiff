@@ -1,13 +1,12 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
-import {
-  finalizeRects,
-  stepExpansion,
-  computeProgress,
-} from "../rectdiff/engine"
-import { rectsToMeshNodes } from "../rectdiff/rectsToMeshNodes"
-import type { XYRect, Candidate3D, Placed3D, Phase } from "../rectdiff/types"
+import { expandRectFromSeed } from "../../utils/rectdiff-geometry"
+import { finalizeRects } from "../../utils/finalizeRects"
+import { buildHardPlacedByLayer } from "../../utils/buildHardPlacedByLayer"
+import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
+import { rectsToMeshNodes } from "./rectsToMeshNodes"
+import type { XYRect, Candidate3D, Placed3D, Phase } from "../../rectdiff-types"
 import type { SimpleRouteJson } from "../../types/srj-types"
 
 export type RectDiffExpansionSolverSnapshot = {
@@ -92,7 +91,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
     if (this.solved) return
 
     if (this.phase === "EXPANSION") {
-      stepExpansion(this as any)
+      this._stepExpansion()
 
       this.stats.phase = this.phase
       this.stats.gridIndex = this.gridIndex
@@ -110,17 +109,87 @@ export class RectDiffExpansionSolver extends BaseSolver {
     this.finalizeIfNeeded()
   }
 
+  private _stepExpansion(): void {
+    if (this.expansionIndex >= this.placed.length) {
+      // Transition to gap fill phase instead of done
+      this.phase = "GAP_FILL"
+      return
+    }
+
+    const idx = this.expansionIndex
+    const p = this.placed[idx]!
+    const lastGrid = this.options.gridSizes[this.options.gridSizes.length - 1]!
+
+    const hardPlacedByLayer = buildHardPlacedByLayer({
+      layerCount: this.layerCount,
+      placed: this.placed,
+    })
+
+    // HARD blockers only: obstacles on p.zLayers + full-stack nodes
+    const hardBlockers: XYRect[] = []
+    for (const z of p.zLayers) {
+      hardBlockers.push(...(this.obstaclesByLayer[z] ?? []))
+      hardBlockers.push(...(hardPlacedByLayer[z] ?? []))
+    }
+
+    const oldRect = p.rect
+    const expanded = expandRectFromSeed({
+      startX: p.rect.x + p.rect.width / 2,
+      startY: p.rect.y + p.rect.height / 2,
+      gridSize: lastGrid,
+      bounds: this.bounds,
+      blockers: hardBlockers,
+      initialCellRatio: 0,
+      maxAspectRatio: null,
+      minReq: { width: p.rect.width, height: p.rect.height },
+    })
+
+    if (expanded) {
+      // Update placement + per-layer index (replace old rect object)
+      this.placed[idx] = { rect: expanded, zLayers: p.zLayers }
+      for (const z of p.zLayers) {
+        const arr = this.placedByLayer[z]!
+        const j = arr.findIndex((r) => r === oldRect)
+        if (j >= 0) arr[j] = expanded
+      }
+
+      // Carve overlapped soft neighbors (respect full-stack nodes)
+      resizeSoftOverlaps(
+        {
+          layerCount: this.layerCount,
+          placed: this.placed,
+          placedByLayer: this.placedByLayer,
+          options: this.options,
+        },
+        idx,
+      )
+    }
+
+    this.expansionIndex += 1
+  }
+
   private finalizeIfNeeded() {
     if (this.solved) return
 
-    const rects = finalizeRects(this as any)
+    const rects = finalizeRects({
+      placed: this.placed,
+      obstaclesByLayer: this.obstaclesByLayer,
+      boardVoidRects: this.boardVoidRects,
+    })
     this._meshNodes = rectsToMeshNodes(rects)
     this.solved = true
   }
 
   computeProgress(): number {
     if (this.solved) return 1
-    return computeProgress(this as any)
+    const grids = this.options.gridSizes.length
+    if (this.phase === "EXPANSION") {
+      const base = grids / (grids + 1)
+      const denom = Math.max(1, this.placed.length)
+      const frac = denom ? this.expansionIndex / denom : 1
+      return Math.min(0.999, base + frac * (1 / (grids + 1)))
+    }
+    return 1
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {

@@ -1,6 +1,6 @@
 // lib/solvers/rectdiff/rectsToMeshNodes.ts
-import type { Rect3d } from "./types"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
+import type { Rect3d } from "../../rectdiff-types"
 
 export function rectsToMeshNodes(rects: Rect3d[]): CapacityMeshNode[] {
   let id = 0

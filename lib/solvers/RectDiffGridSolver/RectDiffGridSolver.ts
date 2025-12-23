@@ -7,16 +7,17 @@ import type {
   Placed3D,
   XYRect,
   Phase,
-} from "../rectdiff/types"
-import { stepGrid, computeProgress } from "../rectdiff/engine"
-import { computeInverseRects } from "../rectdiff/geometry/computeInverseRects"
-import {
-  buildZIndexMap,
-  obstacleToXYRect,
-  obstacleZs,
-} from "../rectdiff/layers"
-import { overlaps } from "../rectdiff/geometry"
-import { computeDefaultGridSizes } from "../rectdiff/candidates"
+} from "../../rectdiff-types"
+import { computeInverseRects } from "./computeInverseRects"
+import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
+import { overlaps, expandRectFromSeed } from "../../utils/rectdiff-geometry"
+import { computeDefaultGridSizes } from "./computeDefaultGridSizes"
+import { computeCandidates3D } from "./computeCandidates3D"
+import { computeEdgeCandidates3D } from "./computeEdgeCandidates3D"
+import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
+import { buildHardPlacedByLayer } from "../../utils/buildHardPlacedByLayer"
+import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
+import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 
 export type RectDiffGridSolverInput = {
   simpleRouteJson: SimpleRouteJson
@@ -173,7 +174,7 @@ export class RectDiffGridSolver extends BaseSolver {
       return
     }
 
-    stepGrid(this as any)
+    this._stepGrid()
 
     this.stats.phase = this.phase
     this.stats.gridIndex = this.gridIndex
@@ -184,12 +185,174 @@ export class RectDiffGridSolver extends BaseSolver {
     }
   }
 
+  /**
+   * One micro-step during the GRID phase: handle exactly one candidate.
+   */
+  private _stepGrid(): void {
+    const {
+      gridSizes,
+      initialCellRatio,
+      maxAspectRatio,
+      minSingle,
+      minMulti,
+      preferMultiLayer,
+      maxMultiLayerSpan,
+    } = this.options
+    const grid = gridSizes[this.gridIndex]!
+
+    // Build hard-placed map once per micro-step (cheap)
+    const hardPlacedByLayer = buildHardPlacedByLayer({
+      layerCount: this.layerCount,
+      placed: this.placed,
+    })
+
+    // Ensure candidates exist for this grid
+    if (this.candidates.length === 0 && this.consumedSeedsThisGrid === 0) {
+      this.candidates = computeCandidates3D({
+        bounds: this.bounds,
+        gridSize: grid,
+        layerCount: this.layerCount,
+        obstaclesByLayer: this.obstaclesByLayer,
+        placedByLayer: this.placedByLayer,
+        hardPlacedByLayer,
+      })
+      this.totalSeedsThisGrid = this.candidates.length
+      this.consumedSeedsThisGrid = 0
+    }
+
+    // If no candidates remain, advance grid or run edge pass or switch phase
+    if (this.candidates.length === 0) {
+      if (this.gridIndex + 1 < gridSizes.length) {
+        this.gridIndex += 1
+        this.totalSeedsThisGrid = 0
+        this.consumedSeedsThisGrid = 0
+        return
+      } else {
+        if (!this.edgeAnalysisDone) {
+          const minSize = Math.min(minSingle.width, minSingle.height)
+          this.candidates = computeEdgeCandidates3D({
+            bounds: this.bounds,
+            minSize,
+            layerCount: this.layerCount,
+            obstaclesByLayer: this.obstaclesByLayer,
+            placedByLayer: this.placedByLayer,
+            hardPlacedByLayer,
+          })
+          this.edgeAnalysisDone = true
+          this.totalSeedsThisGrid = this.candidates.length
+          this.consumedSeedsThisGrid = 0
+          return
+        }
+        this.phase = "EXPANSION"
+        this.expansionIndex = 0
+        return
+      }
+    }
+
+    // Consume exactly one candidate
+    const cand = this.candidates.shift()!
+    this.consumedSeedsThisGrid += 1
+
+    // Evaluate attempts — multi-layer span first (computed ignoring soft nodes)
+    const span = longestFreeSpanAroundZ({
+      x: cand.x,
+      y: cand.y,
+      z: cand.z,
+      layerCount: this.layerCount,
+      minSpan: minMulti.minLayers,
+      maxSpan: maxMultiLayerSpan,
+      obstaclesByLayer: this.obstaclesByLayer,
+      placedByLayer: hardPlacedByLayer,
+    })
+
+    const attempts: Array<{
+      kind: "multi" | "single"
+      layers: number[]
+      minReq: { width: number; height: number }
+    }> = []
+
+    if (span.length >= minMulti.minLayers) {
+      attempts.push({
+        kind: "multi",
+        layers: span,
+        minReq: { width: minMulti.width, height: minMulti.height },
+      })
+    }
+    attempts.push({
+      kind: "single",
+      layers: [cand.z],
+      minReq: { width: minSingle.width, height: minSingle.height },
+    })
+
+    const ordered = preferMultiLayer ? attempts : attempts.reverse()
+
+    for (const attempt of ordered) {
+      // HARD blockers only: obstacles on those layers + full-stack nodes
+      const hardBlockers: XYRect[] = []
+      for (const z of attempt.layers) {
+        if (this.obstaclesByLayer[z])
+          hardBlockers.push(...this.obstaclesByLayer[z]!)
+        if (hardPlacedByLayer[z]) hardBlockers.push(...hardPlacedByLayer[z]!)
+      }
+
+      const rect = expandRectFromSeed({
+        startX: cand.x,
+        startY: cand.y,
+        gridSize: grid,
+        bounds: this.bounds,
+        blockers: hardBlockers,
+        initialCellRatio,
+        maxAspectRatio,
+        minReq: attempt.minReq,
+      })
+      if (!rect) continue
+
+      // Place the new node
+      const placed: Placed3D = { rect, zLayers: [...attempt.layers] }
+      const newIndex = this.placed.push(placed) - 1
+      for (const z of attempt.layers) this.placedByLayer[z]!.push(rect)
+
+      // New: carve overlapped soft nodes
+      resizeSoftOverlaps(
+        {
+          layerCount: this.layerCount,
+          placed: this.placed,
+          placedByLayer: this.placedByLayer,
+          options: this.options,
+        },
+        newIndex,
+      )
+
+      // New: relax candidate culling — only drop seeds that became fully occupied
+      this.candidates = this.candidates.filter(
+        (c) =>
+          !isFullyOccupiedAtPoint(
+            {
+              layerCount: this.layerCount,
+              obstaclesByLayer: this.obstaclesByLayer,
+              placedByLayer: this.placedByLayer,
+            },
+            { x: c.x, y: c.y },
+          ),
+      )
+
+      return // processed one candidate
+    }
+
+    // Neither attempt worked; drop this candidate for now.
+  }
+
   /** Compute solver progress (0 to 1) during GRID phase. */
   computeProgress(): number {
     if (this.solved || this.phase !== "GRID") {
       return 1
     }
-    return computeProgress(this as any)
+    const grids = this.options.gridSizes.length
+    const g = this.gridIndex
+    const base = g / (grids + 1) // reserve final slice for expansion
+    const denom = Math.max(1, this.totalSeedsThisGrid)
+    const frac = denom ? this.consumedSeedsThisGrid / denom : 1
+    return Math.min(0.999, base + frac * (1 / (grids + 1)))
   }
 
   /**
