@@ -4,7 +4,9 @@ import { getColorForZLayer } from "lib/utils/getColorForZLayer"
 
 type MeshNodes = ReturnType<RectDiffPipeline["getOutput"]>["meshNodes"]
 
-export const makeCapacityMeshNodeWithLayerInfo = (nodes: MeshNodes): Map<string, Rect[]> => {
+export const makeCapacityMeshNodeWithLayerInfo = (
+  nodes: MeshNodes,
+): Map<string, Rect[]> => {
   const map = new Map<string, Rect[]>()
 
   for (const node of nodes) {
@@ -17,7 +19,7 @@ export const makeCapacityMeshNodeWithLayerInfo = (nodes: MeshNodes): Map<string,
       height: node.height,
       layer: `z${key}`,
       stroke: colors.stroke,
-      fill: colors.fill,
+      fill: node._containsObstacle ? "red" : colors.fill,
       label: "node",
     }
 

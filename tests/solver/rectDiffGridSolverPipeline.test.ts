@@ -18,6 +18,7 @@ test("RectDiffPipeline mesh layer snapshots", async () => {
   const { meshNodes } = solver.getOutput()
   const rectsByCombo = makeCapacityMeshNodeWithLayerInfo(meshNodes)
 
+  // Generate a snapshot for each z-layer
   for (const z of [0, 1, 2, 3]) {
     const layerRects: Rect[] = []
 
