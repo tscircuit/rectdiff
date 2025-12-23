@@ -95,26 +95,23 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
     )
 
     const { meshNodes: outputNodes } = this.getOutput()
-    
-    // We can try to identify which nodes are from expansion vs gap fill if we want,
-    // but for now let's just show all.
-    // Ideally we track IDs.
-
-    const gridNodes = new Set(
-        (this.rectDiffGridSolverPipeline?.getOutput().meshNodes ?? []).map(n => n.capacityMeshNodeId)
+    const initialNodeIds = new Set(
+      (this.rectDiffGridSolverPipeline?.getOutput().meshNodes ?? []).map(
+        (n) => n.capacityMeshNodeId,
+      ),
     )
 
     for (const node of outputNodes) {
-      const isGrid = gridNodes.has(node.capacityMeshNodeId)
+      const isExpanded = !initialNodeIds.has(node.capacityMeshNodeId)
       graphics.rects!.push({
         center: node.center,
         width: node.width,
         height: node.height,
-        stroke: isGrid ? "rgba(0, 128, 0, 0.8)" : "rgba(0, 0, 255, 0.5)",
-        fill: isGrid ? "rgba(0, 200, 0, 0.3)" : "rgba(0, 0, 255, 0.1)",
+        stroke: isExpanded ? "rgba(0, 128, 0, 0.8)" : "rgba(0, 0, 0, 0.3)",
+        fill: isExpanded ? "rgba(0, 200, 0, 0.3)" : "rgba(100, 100, 100, 0.1)",
         layer: `z${node.availableZ.join(",")}`,
         label: [
-          `${isGrid ? "[grid] " : "[gap] "}node ${node.capacityMeshNodeId}`,
+          `${isExpanded ? "[expanded] " : ""}node ${node.capacityMeshNodeId}`,
           `z:${node.availableZ.join(",")}`,
         ].join("\n"),
       })
