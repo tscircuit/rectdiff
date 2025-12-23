@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import srj from "test-assets/bugreport11-b2de3c.json"
 import {
   getSvgFromGraphicsObject,
+  stackGraphicsVertically,
   type GraphicsObject,
   type Rect,
 } from "graphics-debug"
@@ -17,6 +18,7 @@ test("RectDiffPipeline mesh layer snapshots", async () => {
 
   const { meshNodes } = solver.getOutput()
   const rectsByCombo = makeCapacityMeshNodeWithLayerInfo(meshNodes)
+  const allGraphicsObjects: GraphicsObject[] = []
 
   // Generate a snapshot for each z-layer
   for (const z of [0, 1, 2, 3]) {
@@ -33,15 +35,42 @@ test("RectDiffPipeline mesh layer snapshots", async () => {
       }
     }
 
+    let labelY = 0
+
+    if (layerRects.length > 0) {
+      let maxY = -Infinity
+
+      for (const rect of layerRects) {
+        const top = rect.center.y + rect.height
+
+        if (top > maxY) maxY = top
+      }
+
+      labelY = maxY
+    }
+
     const graphics: GraphicsObject = {
       title: `RectDiffPipeline - z${z}`,
+      texts: [
+        {
+          anchorSide: "top_right",
+          text: `Layer z=${z}`,
+          x: 0,
+          y: labelY,
+          fontSize: 1,
+        },
+      ],
       coordinateSystem: "cartesian",
       rects: layerRects,
       points: [],
       lines: [],
     }
 
-    const svg = getSvgFromGraphicsObject(graphics)
-    await expect(svg).toMatchSvgSnapshot(`${import.meta.path}-z${z}`)
+    allGraphicsObjects.push(graphics)
   }
+
+  const svg = getSvgFromGraphicsObject(
+    stackGraphicsVertically(allGraphicsObjects),
+  )
+  await expect(svg).toMatchSvgSnapshot(import.meta.path)
 })
