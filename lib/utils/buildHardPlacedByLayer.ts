@@ -1,6 +1,6 @@
 import type { Placed3D, XYRect } from "../rectdiff-types"
 
-export function buildHardPlacedByLayer(params: {
+export function allLayerNode(params: {
   layerCount: number
   placed: Placed3D[]
 }): XYRect[][] {

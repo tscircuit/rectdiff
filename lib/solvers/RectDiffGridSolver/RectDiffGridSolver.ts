@@ -15,7 +15,7 @@ import { computeDefaultGridSizes } from "./computeDefaultGridSizes"
 import { computeCandidates3D } from "./computeCandidates3D"
 import { computeEdgeCandidates3D } from "./computeEdgeCandidates3D"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
-import { buildHardPlacedByLayer } from "../../utils/buildHardPlacedByLayer"
+import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 
@@ -187,7 +187,7 @@ export class RectDiffGridSolver extends BaseSolver {
     const grid = gridSizes[this.gridIndex]!
 
     // Build hard-placed map once per micro-step (cheap)
-    const hardPlacedByLayer = buildHardPlacedByLayer({
+    const hardPlacedByLayer = allLayerNode({
       layerCount: this.layerCount,
       placed: this.placed,
     })

@@ -3,7 +3,7 @@ import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
 import { finalizeRects } from "../../utils/finalizeRects"
-import { buildHardPlacedByLayer } from "../../utils/buildHardPlacedByLayer"
+import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { rectsToMeshNodes } from "./rectsToMeshNodes"
 import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
@@ -99,7 +99,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
     const p = this.placed[idx]!
     const lastGrid = this.options.gridSizes[this.options.gridSizes.length - 1]!
 
-    const hardPlacedByLayer = buildHardPlacedByLayer({
+    const hardPlacedByLayer = allLayerNode({
       layerCount: this.layerCount,
       placed: this.placed,
     })

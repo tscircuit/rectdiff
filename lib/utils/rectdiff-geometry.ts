@@ -54,10 +54,7 @@ export function distancePointToRectEdges(
 }
 
 /** Find the intersection of two 1D intervals, or null if they don't overlap. */
-export function intersect1D(
-  r1: [number, number],
-  r2: [number, number],
-) {
+export function intersect1D(r1: [number, number], r2: [number, number]) {
   const lo = Math.max(r1[0], r2[0])
   const hi = Math.min(r1[1], r2[1])
   return hi > lo + EPS ? ([lo, hi] as const) : null
@@ -67,14 +64,8 @@ export function intersect1D(
 export function subtractRect2D(A: XYRect, B: XYRect): XYRect[] {
   if (!overlaps(A, B)) return [A]
 
-  const Xi = intersect1D(
-    [A.x, A.x + A.width],
-    [B.x, B.x + B.width],
-  )
-  const Yi = intersect1D(
-    [A.y, A.y + A.height],
-    [B.y, B.y + B.height],
-  )
+  const Xi = intersect1D([A.x, A.x + A.width], [B.x, B.x + B.width])
+  const Yi = intersect1D([A.y, A.y + A.height], [B.y, B.y + B.height])
   if (!Xi || !Yi) return [A]
 
   const [X0, X1] = Xi

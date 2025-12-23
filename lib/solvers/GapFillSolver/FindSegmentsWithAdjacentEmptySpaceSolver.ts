@@ -182,10 +182,10 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
     if (this.lastOverlappingEdges) {
       for (const edge of this.lastOverlappingEdges) {
         graphics.lines.push({
-          points: visuallyOffsetLine(
-            [edge.start, edge.end],
-            { dir: edge.facingDirection, amt: 0.05 },
-          ),
+          points: visuallyOffsetLine([edge.start, edge.end], {
+            dir: edge.facingDirection,
+            amt: 0.05,
+          }),
           strokeColor: "red",
           strokeDash: "2 2",
         })
@@ -195,10 +195,10 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
     if (this.lastUncoveredSegments) {
       for (const edge of this.lastUncoveredSegments) {
         graphics.lines.push({
-          points: visuallyOffsetLine(
-            [edge.start, edge.end],
-            { dir: edge.facingDirection, amt: -0.05 },
-          ),
+          points: visuallyOffsetLine([edge.start, edge.end], {
+            dir: edge.facingDirection,
+            amt: -0.05,
+          }),
           strokeColor: "green",
           strokeDash: "2 2",
         })

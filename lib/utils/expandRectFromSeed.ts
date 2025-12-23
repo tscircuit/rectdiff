@@ -211,7 +211,7 @@ export function expandRectFromSeed(params: {
     while (improved) {
       improved = false
       const commonParams = { bounds, blockers, maxAspect: maxAspectRatio }
-      
+
       const eR = maxExpandRight({ ...commonParams, r })
       if (eR > 0) {
         r = { ...r, width: r.width + eR }
