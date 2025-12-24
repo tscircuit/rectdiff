@@ -1,3 +1,5 @@
+import type { XYRect } from "lib/rectdiff-types"
+
 export type CapacityMeshNodeId = string
 
 export interface CapacityMesh {
@@ -30,4 +32,11 @@ export interface CapacityMeshNode {
 export interface CapacityMeshEdge {
   capacityMeshEdgeId: string
   nodeIds: [CapacityMeshNodeId, CapacityMeshNodeId]
+}
+
+export type RTreeRect = XYRect & {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
 }

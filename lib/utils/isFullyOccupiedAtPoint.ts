@@ -1,21 +1,28 @@
-import type { XYRect } from "../rectdiff-types"
-import { containsPoint } from "./rectdiff-geometry"
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import RBush from "rbush"
 
-export function isFullyOccupiedAtPoint(
-  params: {
-    layerCount: number
-    obstaclesByLayer: XYRect[][]
-    placedByLayer: XYRect[][]
-  },
-  point: { x: number; y: number },
-): boolean {
+export type OccupancyParams = {
+  layerCount: number
+  obstacleIndexByLayer: Array<RBush<RTreeRect> | undefined>
+  placedIndexByLayer: Array<RBush<RTreeRect> | undefined>
+  point: { x: number; y: number }
+}
+
+export function isFullyOccupiedAtPoint(params: OccupancyParams): boolean {
+  const query = {
+    minX: params.point.x,
+    minY: params.point.y,
+    maxX: params.point.x,
+    maxY: params.point.y,
+  }
   for (let z = 0; z < params.layerCount; z++) {
-    const obs = params.obstaclesByLayer[z] ?? []
-    const placed = params.placedByLayer[z] ?? []
-    const occ =
-      obs.some((b) => containsPoint(b, point)) ||
-      placed.some((b) => containsPoint(b, point))
-    if (!occ) return false
+    const obstacleIdx = params.obstacleIndexByLayer[z]
+    const hasObstacle = !!obstacleIdx && obstacleIdx.search(query).length > 0
+
+    const placedIdx = params.placedIndexByLayer[z]
+    const hasPlaced = !!placedIdx && placedIdx.search(query).length > 0
+
+    if (!hasObstacle && !hasPlaced) return false
   }
   return true
 }

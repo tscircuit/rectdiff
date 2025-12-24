@@ -1,5 +1,7 @@
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
 import type { XYRect } from "../../rectdiff-types"
 import { clamp, containsPoint } from "../../utils/rectdiff-geometry"
+import type RBush from "rbush"
 
 /**
  * Find the longest contiguous free span around z (optionally capped).
@@ -11,8 +13,8 @@ export function longestFreeSpanAroundZ(params: {
   layerCount: number
   minSpan: number
   maxSpan: number | undefined
-  obstaclesByLayer: XYRect[][]
-  placedByLayer: XYRect[][]
+  obstacleIndexByLayer: Array<RBush<RTreeRect> | undefined>
+  additionalBlockersByLayer?: XYRect[][]
 }): number[] {
   const {
     x,
@@ -21,16 +23,22 @@ export function longestFreeSpanAroundZ(params: {
     layerCount,
     minSpan,
     maxSpan,
-    obstaclesByLayer,
-    placedByLayer,
+    obstacleIndexByLayer,
+    additionalBlockersByLayer,
   } = params
 
   const isFreeAt = (layer: number) => {
-    const blockers = [
-      ...(obstaclesByLayer[layer] ?? []),
-      ...(placedByLayer[layer] ?? []),
-    ]
-    return !blockers.some((b) => containsPoint(b, { x, y }))
+    const query = {
+      minX: x,
+      minY: y,
+      maxX: x,
+      maxY: y,
+    }
+    const obstacleIdx = obstacleIndexByLayer[layer]
+    if (obstacleIdx && obstacleIdx.search(query).length > 0) return false
+
+    const extras = additionalBlockersByLayer?.[layer] ?? []
+    return !extras.some((b) => containsPoint(b, { x, y }))
   }
   let lo = z
   let hi = z
