@@ -20,6 +20,7 @@ import { isFullyOccupiedAtPoint } from "lib/utils/isFullyOccupiedAtPoint"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import RBush from "rbush"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import { ensureBoardVoidRectsInObstacleIndex } from "lib/utils/ensureBoardVoidRectsInObstacleIndex"
 
 export type RectDiffSeedingSolverInput = {
   simpleRouteJson: SimpleRouteJson
@@ -110,6 +111,10 @@ export class RectDiffSeedingSolver extends BaseSolver {
     this.bounds = bounds
     this.options = options
     this.boardVoidRects = this.input.boardVoidRects
+    this.input.obstacleIndexByLayer = ensureBoardVoidRectsInObstacleIndex(
+      this.boardVoidRects,
+      this.input.obstacleIndexByLayer,
+    )
     this.gridIndex = 0
     this.candidates = []
     this.placed = []

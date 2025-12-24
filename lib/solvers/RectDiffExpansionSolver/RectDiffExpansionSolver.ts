@@ -16,6 +16,7 @@ import {
 import RBush from "rbush"
 import { rectToTree } from "../../utils/rectToTree"
 import { sameTreeRect } from "../../utils/sameTreeRect"
+import { ensureBoardVoidRectsInObstacleIndex } from "lib/utils/ensureBoardVoidRectsInObstacleIndex"
 
 export type RectDiffExpansionSolverSnapshot = {
   srj: SimpleRouteJson
@@ -108,6 +109,10 @@ export class RectDiffExpansionSolver extends BaseSolver {
         })
       }
     }
+    this.input.obstacleIndexByLayer = ensureBoardVoidRectsInObstacleIndex(
+      this.boardVoidRects,
+      this.input.obstacleIndexByLayer,
+    )
 
     this.placedIndexByLayer = Array.from(
       { length: this.layerCount },
