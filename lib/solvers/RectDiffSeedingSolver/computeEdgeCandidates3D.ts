@@ -2,6 +2,7 @@ import type { Candidate3D, XYRect } from "../../rectdiff-types"
 import { EPS, distancePointToRectEdges } from "../../utils/rectdiff-geometry"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
+import { isPointInPolygon } from "./isPointInPolygon"
 import type RBush from "rbush"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
 
@@ -84,6 +85,7 @@ export function computeEdgeCandidates3D(params: {
   obstacleIndexByLayer: Array<RBush<RTreeRect> | undefined>
   placedIndexByLayer: Array<RBush<RTreeRect> | undefined>
   hardPlacedByLayer: XYRect[][]
+  outline?: Array<{ x: number; y: number }>
 }): Candidate3D[] {
   const {
     bounds,
@@ -92,6 +94,7 @@ export function computeEdgeCandidates3D(params: {
     obstacleIndexByLayer,
     placedIndexByLayer,
     hardPlacedByLayer,
+    outline,
   } = params
 
   const out: Candidate3D[] = []
@@ -119,6 +122,11 @@ export function computeEdgeCandidates3D(params: {
       y > bounds.y + bounds.height - EPS
     )
       return
+    if (outline && outline.length > 2) {
+      if (!isPointInPolygon({ x, y }, outline)) {
+        return
+      }
+    }
     if (fullyOcc({ x, y })) return // new rule: only drop if truly impossible
 
     // Distance uses obstacles + hard nodes (soft nodes ignored for ranking)

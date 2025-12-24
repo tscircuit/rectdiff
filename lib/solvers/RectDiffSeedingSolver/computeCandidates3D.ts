@@ -2,6 +2,7 @@ import type { Candidate3D, XYRect } from "../../rectdiff-types"
 import { EPS, distancePointToRectEdges } from "../../utils/rectdiff-geometry"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
+import { isPointInPolygon } from "./isPointInPolygon"
 import type RBush from "rbush"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
 
@@ -15,6 +16,7 @@ export function computeCandidates3D(params: {
   obstacleIndexByLayer: Array<RBush<RTreeRect> | undefined>
   placedIndexByLayer: Array<RBush<RTreeRect> | undefined>
   hardPlacedByLayer: XYRect[][]
+  outline?: Array<{ x: number; y: number }>
 }): Candidate3D[] {
   const {
     bounds,
@@ -23,6 +25,7 @@ export function computeCandidates3D(params: {
     obstacleIndexByLayer,
     placedIndexByLayer,
     hardPlacedByLayer,
+    outline,
   } = params
   const out = new Map<string, Candidate3D>() // key by (x,y)
 
@@ -36,6 +39,12 @@ export function computeCandidates3D(params: {
         y > bounds.y + bounds.height - gridSize - EPS
       ) {
         continue
+      }
+
+      if (outline && outline.length > 2) {
+        if (!isPointInPolygon({ x, y }, outline)) {
+          continue
+        }
       }
 
       // New rule: Only drop if EVERY layer is occupied (by obstacle or node)

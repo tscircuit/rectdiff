@@ -165,6 +165,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
         hardPlacedByLayer,
         obstacleIndexByLayer: this.input.obstacleIndexByLayer,
         placedIndexByLayer: this.placedIndexByLayer,
+        outline: this.srj.outline,
       })
       this.totalSeedsThisGrid = this.candidates.length
       this.consumedSeedsThisGrid = 0
@@ -187,6 +188,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
             obstacleIndexByLayer: this.input.obstacleIndexByLayer,
             placedIndexByLayer: this.placedIndexByLayer,
             hardPlacedByLayer,
+            outline: this.srj.outline,
           })
           this.edgeAnalysisDone = true
           this.totalSeedsThisGrid = this.candidates.length
