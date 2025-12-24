@@ -4,12 +4,13 @@ import {
   type PipelineStep,
 } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "./types/srj-types"
-import type { GridFill3DOptions } from "./rectdiff-types"
+import type { GridFill3DOptions, XYRect } from "./rectdiff-types"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { GapFillSolverPipeline } from "./solvers/GapFillSolver/GapFillSolverPipeline"
 import { RectDiffGridSolverPipeline } from "./solvers/RectDiffGridSolverPipeline/RectDiffGridSolverPipeline"
 import { createBaseVisualization } from "./rectdiff-visualization"
+import { computeInverseRects } from "./solvers/RectDiffSeedingSolver/computeInverseRects"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -19,6 +20,8 @@ export interface RectDiffPipelineInput {
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
   rectDiffGridSolverPipeline?: RectDiffGridSolverPipeline
   gapFillSolver?: GapFillSolverPipeline
+  // Represents cutout area
+  boardCutoutArea: XYRect[] = []
 
   override pipelineDef: PipelineStep<any>[] = [
     definePipelineStep(
@@ -28,6 +31,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
         {
           simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
           gridOptions: rectDiffPipeline.inputProblem.gridOptions,
+          boardCutoutArea: rectDiffPipeline.boardCutoutArea,
         },
       ],
     ),
@@ -39,10 +43,28 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           meshNodes:
             rectDiffPipeline.rectDiffGridSolverPipeline?.getOutput()
               .meshNodes ?? [],
+          simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
+          boardCutoutArea: rectDiffPipeline.boardCutoutArea,
         },
       ],
     ),
   ]
+
+  override _setup(): void {
+    const srj = this.inputProblem.simpleRouteJson
+    const bounds: XYRect = {
+      x: srj.bounds.minX,
+      y: srj.bounds.minY,
+      width: srj.bounds.maxX - srj.bounds.minX,
+      height: srj.bounds.maxY - srj.bounds.minY,
+    }
+
+    if (srj.outline && srj.outline.length > 2) {
+      this.boardCutoutArea = computeInverseRects(bounds, srj.outline)
+    } else {
+      this.boardCutoutArea = []
+    }
+  }
 
   override getConstructorParams() {
     return [this.inputProblem]

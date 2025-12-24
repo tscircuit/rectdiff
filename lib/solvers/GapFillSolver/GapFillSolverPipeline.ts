@@ -6,12 +6,17 @@ import {
 import type { SimpleRouteJson } from "lib/types/srj-types"
 import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
+import type { XYRect } from "lib/rectdiff-types"
 import { FindSegmentsWithAdjacentEmptySpaceSolver } from "./FindSegmentsWithAdjacentEmptySpaceSolver"
 import { ExpandEdgesToEmptySpaceSolver } from "./ExpandEdgesToEmptySpaceSolver"
 
-export class GapFillSolverPipeline extends BasePipelineSolver<{
+type GapFillSolverPipelineInput = {
   meshNodes: CapacityMeshNode[]
-}> {
+  simpleRouteJson?: SimpleRouteJson
+  boardCutoutArea?: XYRect[]
+}
+
+export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverPipelineInput> {
   findSegmentsWithAdjacentEmptySpaceSolver?: FindSegmentsWithAdjacentEmptySpaceSolver
   expandEdgesToEmptySpaceSolver?: ExpandEdgesToEmptySpaceSolver
 
@@ -24,11 +29,6 @@ export class GapFillSolverPipeline extends BasePipelineSolver<{
           meshNodes: gapFillPipeline.inputProblem.meshNodes,
         },
       ],
-      {
-        onSolved: () => {
-          // Gap fill solver completed
-        },
-      },
     ),
     definePipelineStep(
       "expandEdgesToEmptySpaceSolver",
@@ -39,13 +39,9 @@ export class GapFillSolverPipeline extends BasePipelineSolver<{
           segmentsWithAdjacentEmptySpace:
             gapFillPipeline.findSegmentsWithAdjacentEmptySpaceSolver!.getOutput()
               .segmentsWithAdjacentEmptySpace,
+          boardCutoutArea: gapFillPipeline.inputProblem.boardCutoutArea,
         },
       ],
-      {
-        onSolved: () => {
-          // Gap fill solver completed
-        },
-      },
     ),
   ] as const
 

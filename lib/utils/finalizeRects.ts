@@ -3,7 +3,7 @@ import type { Placed3D, Rect3d, XYRect } from "../rectdiff-types"
 export function finalizeRects(params: {
   placed: Placed3D[]
   obstaclesByLayer: XYRect[][]
-  boardVoidRects: XYRect[]
+  boardCutoutArea: XYRect[]
 }): Rect3d[] {
   // Convert all placed (free space) nodes to output format
   const out: Rect3d[] = params.placed.map((p) => ({
@@ -31,7 +31,7 @@ export function finalizeRects(params: {
   })
 
   // Append obstacle nodes to the output
-  const voidSet = new Set(params.boardVoidRects || [])
+  const voidSet = new Set(params.boardCutoutArea || [])
   for (const [rect, layerIndices] of layersByObstacleRect.entries()) {
     if (voidSet.has(rect)) continue // Skip void rects
 

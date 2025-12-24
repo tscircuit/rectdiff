@@ -9,18 +9,18 @@ import { rectsToMeshNodes } from "./rectsToMeshNodes"
 import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
 import type { SimpleRouteJson } from "../../types/srj-types"
 
+type RectDiffExpansionOptions = {
+  gridSizes: number[]
+  // the engine only uses gridSizes here, other options are ignored
+} & Record<string, any>
+
 export type RectDiffExpansionSolverSnapshot = {
   srj: SimpleRouteJson
   layerNames: string[]
   layerCount: number
   bounds: XYRect
-  options: {
-    gridSizes: number[]
-    // the engine only uses gridSizes here, other options are ignored
-    [key: string]: any
-  }
+  options: RectDiffExpansionOptions
   obstaclesByLayer: XYRect[][]
-  boardVoidRects: XYRect[]
   gridIndex: number
   candidates: Candidate3D[]
   placed: Placed3D[]
@@ -33,6 +33,7 @@ export type RectDiffExpansionSolverSnapshot = {
 
 export type RectDiffExpansionSolverInput = {
   initialSnapshot: RectDiffExpansionSolverSnapshot
+  boardCutoutArea: XYRect[]
 }
 
 /**
@@ -47,13 +48,9 @@ export class RectDiffExpansionSolver extends BaseSolver {
   private layerNames!: string[]
   private layerCount!: number
   private bounds!: XYRect
-  private options!: {
-    gridSizes: number[]
-    // the engine only uses gridSizes here, other options are ignored
-    [key: string]: any
-  }
+  private options!: RectDiffExpansionOptions
   private obstaclesByLayer!: XYRect[][]
-  private boardVoidRects!: XYRect[]
+  private boardCutoutArea!: XYRect[]
   private gridIndex!: number
   private candidates!: Candidate3D[]
   private placed!: Placed3D[]
@@ -69,6 +66,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
     super()
     // Copy engine snapshot fields directly onto this solver instance
     Object.assign(this, this.input.initialSnapshot)
+    this.boardCutoutArea = this.input.boardCutoutArea
   }
 
   override _setup() {
@@ -153,7 +151,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
     const rects = finalizeRects({
       placed: this.placed,
       obstaclesByLayer: this.obstaclesByLayer,
-      boardVoidRects: this.boardVoidRects,
+      boardCutoutArea: this.boardCutoutArea,
     })
     this._meshNodes = rectsToMeshNodes(rects)
     this.solved = true

@@ -4,7 +4,7 @@ import {
   type PipelineStep,
 } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "../../types/srj-types"
-import type { GridFill3DOptions } from "../../rectdiff-types"
+import type { GridFill3DOptions, XYRect, Placed3D } from "../../rectdiff-types"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import { RectDiffSeedingSolver } from "../RectDiffSeedingSolver/RectDiffSeedingSolver"
 import { RectDiffExpansionSolver } from "../RectDiffExpansionSolver/RectDiffExpansionSolver"
@@ -13,6 +13,7 @@ import type { GraphicsObject } from "graphics-debug"
 export type RectDiffGridSolverPipelineInput = {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
+  boardCutoutArea?: XYRect[]
 }
 
 export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridSolverPipelineInput> {
@@ -27,6 +28,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
         {
           simpleRouteJson: pipeline.inputProblem.simpleRouteJson,
           gridOptions: pipeline.inputProblem.gridOptions,
+          boardCutoutArea: pipeline.inputProblem.boardCutoutArea ?? [],
         },
       ],
     ),
@@ -36,6 +38,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
       (pipeline: RectDiffGridSolverPipeline) => [
         {
           initialSnapshot: pipeline.rectDiffSeedingSolver!.getOutput(),
+          boardCutoutArea: pipeline.inputProblem.boardCutoutArea ?? [],
         },
       ],
     ),
@@ -52,7 +55,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
     if (this.rectDiffSeedingSolver) {
       const snapshot = this.rectDiffSeedingSolver.getOutput()
       const meshNodes: CapacityMeshNode[] = snapshot.placed.map(
-        (placement: any, idx: number) => ({
+        (placement: Placed3D, idx: number) => ({
           capacityMeshNodeId: `grid-${idx}`,
           center: {
             x: placement.rect.x + placement.rect.width / 2,

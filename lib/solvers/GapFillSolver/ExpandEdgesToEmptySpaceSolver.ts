@@ -7,12 +7,27 @@ import { EDGE_MAP, EDGES } from "./edge-constants"
 import { getBoundsFromCorners } from "./getBoundsFromCorners"
 import type { Bounds } from "@tscircuit/math-utils"
 import { midpoint, segmentToBoxMinDistance } from "@tscircuit/math-utils"
+import type { XYRect } from "lib/rectdiff-types"
 
 const EPS = 1e-4
+
+type ExpandEdgesToEmptySpaceSolverInput = {
+  inputMeshNodes: CapacityMeshNode[]
+  segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace>
+  boardCutoutArea?: XYRect[]
+}
 
 export interface ExpandedSegment {
   segment: SegmentWithAdjacentEmptySpace
   newNode: CapacityMeshNode
+}
+
+type IndexedCapacityMeshNode = CapacityMeshNode & {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  _boardCutout?: boolean
 }
 
 export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
@@ -26,26 +41,49 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
   lastSearchCorner2: { x: number; y: number } | null = null
   lastExpandedSegment: ExpandedSegment | null = null
 
-  rectSpatialIndex: RBush<CapacityMeshNode>
+  rectSpatialIndex: RBush<IndexedCapacityMeshNode>
 
-  constructor(
-    private input: {
-      inputMeshNodes: CapacityMeshNode[]
-      segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace>
-    },
-  ) {
+  constructor(private input: ExpandEdgesToEmptySpaceSolverInput) {
     super()
     this.unprocessedSegments = [...this.input.segmentsWithAdjacentEmptySpace]
-    this.rectSpatialIndex = new RBush<CapacityMeshNode>()
-    this.rectSpatialIndex.load(
+    const allLayerZs = Array.from(
+      new Set(
+        this.input.inputMeshNodes.flatMap((n) => n.availableZ ?? []).sort(),
+      ),
+    )
+    const boardCutoutNodes: IndexedCapacityMeshNode[] = (
+      this.input.boardCutoutArea ?? []
+    )
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .map((rect, idx) => {
+        const center = {
+          x: rect.x + rect.width / 2,
+          y: rect.y + rect.height / 2,
+        }
+        return {
+          capacityMeshNodeId: `board-void-${idx}`,
+          center,
+          width: rect.width,
+          height: rect.height,
+          availableZ: allLayerZs.length ? allLayerZs : [0],
+          layer: "board-void",
+          _boardCutout: true,
+          minX: center.x - rect.width / 2,
+          minY: center.y - rect.height / 2,
+          maxX: center.x + rect.width / 2,
+          maxY: center.y + rect.height / 2,
+        }
+      })
+    const meshNodesForIndex: IndexedCapacityMeshNode[] =
       this.input.inputMeshNodes.map((n) => ({
         ...n,
         minX: n.center.x - n.width / 2,
         minY: n.center.y - n.height / 2,
         maxX: n.center.x + n.width / 2,
         maxY: n.center.y + n.height / 2,
-      })),
-    )
+      }))
+    this.rectSpatialIndex = new RBush<IndexedCapacityMeshNode>()
+    this.rectSpatialIndex.load([...meshNodesForIndex, ...boardCutoutNodes])
   }
 
   override _step() {
@@ -105,7 +143,9 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
       this.lastSearchBounds = searchBounds
       collidingNodes = this.rectSpatialIndex
         .search(searchBounds)
-        .filter((n) => n.availableZ.includes(segment.z))
+        .filter(
+          (n) => (n._boardCutout ?? false) || n.availableZ.includes(segment.z),
+        )
         .filter(
           (n) => n.capacityMeshNodeId !== segment.parent.capacityMeshNodeId,
         )

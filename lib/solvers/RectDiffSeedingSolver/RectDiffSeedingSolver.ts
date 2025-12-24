@@ -1,13 +1,12 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "../../types/srj-types"
-import type { GraphicsObject } from "graphics-debug"
+import type { GraphicsObject, Point } from "graphics-debug"
 import type {
   GridFill3DOptions,
   Candidate3D,
   Placed3D,
   XYRect,
 } from "../../rectdiff-types"
-import { computeInverseRects } from "./computeInverseRects"
 import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
 import { overlaps } from "../../utils/rectdiff-geometry"
 import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
@@ -18,10 +17,10 @@ import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
-
 export type RectDiffSeedingSolverInput = {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
+  boardCutoutArea: XYRect[]
 }
 
 /**
@@ -44,7 +43,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
     maxMultiLayerSpan: number | undefined
   }
   private obstaclesByLayer!: XYRect[][]
-  private boardVoidRects!: XYRect[]
+  private boardCutoutArea!: XYRect[]
   private gridIndex!: number
   private candidates!: Candidate3D[]
   private placed!: Placed3D[]
@@ -77,20 +76,18 @@ export class RectDiffSeedingSolver extends BaseSolver {
       () => [],
     )
 
-    let boardVoidRects: XYRect[] = []
-    if (srj.outline && srj.outline.length > 2) {
-      boardVoidRects = computeInverseRects(bounds, srj.outline as any)
-      for (const voidR of boardVoidRects) {
-        for (let z = 0; z < layerCount; z++) {
-          obstaclesByLayer[z]!.push(voidR)
-        }
+    this.boardCutoutArea = this.input.boardCutoutArea
+
+    for (const voidR of this.boardCutoutArea) {
+      for (let z = 0; z < layerCount; z++) {
+        obstaclesByLayer[z]!.push(voidR)
       }
     }
 
     for (const obstacle of srj.obstacles ?? []) {
-      const rect = obstacleToXYRect(obstacle as any)
+      const rect = obstacleToXYRect(obstacle)
       if (!rect) continue
-      const zLayers = obstacleZs(obstacle as any, zIndexByName)
+      const zLayers = obstacleZs(obstacle, zIndexByName)
       const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
       if (invalidZs.length) {
         throw new Error(
@@ -148,7 +145,6 @@ export class RectDiffSeedingSolver extends BaseSolver {
     this.bounds = bounds
     this.options = options
     this.obstaclesByLayer = obstaclesByLayer
-    this.boardVoidRects = boardVoidRects
     this.gridIndex = 0
     this.candidates = []
     this.placed = []
@@ -353,7 +349,6 @@ export class RectDiffSeedingSolver extends BaseSolver {
       bounds: this.bounds,
       options: this.options,
       obstaclesByLayer: this.obstaclesByLayer,
-      boardVoidRects: this.boardVoidRects,
       gridIndex: this.gridIndex,
       candidates: this.candidates,
       placed: this.placed,
@@ -436,7 +431,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
     }
 
     // board void rects (early visualization of mask)
-    if (this.boardVoidRects) {
+    if (this.boardCutoutArea.length > 0) {
       let outlineBBox: {
         x: number
         y: number
@@ -457,7 +452,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
         }
       }
 
-      for (const r of this.boardVoidRects) {
+      for (const r of this.boardCutoutArea) {
         if (outlineBBox && !overlaps(r, outlineBBox)) {
           continue
         }
@@ -476,13 +471,13 @@ export class RectDiffSeedingSolver extends BaseSolver {
     // candidate positions (where expansion will later start from)
     if (this.candidates?.length) {
       for (const cand of this.candidates) {
-        points.push({
+        const candidatePoint: NonNullable<Point[]>[number] = {
           x: cand.x,
           y: cand.y,
-          fill: "#9333ea",
-          stroke: "#6b21a8",
+          color: "#9333ea",
           label: `z:${cand.z}`,
-        } as any)
+        }
+        points.push(candidatePoint)
       }
     }
 
