@@ -3,12 +3,14 @@ import {
   definePipelineStep,
   type PipelineStep,
 } from "@tscircuit/solver-utils"
-import type { SimpleRouteJson } from "../../types/srj-types"
-import type { GridFill3DOptions } from "../../rectdiff-types"
-import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
-import { RectDiffSeedingSolver } from "../RectDiffSeedingSolver/RectDiffSeedingSolver"
-import { RectDiffExpansionSolver } from "../RectDiffExpansionSolver/RectDiffExpansionSolver"
+import type { SimpleRouteJson } from "lib/types/srj-types"
+import type { GridFill3DOptions, XYRect } from "lib/rectdiff-types"
+import type { CapacityMeshNode, RTreeRect } from "lib/types/capacity-mesh-types"
+import { RectDiffSeedingSolver } from "lib/solvers/RectDiffSeedingSolver/RectDiffSeedingSolver"
+import { RectDiffExpansionSolver } from "lib/solvers/RectDiffExpansionSolver/RectDiffExpansionSolver"
 import type { GraphicsObject } from "graphics-debug"
+import RBush from "rbush"
+import { buildObstacleIndexes } from "./buildObstacleIndexes"
 
 export type RectDiffGridSolverPipelineInput = {
   simpleRouteJson: SimpleRouteJson
@@ -18,6 +20,17 @@ export type RectDiffGridSolverPipelineInput = {
 export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridSolverPipelineInput> {
   rectDiffSeedingSolver?: RectDiffSeedingSolver
   rectDiffExpansionSolver?: RectDiffExpansionSolver
+  private boardVoidRects?: XYRect[]
+  private obstacleIndexByLayer: Array<RBush<RTreeRect>>
+
+  constructor(inputProblem: RectDiffGridSolverPipelineInput) {
+    super(inputProblem)
+    const { obstacleIndexByLayer, boardVoidRects } = buildObstacleIndexes(
+      inputProblem.simpleRouteJson,
+    )
+    this.obstacleIndexByLayer = obstacleIndexByLayer
+    this.boardVoidRects = boardVoidRects
+  }
 
   override pipelineDef: PipelineStep<any>[] = [
     definePipelineStep(
@@ -27,6 +40,8 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
         {
           simpleRouteJson: pipeline.inputProblem.simpleRouteJson,
           gridOptions: pipeline.inputProblem.gridOptions,
+          obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
+          boardVoidRects: pipeline.boardVoidRects,
         },
       ],
     ),
@@ -36,6 +51,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
       (pipeline: RectDiffGridSolverPipeline) => [
         {
           initialSnapshot: pipeline.rectDiffSeedingSolver!.getOutput(),
+          obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
         },
       ],
     ),

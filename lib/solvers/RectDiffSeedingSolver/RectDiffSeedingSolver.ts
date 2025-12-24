@@ -16,12 +16,16 @@ import { computeCandidates3D } from "./computeCandidates3D"
 import { computeEdgeCandidates3D } from "./computeEdgeCandidates3D"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
-import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
+import { isFullyOccupiedAtPoint } from "lib/utils/isFullyOccupiedAtPoint"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
+import RBush from "rbush"
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
 
 export type RectDiffSeedingSolverInput = {
   simpleRouteJson: SimpleRouteJson
+  obstacleIndexByLayer: Array<RBush<RTreeRect>>
   gridOptions?: Partial<GridFill3DOptions>
+  boardVoidRects?: XYRect[]
 }
 
 /**
@@ -43,12 +47,11 @@ export class RectDiffSeedingSolver extends BaseSolver {
     gridSizes: number[]
     maxMultiLayerSpan: number | undefined
   }
-  private obstaclesByLayer!: XYRect[][]
   private boardVoidRects!: XYRect[]
   private gridIndex!: number
   private candidates!: Candidate3D[]
   private placed!: Placed3D[]
-  private placedByLayer!: XYRect[][]
+  private placedIndexByLayer!: Array<RBush<RTreeRect>>
   private expansionIndex!: number
   private edgeAnalysisDone!: boolean
   private totalSeedsThisGrid!: number
@@ -72,40 +75,57 @@ export class RectDiffSeedingSolver extends BaseSolver {
       height: srj.bounds.maxY - srj.bounds.minY,
     }
 
-    const obstaclesByLayer: XYRect[][] = Array.from(
-      { length: layerCount },
-      () => [],
-    )
+    let obstacleIndexByLayer: Array<RBush<RTreeRect>>
+    let boardVoidRects: XYRect[]
 
-    let boardVoidRects: XYRect[] = []
-    if (srj.outline && srj.outline.length > 2) {
-      boardVoidRects = computeInverseRects(bounds, srj.outline as any)
-      for (const voidR of boardVoidRects) {
-        for (let z = 0; z < layerCount; z++) {
-          obstaclesByLayer[z]!.push(voidR)
+    if (this.input.obstacleIndexByLayer) {
+      obstacleIndexByLayer = this.input.obstacleIndexByLayer
+      boardVoidRects = this.input.boardVoidRects ?? []
+    } else {
+      obstacleIndexByLayer = Array.from(
+        { length: layerCount },
+        () => new RBush<RTreeRect>(),
+      )
+
+      const insertObstacle = (rect: XYRect, z: number) => {
+        const treeRect = {
+          ...rect,
+          minX: rect.x,
+          minY: rect.y,
+          maxX: rect.x + rect.width,
+          maxY: rect.y + rect.height,
+        }
+        obstacleIndexByLayer[z]?.insert(treeRect)
+      }
+
+      boardVoidRects = []
+      if (srj.outline && srj.outline.length > 2) {
+        boardVoidRects = computeInverseRects(bounds, srj.outline as any)
+        for (const voidR of boardVoidRects) {
+          for (let z = 0; z < layerCount; z++) insertObstacle(voidR, z)
         }
       }
-    }
 
-    for (const obstacle of srj.obstacles ?? []) {
-      const rect = obstacleToXYRect(obstacle as any)
-      if (!rect) continue
-      const zLayers = obstacleZs(obstacle as any, zIndexByName)
-      const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
-      if (invalidZs.length) {
-        throw new Error(
-          `RectDiff: obstacle uses z-layer indices ${invalidZs.join(",")} outside 0-${
-            layerCount - 1
-          }`,
-        )
+      for (const obstacle of srj.obstacles ?? []) {
+        const rect = obstacleToXYRect(obstacle as any)
+        if (!rect) continue
+        const zLayers = obstacleZs(obstacle as any, zIndexByName)
+        const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
+        if (invalidZs.length) {
+          throw new Error(
+            `RectDiff: obstacle uses z-layer indices ${invalidZs.join(",")} outside 0-${
+              layerCount - 1
+            }`,
+          )
+        }
+        if (
+          (!obstacle.zLayers || obstacle.zLayers.length === 0) &&
+          zLayers.length
+        ) {
+          obstacle.zLayers = zLayers
+        }
+        for (const z of zLayers) insertObstacle(rect, z)
       }
-      if (
-        (!obstacle.zLayers || obstacle.zLayers.length === 0) &&
-        zLayers.length
-      ) {
-        obstacle.zLayers = zLayers
-      }
-      for (const z of zLayers) obstaclesByLayer[z]!.push(rect)
     }
 
     const trace = Math.max(0.01, srj.minTraceWidth || 0.15)
@@ -137,22 +157,19 @@ export class RectDiffSeedingSolver extends BaseSolver {
         computeDefaultGridSizes(bounds),
     }
 
-    const placedByLayer: XYRect[][] = Array.from(
-      { length: layerCount },
-      () => [],
-    )
-
     this.srj = srj
     this.layerNames = layerNames
     this.layerCount = layerCount
     this.bounds = bounds
     this.options = options
-    this.obstaclesByLayer = obstaclesByLayer
     this.boardVoidRects = boardVoidRects
     this.gridIndex = 0
     this.candidates = []
     this.placed = []
-    this.placedByLayer = placedByLayer
+    this.placedIndexByLayer = Array.from(
+      { length: layerCount },
+      () => new RBush<RTreeRect>(),
+    )
     this.expansionIndex = 0
     this.edgeAnalysisDone = false
     this.totalSeedsThisGrid = 0
@@ -198,9 +215,9 @@ export class RectDiffSeedingSolver extends BaseSolver {
         bounds: this.bounds,
         gridSize: grid,
         layerCount: this.layerCount,
-        obstaclesByLayer: this.obstaclesByLayer,
-        placedByLayer: this.placedByLayer,
         hardPlacedByLayer,
+        obstacleIndexByLayer: this.input.obstacleIndexByLayer,
+        placedIndexByLayer: this.placedIndexByLayer,
       })
       this.totalSeedsThisGrid = this.candidates.length
       this.consumedSeedsThisGrid = 0
@@ -220,8 +237,8 @@ export class RectDiffSeedingSolver extends BaseSolver {
             bounds: this.bounds,
             minSize,
             layerCount: this.layerCount,
-            obstaclesByLayer: this.obstaclesByLayer,
-            placedByLayer: this.placedByLayer,
+            obstacleIndexByLayer: this.input.obstacleIndexByLayer,
+            placedIndexByLayer: this.placedIndexByLayer,
             hardPlacedByLayer,
           })
           this.edgeAnalysisDone = true
@@ -247,8 +264,8 @@ export class RectDiffSeedingSolver extends BaseSolver {
       layerCount: this.layerCount,
       minSpan: minMulti.minLayers,
       maxSpan: maxMultiLayerSpan,
-      obstaclesByLayer: this.obstaclesByLayer,
-      placedByLayer: hardPlacedByLayer,
+      obstacleIndexByLayer: this.input.obstacleIndexByLayer,
+      additionalBlockersByLayer: hardPlacedByLayer,
     })
 
     const attempts: Array<{
@@ -276,8 +293,8 @@ export class RectDiffSeedingSolver extends BaseSolver {
       // HARD blockers only: obstacles on those layers + full-stack nodes
       const hardBlockers: XYRect[] = []
       for (const z of attempt.layers) {
-        if (this.obstaclesByLayer[z])
-          hardBlockers.push(...this.obstaclesByLayer[z]!)
+        const obstacleLayer = this.input.obstacleIndexByLayer[z]
+        if (obstacleLayer) hardBlockers.push(...obstacleLayer.all())
         if (hardPlacedByLayer[z]) hardBlockers.push(...hardPlacedByLayer[z]!)
       }
 
@@ -296,15 +313,26 @@ export class RectDiffSeedingSolver extends BaseSolver {
       // Place the new node
       const placed: Placed3D = { rect, zLayers: [...attempt.layers] }
       const newIndex = this.placed.push(placed) - 1
-      for (const z of attempt.layers) this.placedByLayer[z]!.push(rect)
+      for (const z of attempt.layers) {
+        const idx = this.placedIndexByLayer[z]
+        if (idx) {
+          idx.insert({
+            ...rect,
+            minX: rect.x,
+            minY: rect.y,
+            maxX: rect.x + rect.width,
+            maxY: rect.y + rect.height,
+          })
+        }
+      }
 
       // New: carve overlapped soft nodes
       resizeSoftOverlaps(
         {
           layerCount: this.layerCount,
           placed: this.placed,
-          placedByLayer: this.placedByLayer,
           options: this.options,
+          placedIndexByLayer: this.placedIndexByLayer,
         },
         newIndex,
       )
@@ -312,14 +340,12 @@ export class RectDiffSeedingSolver extends BaseSolver {
       // New: relax candidate culling — only drop seeds that became fully occupied
       this.candidates = this.candidates.filter(
         (c) =>
-          !isFullyOccupiedAtPoint(
-            {
-              layerCount: this.layerCount,
-              obstaclesByLayer: this.obstaclesByLayer,
-              placedByLayer: this.placedByLayer,
-            },
-            { x: c.x, y: c.y },
-          ),
+          !isFullyOccupiedAtPoint({
+            layerCount: this.layerCount,
+            obstacleIndexByLayer: this.input.obstacleIndexByLayer,
+            placedIndexByLayer: this.placedIndexByLayer,
+            point: { x: c.x, y: c.y },
+          }),
       )
 
       return // processed one candidate
@@ -352,12 +378,10 @@ export class RectDiffSeedingSolver extends BaseSolver {
       layerCount: this.layerCount,
       bounds: this.bounds,
       options: this.options,
-      obstaclesByLayer: this.obstaclesByLayer,
       boardVoidRects: this.boardVoidRects,
       gridIndex: this.gridIndex,
       candidates: this.candidates,
       placed: this.placed,
-      placedByLayer: this.placedByLayer,
       expansionIndex: this.expansionIndex,
       edgeAnalysisDone: this.edgeAnalysisDone,
       totalSeedsThisGrid: this.totalSeedsThisGrid,

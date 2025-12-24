@@ -2,6 +2,8 @@ import type { Candidate3D, XYRect } from "../../rectdiff-types"
 import { EPS, distancePointToRectEdges } from "../../utils/rectdiff-geometry"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
+import type RBush from "rbush"
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
 
 /**
  * Compute candidate seed points for a given grid size.
@@ -10,16 +12,16 @@ export function computeCandidates3D(params: {
   bounds: XYRect
   gridSize: number
   layerCount: number
-  obstaclesByLayer: XYRect[][]
-  placedByLayer: XYRect[][]
+  obstacleIndexByLayer: Array<RBush<RTreeRect> | undefined>
+  placedIndexByLayer: Array<RBush<RTreeRect> | undefined>
   hardPlacedByLayer: XYRect[][]
 }): Candidate3D[] {
   const {
     bounds,
     gridSize,
     layerCount,
-    obstaclesByLayer,
-    placedByLayer,
+    obstacleIndexByLayer,
+    placedIndexByLayer,
     hardPlacedByLayer,
   } = params
   const out = new Map<string, Candidate3D>() // key by (x,y)
@@ -38,14 +40,12 @@ export function computeCandidates3D(params: {
 
       // New rule: Only drop if EVERY layer is occupied (by obstacle or node)
       if (
-        isFullyOccupiedAtPoint(
-          {
-            layerCount,
-            obstaclesByLayer,
-            placedByLayer,
-          },
-          { x, y },
-        )
+        isFullyOccupiedAtPoint({
+          layerCount,
+          obstacleIndexByLayer,
+          placedIndexByLayer,
+          point: { x, y },
+        })
       )
         continue
 
@@ -60,8 +60,8 @@ export function computeCandidates3D(params: {
           layerCount,
           minSpan: 1,
           maxSpan: undefined,
-          obstaclesByLayer,
-          placedByLayer: hardPlacedByLayer,
+          obstacleIndexByLayer,
+          additionalBlockersByLayer: hardPlacedByLayer,
         })
         if (s.length > bestSpan.length) {
           bestSpan = s
@@ -74,7 +74,7 @@ export function computeCandidates3D(params: {
 
       // Distance heuristic against hard blockers only (obstacles + full-stack)
       const hardAtZ = [
-        ...(obstaclesByLayer[anchorZ] ?? []),
+        ...(obstacleIndexByLayer[anchorZ]?.all() ?? []),
         ...(hardPlacedByLayer[anchorZ] ?? []),
       ]
       const d = Math.min(

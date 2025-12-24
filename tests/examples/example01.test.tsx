@@ -2,6 +2,11 @@ import { expect, test } from "bun:test"
 import simpleRouteJson from "../../test-assets/example01.json"
 import { RectDiffPipeline } from "../../lib/RectDiffPipeline"
 import { getSvgFromGraphicsObject } from "graphics-debug"
+import {
+  buildZIndexMap,
+  obstacleToXYRect,
+  obstacleZs,
+} from "lib/solvers/RectDiffSeedingSolver/layers"
 
 test.skip("example01", () => {
   const solver = new RectDiffPipeline({ simpleRouteJson })
@@ -17,7 +22,19 @@ test.skip("example01", () => {
   const step = 0.004
   const layerCount = simpleRouteJson.layerCount || 2
   const state = (solver as any).state
-  const obstacles = state.obstaclesByLayer
+  const { zIndexByName } = buildZIndexMap(simpleRouteJson as any)
+  const obstacles = Array.from({ length: layerCount }, () => [] as any[])
+  for (const obstacle of simpleRouteJson.obstacles ?? []) {
+    const rect = obstacleToXYRect(obstacle as any)
+    if (!rect) continue
+    const zLayers =
+      obstacle.zLayers?.length && obstacle.zLayers.length > 0
+        ? obstacle.zLayers
+        : obstacleZs(obstacle as any, zIndexByName)
+    zLayers.forEach((z: number) => {
+      if (z >= 0 && z < layerCount) obstacles[z]!.push(rect)
+    })
+  }
   const placed = state.placed
 
   const gapPoints: Array<{ x: number; y: number; z: number }> = []
