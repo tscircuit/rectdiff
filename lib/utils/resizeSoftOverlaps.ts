@@ -1,12 +1,14 @@
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
 import type { Placed3D, XYRect } from "../rectdiff-types"
 import { overlaps, subtractRect2D, EPS } from "./rectdiff-geometry"
+import type RBush from "rbush"
 
 export function resizeSoftOverlaps(
   params: {
     layerCount: number
     placed: Placed3D[]
-    placedByLayer: XYRect[][]
     options: any
+    placedIndexByLayer?: Array<RBush<RTreeRect> | undefined>
   },
   newIndex: number,
 ) {
@@ -54,21 +56,48 @@ export function resizeSoftOverlaps(
     }
   }
 
-  // Remove (and clear placedByLayer)
+  // Remove fully overlapped nodes and keep indexes in sync
+  const rectToTree = (rect: XYRect): RTreeRect => ({
+    ...rect,
+    minX: rect.x,
+    minY: rect.y,
+    maxX: rect.x + rect.width,
+    maxY: rect.y + rect.height,
+  })
+  const sameRect = (a: RTreeRect, b: RTreeRect) =>
+    a.minX === b.minX &&
+    a.minY === b.minY &&
+    a.maxX === b.maxX &&
+    a.maxY === b.maxY
+
   removeIdx
     .sort((a, b) => b - a)
     .forEach((idx) => {
       const rem = params.placed.splice(idx, 1)[0]!
-      for (const z of rem.zLayers) {
-        const arr = params.placedByLayer[z]!
-        const j = arr.findIndex((r) => r === rem.rect)
-        if (j >= 0) arr.splice(j, 1)
+      if (params.placedIndexByLayer) {
+        for (const z of rem.zLayers) {
+          const tree = params.placedIndexByLayer[z]
+          if (tree) tree.remove(rectToTree(rem.rect), sameRect)
+        }
       }
     })
 
   // Add replacements
   for (const p of toAdd) {
     params.placed.push(p)
-    for (const z of p.zLayers) params.placedByLayer[z]!.push(p.rect)
+    for (const z of p.zLayers) {
+      if (params.placedIndexByLayer) {
+        const idx = params.placedIndexByLayer[z]
+        if (idx) {
+          idx.insert({
+            ...p.rect,
+            minX: p.rect.x,
+            minY: p.rect.y,
+            maxX: p.rect.x + p.rect.width,
+            maxY: p.rect.y + p.rect.height,
+          })
+        }
+      }
+    }
   }
 }

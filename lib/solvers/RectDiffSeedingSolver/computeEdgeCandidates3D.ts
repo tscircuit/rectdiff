@@ -2,6 +2,8 @@ import type { Candidate3D, XYRect } from "../../rectdiff-types"
 import { EPS, distancePointToRectEdges } from "../../utils/rectdiff-geometry"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
+import type RBush from "rbush"
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
 
 /**
  * Compute exact uncovered segments along a 1D line.
@@ -79,16 +81,16 @@ export function computeEdgeCandidates3D(params: {
   bounds: XYRect
   minSize: number
   layerCount: number
-  obstaclesByLayer: XYRect[][]
-  placedByLayer: XYRect[][]
+  obstacleIndexByLayer: Array<RBush<RTreeRect> | undefined>
+  placedIndexByLayer: Array<RBush<RTreeRect> | undefined>
   hardPlacedByLayer: XYRect[][]
 }): Candidate3D[] {
   const {
     bounds,
     minSize,
     layerCount,
-    obstaclesByLayer,
-    placedByLayer,
+    obstacleIndexByLayer,
+    placedIndexByLayer,
     hardPlacedByLayer,
   } = params
 
@@ -100,14 +102,12 @@ export function computeEdgeCandidates3D(params: {
     `${p.z}|${p.x.toFixed(6)}|${p.y.toFixed(6)}`
 
   function fullyOcc(p: { x: number; y: number }) {
-    return isFullyOccupiedAtPoint(
-      {
-        layerCount,
-        obstaclesByLayer,
-        placedByLayer,
-      },
-      p,
-    )
+    return isFullyOccupiedAtPoint({
+      layerCount,
+      obstacleIndexByLayer,
+      placedIndexByLayer,
+      point: p,
+    })
   }
 
   function pushIfFree(p: { x: number; y: number; z: number }) {
@@ -123,7 +123,7 @@ export function computeEdgeCandidates3D(params: {
 
     // Distance uses obstacles + hard nodes (soft nodes ignored for ranking)
     const hard = [
-      ...(obstaclesByLayer[z] ?? []),
+      ...(obstacleIndexByLayer[z]?.all() ?? []),
       ...(hardPlacedByLayer[z] ?? []),
     ]
     const d = Math.min(
@@ -145,15 +145,15 @@ export function computeEdgeCandidates3D(params: {
       layerCount,
       minSpan: 1,
       maxSpan: undefined,
-      obstaclesByLayer,
-      placedByLayer: hardPlacedByLayer,
+      obstacleIndexByLayer,
+      additionalBlockersByLayer: hardPlacedByLayer,
     })
     out.push({ x, y, z, distance: d, zSpanLen: span.length, isEdgeSeed: true })
   }
 
   for (let z = 0; z < layerCount; z++) {
     const blockers = [
-      ...(obstaclesByLayer[z] ?? []),
+      ...(obstacleIndexByLayer[z]?.all() ?? []),
       ...(hardPlacedByLayer[z] ?? []),
     ]
 
