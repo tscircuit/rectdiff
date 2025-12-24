@@ -51,29 +51,29 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
         this.input.inputMeshNodes.flatMap((n) => n.availableZ ?? []).sort(),
       ),
     )
+
+    // Add board cutout areas as special mesh nodes that block expansion
     const boardCutoutNodes: IndexedCapacityMeshNode[] = (
       this.input.boardCutoutArea ?? []
-    )
-      .filter((rect) => rect.width > 0 && rect.height > 0)
-      .map((rect, idx) => {
-        const center = {
-          x: rect.x + rect.width / 2,
-          y: rect.y + rect.height / 2,
-        }
-        return {
-          capacityMeshNodeId: `board-void-${idx}`,
-          center,
-          width: rect.width,
-          height: rect.height,
-          availableZ: allLayerZs.length ? allLayerZs : [0],
-          layer: "board-void",
-          _boardCutout: true,
-          minX: center.x - rect.width / 2,
-          minY: center.y - rect.height / 2,
-          maxX: center.x + rect.width / 2,
-          maxY: center.y + rect.height / 2,
-        }
-      })
+    ).map((rect, idx) => {
+      const center = {
+        x: rect.x + rect.width / 2,
+        y: rect.y + rect.height / 2,
+      }
+      return {
+        capacityMeshNodeId: `board-void-${idx}`,
+        center,
+        width: rect.width,
+        height: rect.height,
+        availableZ: allLayerZs.length ? allLayerZs : [0],
+        layer: "board-void",
+        _boardCutout: true,
+        minX: center.x - rect.width / 2,
+        minY: center.y - rect.height / 2,
+        maxX: center.x + rect.width / 2,
+        maxY: center.y + rect.height / 2,
+      }
+    })
     const meshNodesForIndex: IndexedCapacityMeshNode[] =
       this.input.inputMeshNodes.map((n) => ({
         ...n,
