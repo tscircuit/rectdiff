@@ -50,7 +50,10 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
       RectDiffExpansionSolver,
       (pipeline: RectDiffGridSolverPipeline) => [
         {
-          initialSnapshot: pipeline.rectDiffSeedingSolver!.getOutput(),
+          initialSnapshot: {
+            ...pipeline.rectDiffSeedingSolver!.getOutput(),
+            boardVoidRects: pipeline.boardVoidRects ?? [],
+          },
           obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
         },
       ],

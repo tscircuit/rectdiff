@@ -47,7 +47,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
     gridSizes: number[]
     maxMultiLayerSpan: number | undefined
   }
-  private boardVoidRects!: XYRect[]
+  private boardVoidRects?: XYRect[]
   private gridIndex!: number
   private candidates!: Candidate3D[]
   private placed!: Placed3D[]
@@ -73,59 +73,6 @@ export class RectDiffSeedingSolver extends BaseSolver {
       y: srj.bounds.minY,
       width: srj.bounds.maxX - srj.bounds.minX,
       height: srj.bounds.maxY - srj.bounds.minY,
-    }
-
-    let obstacleIndexByLayer: Array<RBush<RTreeRect>>
-    let boardVoidRects: XYRect[]
-
-    if (this.input.obstacleIndexByLayer) {
-      obstacleIndexByLayer = this.input.obstacleIndexByLayer
-      boardVoidRects = this.input.boardVoidRects ?? []
-    } else {
-      obstacleIndexByLayer = Array.from(
-        { length: layerCount },
-        () => new RBush<RTreeRect>(),
-      )
-
-      const insertObstacle = (rect: XYRect, z: number) => {
-        const treeRect = {
-          ...rect,
-          minX: rect.x,
-          minY: rect.y,
-          maxX: rect.x + rect.width,
-          maxY: rect.y + rect.height,
-        }
-        obstacleIndexByLayer[z]?.insert(treeRect)
-      }
-
-      boardVoidRects = []
-      if (srj.outline && srj.outline.length > 2) {
-        boardVoidRects = computeInverseRects(bounds, srj.outline as any)
-        for (const voidR of boardVoidRects) {
-          for (let z = 0; z < layerCount; z++) insertObstacle(voidR, z)
-        }
-      }
-
-      for (const obstacle of srj.obstacles ?? []) {
-        const rect = obstacleToXYRect(obstacle as any)
-        if (!rect) continue
-        const zLayers = obstacleZs(obstacle as any, zIndexByName)
-        const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
-        if (invalidZs.length) {
-          throw new Error(
-            `RectDiff: obstacle uses z-layer indices ${invalidZs.join(",")} outside 0-${
-              layerCount - 1
-            }`,
-          )
-        }
-        if (
-          (!obstacle.zLayers || obstacle.zLayers.length === 0) &&
-          zLayers.length
-        ) {
-          obstacle.zLayers = zLayers
-        }
-        for (const z of zLayers) insertObstacle(rect, z)
-      }
     }
 
     const trace = Math.max(0.01, srj.minTraceWidth || 0.15)
@@ -162,7 +109,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
     this.layerCount = layerCount
     this.bounds = bounds
     this.options = options
-    this.boardVoidRects = boardVoidRects
+    this.boardVoidRects = this.input.boardVoidRects
     this.gridIndex = 0
     this.candidates = []
     this.placed = []
