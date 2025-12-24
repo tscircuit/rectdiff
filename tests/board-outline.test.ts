@@ -11,8 +11,7 @@ test("board outline snapshot", async () => {
   // Run to completion
   solver.solve()
 
-  const viz =
-    solver.rectDiffGridSolverPipeline!.rectDiffSeedingSolver!.visualize()
+  const viz = solver.finalVisualize()
   const svg = getSvgFromGraphicsObject(viz)
 
   await expect(svg).toMatchSvgSnapshot(import.meta.path)
