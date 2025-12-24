@@ -7,7 +7,7 @@ import {
   type Rect,
 } from "graphics-debug"
 import { RectDiffPipeline } from "lib/RectDiffPipeline"
-import { makeCapacityMeshNodeWithLayerInfo } from "tests/fixtures/makeCapqcityNode"
+import { makeCapacityMeshNodeWithLayerInfo } from "tests/fixtures/makeCapacityMeshNodeWithLayerInfo"
 
 test("RectDiffPipeline mesh layer snapshots", async () => {
   const solver = new RectDiffPipeline({

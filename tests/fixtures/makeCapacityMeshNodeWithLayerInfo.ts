@@ -1,11 +1,9 @@
 import type { Rect } from "graphics-debug"
-import type { RectDiffPipeline } from "lib/RectDiffPipeline"
+import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
 import { getColorForZLayer } from "lib/utils/getColorForZLayer"
 
-type MeshNodes = ReturnType<RectDiffPipeline["getOutput"]>["meshNodes"]
-
 export const makeCapacityMeshNodeWithLayerInfo = (
-  nodes: MeshNodes,
+  nodes: CapacityMeshNode[],
 ): Map<string, Rect[]> => {
   const map = new Map<string, Rect[]>()
 
