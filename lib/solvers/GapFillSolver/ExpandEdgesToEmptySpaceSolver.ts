@@ -7,8 +7,18 @@ import { EDGE_MAP, EDGES } from "./edge-constants"
 import { getBoundsFromCorners } from "./getBoundsFromCorners"
 import type { Bounds } from "@tscircuit/math-utils"
 import { midpoint, segmentToBoxMinDistance } from "@tscircuit/math-utils"
+import type { XYRect } from "lib/rectdiff-types"
 
 const EPS = 1e-4
+
+export type ExpandEdgesToEmptySpaceSolverInput = {
+  inputMeshNodes: CapacityMeshNode[]
+  segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace>
+  boardVoid?: {
+    boardVoidRects: XYRect[]
+    layerCount: number
+  }
+}
 
 export interface ExpandedSegment {
   segment: SegmentWithAdjacentEmptySpace
@@ -28,15 +38,31 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
 
   rectSpatialIndex: RBush<CapacityMeshNode>
 
-  constructor(
-    private input: {
-      inputMeshNodes: CapacityMeshNode[]
-      segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace>
-    },
-  ) {
+  constructor(private input: ExpandEdgesToEmptySpaceSolverInput) {
     super()
     this.unprocessedSegments = [...this.input.segmentsWithAdjacentEmptySpace]
     this.rectSpatialIndex = new RBush<CapacityMeshNode>()
+    // create fake bound for the boardVoidRects
+    this.rectSpatialIndex.load(
+      this.input.boardVoid?.boardVoidRects.map((rect, index) => ({
+        capacityMeshNodeId: `void-rect-${index}`,
+        center: {
+          x: rect.x + rect.width / 2,
+          y: rect.y + rect.height / 2,
+        },
+        width: rect.width,
+        height: rect.height,
+        availableZ: Array.from(
+          { length: this.input.boardVoid?.layerCount || 0 },
+          (_, i) => i,
+        ),
+        layer: "void",
+        minX: rect.x,
+        minY: rect.y,
+        maxX: rect.x + rect.width,
+        maxY: rect.y + rect.height,
+      })) || [],
+    )
     this.rectSpatialIndex.load(
       this.input.inputMeshNodes.map((n) => ({
         ...n,

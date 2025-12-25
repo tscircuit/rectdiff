@@ -10,26 +10,26 @@ import { RectDiffSeedingSolver } from "lib/solvers/RectDiffSeedingSolver/RectDif
 import { RectDiffExpansionSolver } from "lib/solvers/RectDiffExpansionSolver/RectDiffExpansionSolver"
 import type { GraphicsObject } from "graphics-debug"
 import RBush from "rbush"
-import { buildObstacleIndexes } from "./buildObstacleIndexes"
+import { buildObstacleIndexesByLayer } from "./buildObstacleIndexes"
 
 export type RectDiffGridSolverPipelineInput = {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
+  boardVoidRects?: XYRect[]
 }
 
 export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridSolverPipelineInput> {
   rectDiffSeedingSolver?: RectDiffSeedingSolver
   rectDiffExpansionSolver?: RectDiffExpansionSolver
-  private boardVoidRects?: XYRect[]
   private obstacleIndexByLayer: Array<RBush<RTreeRect>>
 
   constructor(inputProblem: RectDiffGridSolverPipelineInput) {
     super(inputProblem)
-    const { obstacleIndexByLayer, boardVoidRects } = buildObstacleIndexes(
-      inputProblem.simpleRouteJson,
-    )
+    const { obstacleIndexByLayer } = buildObstacleIndexesByLayer({
+      srj: inputProblem.simpleRouteJson,
+      boardVoidRects: inputProblem.boardVoidRects,
+    })
     this.obstacleIndexByLayer = obstacleIndexByLayer
-    this.boardVoidRects = boardVoidRects
   }
 
   override pipelineDef: PipelineStep<any>[] = [
@@ -41,7 +41,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
           simpleRouteJson: pipeline.inputProblem.simpleRouteJson,
           gridOptions: pipeline.inputProblem.gridOptions,
           obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
-          boardVoidRects: pipeline.boardVoidRects,
+          boardVoidRects: pipeline.inputProblem.boardVoidRects,
         },
       ],
     ),
@@ -52,7 +52,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
         {
           initialSnapshot: {
             ...pipeline.rectDiffSeedingSolver!.getOutput(),
-            boardVoidRects: pipeline.boardVoidRects ?? [],
+            boardVoidRects: pipeline.inputProblem.boardVoidRects ?? [],
           },
           obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
         },
