@@ -1,0 +1,72 @@
+{
+  "description": "H-shaped configuration - two vertical nodes with a horizontal connector in the middle",
+  "expectedBehavior": "Should detect segments on all exposed edges and expand into empty spaces around the H shape",
+  "meshNodes": [
+    {
+      "capacityMeshNodeId": "node-left-vertical",
+      "center": { "x": -3, "y": 0 },
+      "width": 1,
+      "height": 6,
+      "layer": "top",
+      "availableZ": [0]
+    },
+    {
+      "capacityMeshNodeId": "node-right-vertical",
+      "center": { "x": 3, "y": 0 },
+      "width": 1,
+      "height": 6,
+      "layer": "top",
+      "availableZ": [0]
+    },
+    {
+      "capacityMeshNodeId": "node-middle-horizontal",
+      "center": { "x": 0, "y": 0 },
+      "width": 2,
+      "height": 1,
+      "layer": "top",
+      "availableZ": [0]
+    }
+  ],
+  "expectedSegments": [
+    {
+      "description": "Left vertical - left edge",
+      "parentNodeId": "node-left-vertical",
+      "facingDirection": "x-"
+    },
+    {
+      "description": "Left vertical - top edge (above horizontal)",
+      "parentNodeId": "node-left-vertical",
+      "facingDirection": "y+"
+    },
+    {
+      "description": "Left vertical - bottom edge (below horizontal)",
+      "parentNodeId": "node-left-vertical",
+      "facingDirection": "y-"
+    },
+    {
+      "description": "Right vertical - right edge",
+      "parentNodeId": "node-right-vertical",
+      "facingDirection": "x+"
+    },
+    {
+      "description": "Right vertical - top edge (above horizontal)",
+      "parentNodeId": "node-right-vertical",
+      "facingDirection": "y+"
+    },
+    {
+      "description": "Right vertical - bottom edge (below horizontal)",
+      "parentNodeId": "node-right-vertical",
+      "facingDirection": "y-"
+    },
+    {
+      "description": "Middle horizontal - top edge",
+      "parentNodeId": "node-middle-horizontal",
+      "facingDirection": "y+"
+    },
+    {
+      "description": "Middle horizontal - bottom edge",
+      "parentNodeId": "node-middle-horizontal",
+      "facingDirection": "y-"
+    }
+  ]
+}
