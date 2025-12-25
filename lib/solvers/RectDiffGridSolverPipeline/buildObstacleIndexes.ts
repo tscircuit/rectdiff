@@ -9,12 +9,13 @@ import {
 import type { XYRect } from "lib/rectdiff-types"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
 
-export const buildObstacleIndexes = (
-  srj: SimpleRouteJson,
-): {
+export const buildObstacleIndexesByLayer = (params: {
+  srj: SimpleRouteJson
+  boardVoidRects?: XYRect[]
+}): {
   obstacleIndexByLayer: Array<RBush<RTreeRect>>
-  boardVoidRects: XYRect[]
 } => {
+  const { srj, boardVoidRects } = params
   const { layerNames, zIndexByName } = buildZIndexMap(srj)
   const layerCount = Math.max(1, layerNames.length, srj.layerCount || 1)
   const bounds: XYRect = {
@@ -39,10 +40,8 @@ export const buildObstacleIndexes = (
     obstacleIndexByLayer[z]?.insert(treeRect)
   }
 
-  let boardVoidRects: XYRect[] = []
   if (srj.outline && srj.outline.length > 2) {
-    boardVoidRects = computeInverseRects(bounds, srj.outline as any)
-    for (const voidRect of boardVoidRects) {
+    for (const voidRect of boardVoidRects ?? []) {
       for (let z = 0; z < layerCount; z++) insertObstacle(voidRect, z)
     }
   }
@@ -66,5 +65,5 @@ export const buildObstacleIndexes = (
     for (const z of zLayers) insertObstacle(rect, z)
   }
 
-  return { obstacleIndexByLayer, boardVoidRects }
+  return { obstacleIndexByLayer }
 }

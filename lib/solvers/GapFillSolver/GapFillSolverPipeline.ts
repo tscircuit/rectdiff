@@ -3,15 +3,21 @@ import {
   definePipelineStep,
   type PipelineStep,
 } from "@tscircuit/solver-utils"
-import type { SimpleRouteJson } from "lib/types/srj-types"
 import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { FindSegmentsWithAdjacentEmptySpaceSolver } from "./FindSegmentsWithAdjacentEmptySpaceSolver"
 import { ExpandEdgesToEmptySpaceSolver } from "./ExpandEdgesToEmptySpaceSolver"
+import type { XYRect } from "lib/rectdiff-types"
 
-export class GapFillSolverPipeline extends BasePipelineSolver<{
+type GapFillSolverInput = {
   meshNodes: CapacityMeshNode[]
-}> {
+  boardVoid?: {
+    boardVoidRects: XYRect[]
+    layerCount: number
+  }
+}
+
+export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput> {
   findSegmentsWithAdjacentEmptySpaceSolver?: FindSegmentsWithAdjacentEmptySpaceSolver
   expandEdgesToEmptySpaceSolver?: ExpandEdgesToEmptySpaceSolver
 
@@ -39,6 +45,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<{
           segmentsWithAdjacentEmptySpace:
             gapFillPipeline.findSegmentsWithAdjacentEmptySpaceSolver!.getOutput()
               .segmentsWithAdjacentEmptySpace,
+          boardVoid: gapFillPipeline.inputProblem.boardVoid,
         },
       ],
       {

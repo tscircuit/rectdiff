@@ -4,12 +4,13 @@ import {
   type PipelineStep,
 } from "@tscircuit/solver-utils"
 import type { SimpleRouteJson } from "./types/srj-types"
-import type { GridFill3DOptions } from "./rectdiff-types"
+import type { GridFill3DOptions, XYRect } from "./rectdiff-types"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { GapFillSolverPipeline } from "./solvers/GapFillSolver/GapFillSolverPipeline"
 import { RectDiffGridSolverPipeline } from "./solvers/RectDiffGridSolverPipeline/RectDiffGridSolverPipeline"
 import { createBaseVisualization } from "./rectdiff-visualization"
+import { computeInverseRects } from "./solvers/RectDiffSeedingSolver/computeInverseRects"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -19,6 +20,7 @@ export interface RectDiffPipelineInput {
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
   rectDiffGridSolverPipeline?: RectDiffGridSolverPipeline
   gapFillSolver?: GapFillSolverPipeline
+  boardVoidRects: XYRect[] | undefined
 
   override pipelineDef: PipelineStep<any>[] = [
     definePipelineStep(
@@ -28,6 +30,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
         {
           simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
           gridOptions: rectDiffPipeline.inputProblem.gridOptions,
+          boardVoidRects: rectDiffPipeline.boardVoidRects,
         },
       ],
     ),
@@ -39,10 +42,33 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           meshNodes:
             rectDiffPipeline.rectDiffGridSolverPipeline?.getOutput()
               .meshNodes ?? [],
+          boardVoid: {
+            boardVoidRects: rectDiffPipeline.boardVoidRects || [],
+            layerCount:
+              rectDiffPipeline.inputProblem.simpleRouteJson.layerCount || 0,
+          },
         },
       ],
     ),
   ]
+
+  override _setup(): void {
+    if (this.inputProblem.simpleRouteJson.outline) {
+      this.boardVoidRects = computeInverseRects(
+        {
+          x: this.inputProblem.simpleRouteJson.bounds.minX,
+          y: this.inputProblem.simpleRouteJson.bounds.minY,
+          width:
+            this.inputProblem.simpleRouteJson.bounds.maxX -
+            this.inputProblem.simpleRouteJson.bounds.minX,
+          height:
+            this.inputProblem.simpleRouteJson.bounds.maxY -
+            this.inputProblem.simpleRouteJson.bounds.minY,
+        },
+        this.inputProblem.simpleRouteJson.outline ?? [],
+      )
+    }
+  }
 
   override getConstructorParams() {
     return [this.inputProblem]
