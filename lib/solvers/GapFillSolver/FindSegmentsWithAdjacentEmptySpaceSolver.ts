@@ -13,6 +13,7 @@ export interface SegmentWithAdjacentEmptySpace {
   end: { x: number; y: number }
   z: number
   facingDirection: "x+" | "x-" | "y+" | "y-"
+  isSegmentSameLengthAsParentEdge: boolean
 }
 
 const EPS = 1e-4
@@ -73,6 +74,7 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
             end,
             facingDirection: edge.facingDirection,
             z,
+            isSegmentSameLengthAsParentEdge: false,
           })
         }
       }
@@ -111,14 +113,14 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
       candidateEdge.end.y + EPS,
     )
 
-    const overlappingEdges = nearbyEdges
+    const mightBeOverlappingEdges = nearbyEdges
       .map((i) => this.allEdges[i]!)
       .filter((e) => e.z === candidateEdge.z)
-    this.lastOverlappingEdges = overlappingEdges
+    this.lastOverlappingEdges = mightBeOverlappingEdges
 
     const uncoveredSegments = projectToUncoveredSegments(
       candidateEdge,
-      overlappingEdges,
+      mightBeOverlappingEdges,
     )
     this.lastUncoveredSegments = uncoveredSegments
     this.segmentsWithAdjacentEmptySpace.push(...uncoveredSegments)
