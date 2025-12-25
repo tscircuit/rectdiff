@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import srj from "test-assets/bugreport11-b2de3c.json"
 import {
+  getBounds,
   getSvgFromGraphicsObject,
   stackGraphicsVertically,
   type GraphicsObject,
@@ -41,7 +42,7 @@ test("RectDiffPipeline mesh layer snapshots", async () => {
       let maxY = -Infinity
 
       for (const rect of layerRects) {
-        const top = rect.center.y + rect.height
+        const top = rect.center.y + rect.height * (2 / 3)
 
         if (top > maxY) maxY = top
       }
@@ -57,7 +58,7 @@ test("RectDiffPipeline mesh layer snapshots", async () => {
           text: `Layer z=${z}`,
           x: 0,
           y: labelY,
-          fontSize: 1,
+          fontSize: 0.5,
         },
       ],
       coordinateSystem: "cartesian",
@@ -69,8 +70,19 @@ test("RectDiffPipeline mesh layer snapshots", async () => {
     allGraphicsObjects.push(graphics)
   }
 
-  const svg = getSvgFromGraphicsObject(
-    stackGraphicsVertically(allGraphicsObjects),
+  const stackedGraphics = stackGraphicsVertically(allGraphicsObjects)
+  const bounds = getBounds(stackedGraphics)
+  const boundsWidth = Math.max(1, bounds.maxX - bounds.minX)
+  const boundsHeight = Math.max(1, bounds.maxY - bounds.minY)
+  const svgWidth = 640
+  const svgHeight = Math.max(
+    svgWidth,
+    Math.ceil((boundsHeight / boundsWidth) * svgWidth),
   )
+
+  const svg = getSvgFromGraphicsObject(stackedGraphics, {
+    svgWidth,
+    svgHeight,
+  })
   await expect(svg).toMatchSvgSnapshot(import.meta.path)
 })
