@@ -4,7 +4,7 @@ const EPS = 1e-4
 
 export function projectToUncoveredSegments(
   primaryEdge: SegmentWithAdjacentEmptySpace,
-  overlappingEdges: SegmentWithAdjacentEmptySpace[],
+  mightBeOverlappingEdges: SegmentWithAdjacentEmptySpace[],
 ): Array<SegmentWithAdjacentEmptySpace> {
   const isHorizontal = Math.abs(primaryEdge.start.y - primaryEdge.end.y) < EPS
   const isVertical = Math.abs(primaryEdge.start.x - primaryEdge.end.x) < EPS
@@ -23,7 +23,7 @@ export function projectToUncoveredSegments(
 
   // 1) project each overlapping edge to an interval on the primary edge
   const intervals: Array<{ s: number; e: number }> = []
-  for (const e of overlappingEdges) {
+  for (const e of mightBeOverlappingEdges) {
     if (e === primaryEdge) continue
 
     // only consider edges parallel + colinear (within EPS) with the primary edge
@@ -48,6 +48,7 @@ export function projectToUncoveredSegments(
         ...primaryEdge,
         start: { ...primaryEdge.start },
         end: { ...primaryEdge.end },
+        isSegmentSameLengthAsParentEdge: false,
       },
     ]
   }
@@ -87,6 +88,7 @@ export function projectToUncoveredSegments(
         start,
         end,
         z: primaryEdge.z,
+        isSegmentSameLengthAsParentEdge: true,
       }
     })
 }

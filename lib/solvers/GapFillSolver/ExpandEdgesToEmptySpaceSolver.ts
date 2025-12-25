@@ -174,17 +174,63 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     const nodeWidth = nodeBounds.maxX - nodeBounds.minX
     const nodeHeight = nodeBounds.maxY - nodeBounds.minY
 
-    const expandedSegment = {
-      segment,
-      newNode: {
-        capacityMeshNodeId: `new-${segment.parent.capacityMeshNodeId}-${this.expandedSegments.length}`,
-        center: nodeCenter,
-        width: nodeWidth,
-        height: nodeHeight,
-        availableZ: [segment.z],
-        layer: segment.parent.layer,
-      },
+    let expandedSegment: ExpandedSegment
+
+    if (segment.isSegmentSameLengthAsParentEdge) {
+      // Segment is broken, create a new node
+      expandedSegment = {
+        segment,
+        newNode: {
+          capacityMeshNodeId: `new-${segment.parent.capacityMeshNodeId}-${this.expandedSegments.length}`,
+          center: nodeCenter,
+          width: nodeWidth,
+          height: nodeHeight,
+          availableZ: [segment.z],
+          layer: segment.parent.layer,
+        },
+      }
+    } else {
+      // Segment is not broken (original size), expand the parent node
+      const parentBounds = {
+        minX: segment.parent.center.x - segment.parent.width / 2,
+        minY: segment.parent.center.y - segment.parent.height / 2,
+        maxX: segment.parent.center.x + segment.parent.width / 2,
+        maxY: segment.parent.center.y + segment.parent.height / 2,
+      }
+
+      // Merge the parent bounds with the new expansion bounds
+      const mergedBounds = {
+        minX: Math.min(parentBounds.minX, nodeBounds.minX),
+        minY: Math.min(parentBounds.minY, nodeBounds.minY),
+        maxX: Math.max(parentBounds.maxX, nodeBounds.maxX),
+        maxY: Math.max(parentBounds.maxY, nodeBounds.maxY),
+      }
+
+      const mergedCenter = {
+        x: (mergedBounds.minX + mergedBounds.maxX) / 2,
+        y: (mergedBounds.minY + mergedBounds.maxY) / 2,
+      }
+      const mergedWidth = mergedBounds.maxX - mergedBounds.minX
+      const mergedHeight = mergedBounds.maxY - mergedBounds.minY
+
+      // Merge availableZ arrays (remove duplicates)
+      const mergedAvailableZ = Array.from(
+        new Set([...segment.parent.availableZ, segment.z]),
+      )
+
+      expandedSegment = {
+        segment,
+        newNode: {
+          capacityMeshNodeId: `expanded-${mergedWidth}-${mergedHeight}-${segment.parent.capacityMeshNodeId}`,
+          center: mergedCenter,
+          width: mergedWidth,
+          height: mergedHeight,
+          availableZ: mergedAvailableZ,
+          layer: segment.parent.layer,
+        },
+      }
     }
+
     this.lastExpandedSegment = expandedSegment
 
     if (nodeWidth < EPS || nodeHeight < EPS) {

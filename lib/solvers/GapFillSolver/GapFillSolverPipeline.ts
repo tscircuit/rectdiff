@@ -59,10 +59,24 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
   override getOutput(): { outputNodes: CapacityMeshNode[] } {
     const expandedSegments =
       this.expandEdgesToEmptySpaceSolver?.getOutput().expandedSegments ?? []
+
+    // Collect parent node IDs that were expanded (not broken)
+    const expandedParentNodeIds = new Set(
+      expandedSegments
+        .filter((es) => !es.segment.isSegmentSameLengthAsParentEdge)
+        .map((es) => es.segment.parent.capacityMeshNodeId),
+    )
+
+    // Filter out parent nodes that were expanded
+    const nonExpandedOriginalNodes = this.inputProblem.meshNodes.filter(
+      (node) => !expandedParentNodeIds.has(node.capacityMeshNodeId),
+    )
+
+    // Add all expanded nodes (both broken and non-broken segments)
     const expandedNodes = expandedSegments.map((es) => es.newNode)
 
     return {
-      outputNodes: [...this.inputProblem.meshNodes, ...expandedNodes],
+      outputNodes: [...nonExpandedOriginalNodes, ...expandedNodes],
     }
   }
 
