@@ -60,7 +60,6 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override initialVisualize(): GraphicsObject {
-    console.log("RectDiffPipeline - initialVisualize")
     const graphics = createBaseVisualization(
       this.inputProblem.simpleRouteJson,
       "RectDiffPipeline - Initial",
