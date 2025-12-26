@@ -216,6 +216,7 @@ export function expandRectFromSeed(params: {
   const initialH = Math.max(minSide, minReq.height)
   const blockers: XYRect[] = []
   const seen = new Set<string>()
+  const totalLayers = placedIndexByLayer.length
 
   // Ignore the existing placement we are expanding so it doesn't self-block.
 
@@ -232,6 +233,8 @@ export function expandRectFromSeed(params: {
       const placedLayer = placedIndexByLayer[z]
       if (placedLayer) {
         for (const entry of placedLayer.search(query)) {
+          const isFullStack = entry.zLayers.length >= totalLayers
+          if (!isFullStack) continue
           const rect = toRect(entry)
           if (
             isSelfRect({

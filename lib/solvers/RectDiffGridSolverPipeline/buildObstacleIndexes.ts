@@ -30,12 +30,13 @@ export const buildObstacleIndexesByLayer = (params: {
   )
 
   const insertObstacle = (rect: XYRect, z: number) => {
-    const treeRect = {
+    const treeRect: RTreeRect = {
       ...rect,
       minX: rect.x,
       minY: rect.y,
       maxX: rect.x + rect.width,
       maxY: rect.y + rect.height,
+      zLayers: [z],
     }
     obstacleIndexByLayer[z]?.insert(treeRect)
   }

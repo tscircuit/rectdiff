@@ -1,7 +1,8 @@
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
-import type { Placed3D, XYRect } from "../rectdiff-types"
+import type { Placed3D } from "../rectdiff-types"
 import { overlaps, subtractRect2D, EPS } from "./rectdiff-geometry"
 import type RBush from "rbush"
+import { rectToTree } from "./rectToTree"
 
 export function resizeSoftOverlaps(
   params: {
@@ -57,13 +58,6 @@ export function resizeSoftOverlaps(
   }
 
   // Remove fully overlapped nodes and keep indexes in sync
-  const rectToTree = (rect: XYRect): RTreeRect => ({
-    ...rect,
-    minX: rect.x,
-    minY: rect.y,
-    maxX: rect.x + rect.width,
-    maxY: rect.y + rect.height,
-  })
   const sameRect = (a: RTreeRect, b: RTreeRect) =>
     a.minX === b.minX &&
     a.minY === b.minY &&
@@ -77,7 +71,11 @@ export function resizeSoftOverlaps(
       if (params.placedIndexByLayer) {
         for (const z of rem.zLayers) {
           const tree = params.placedIndexByLayer[z]
-          if (tree) tree.remove(rectToTree(rem.rect), sameRect)
+          if (tree)
+            tree.remove(
+              rectToTree(rem.rect, { zLayers: rem.zLayers }),
+              sameRect,
+            )
         }
       }
     })
@@ -89,13 +87,7 @@ export function resizeSoftOverlaps(
       if (params.placedIndexByLayer) {
         const idx = params.placedIndexByLayer[z]
         if (idx) {
-          idx.insert({
-            ...p.rect,
-            minX: p.rect.x,
-            minY: p.rect.y,
-            maxX: p.rect.x + p.rect.width,
-            maxY: p.rect.y + p.rect.height,
-          })
+          idx.insert(rectToTree(p.rect, { zLayers: p.zLayers.slice() }))
         }
       }
     }
