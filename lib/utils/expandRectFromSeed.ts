@@ -1,7 +1,10 @@
 import type RBush from "rbush"
 import type { XYRect } from "../rectdiff-types"
 import { EPS, gt, gte, lt, lte, overlaps } from "./rectdiff-geometry"
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import type {
+  MightBeFullStackRect,
+  RTreeRect,
+} from "lib/types/capacity-mesh-types"
 import { isSelfRect } from "./isSelfRect"
 import {
   searchStripDown,
@@ -193,7 +196,7 @@ export function expandRectFromSeed(params: {
   gridSize: number
   bounds: XYRect
   obsticalIndexByLayer: Array<RBush<RTreeRect>>
-  placedIndexByLayer: Array<RBush<RTreeRect>>
+  placedIndexByLayer: Array<RBush<MightBeFullStackRect>>
   initialCellRatio: number
   maxAspectRatio: number | null | undefined
   minReq: { width: number; height: number }
@@ -232,6 +235,7 @@ export function expandRectFromSeed(params: {
       const placedLayer = placedIndexByLayer[z]
       if (placedLayer) {
         for (const entry of placedLayer.search(query)) {
+          if (!entry.isFullStack) continue
           const rect = toRect(entry)
           if (
             isSelfRect({

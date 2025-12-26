@@ -3,7 +3,10 @@ import { EPS, distancePointToRectEdges } from "../../utils/rectdiff-geometry"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import type RBush from "rbush"
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import type {
+  MightBeFullStackRect,
+  RTreeRect,
+} from "lib/types/capacity-mesh-types"
 
 /**
  * Compute candidate seed points for a given grid size.
@@ -13,7 +16,7 @@ export function computeCandidates3D(params: {
   gridSize: number
   layerCount: number
   obstacleIndexByLayer: Array<RBush<RTreeRect> | undefined>
-  placedIndexByLayer: Array<RBush<RTreeRect> | undefined>
+  placedIndexByLayer: Array<RBush<MightBeFullStackRect> | undefined>
   hardPlacedByLayer: XYRect[][]
 }): Candidate3D[] {
   const {

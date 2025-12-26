@@ -1,4 +1,7 @@
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import type {
+  MightBeFullStackRect,
+  RTreeRect,
+} from "lib/types/capacity-mesh-types"
 import type { Placed3D, XYRect } from "../rectdiff-types"
 import { overlaps, subtractRect2D, EPS } from "./rectdiff-geometry"
 import type RBush from "rbush"
@@ -8,7 +11,7 @@ export function resizeSoftOverlaps(
     layerCount: number
     placed: Placed3D[]
     options: any
-    placedIndexByLayer?: Array<RBush<RTreeRect> | undefined>
+    placedIndexByLayer?: Array<RBush<MightBeFullStackRect> | undefined>
   },
   newIndex: number,
 ) {
@@ -57,12 +60,16 @@ export function resizeSoftOverlaps(
   }
 
   // Remove fully overlapped nodes and keep indexes in sync
-  const rectToTree = (rect: XYRect): RTreeRect => ({
+  const rectToTree = (
+    rect: XYRect,
+    meta?: Partial<MightBeFullStackRect>,
+  ): MightBeFullStackRect => ({
     ...rect,
     minX: rect.x,
     minY: rect.y,
     maxX: rect.x + rect.width,
     maxY: rect.y + rect.height,
+    ...(meta ?? {}),
   })
   const sameRect = (a: RTreeRect, b: RTreeRect) =>
     a.minX === b.minX &&
@@ -89,13 +96,11 @@ export function resizeSoftOverlaps(
       if (params.placedIndexByLayer) {
         const idx = params.placedIndexByLayer[z]
         if (idx) {
-          idx.insert({
-            ...p.rect,
-            minX: p.rect.x,
-            minY: p.rect.y,
-            maxX: p.rect.x + p.rect.width,
-            maxY: p.rect.y + p.rect.height,
-          })
+          idx.insert(
+            rectToTree(p.rect, {
+              isFullStack: p.zLayers.length >= layerCount,
+            }),
+          )
         }
       }
     }

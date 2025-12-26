@@ -20,7 +20,10 @@ import { isFullyOccupiedAtPoint } from "lib/utils/isFullyOccupiedAtPoint"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { getColorForZLayer } from "lib/utils/getColorForZLayer"
 import RBush from "rbush"
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import type {
+  MightBeFullStackRect,
+  RTreeRect,
+} from "lib/types/capacity-mesh-types"
 
 export type RectDiffSeedingSolverInput = {
   simpleRouteJson: SimpleRouteJson
@@ -52,7 +55,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
   private gridIndex!: number
   private candidates!: Candidate3D[]
   private placed!: Placed3D[]
-  private placedIndexByLayer!: Array<RBush<RTreeRect>>
+  private placedIndexByLayer!: Array<RBush<MightBeFullStackRect>>
   private expansionIndex!: number
   private edgeAnalysisDone!: boolean
   private totalSeedsThisGrid!: number
@@ -116,7 +119,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
     this.placed = []
     this.placedIndexByLayer = Array.from(
       { length: layerCount },
-      () => new RBush<RTreeRect>(),
+      () => new RBush<MightBeFullStackRect>(),
     )
     this.expansionIndex = 0
     this.edgeAnalysisDone = false
@@ -255,6 +258,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
       // Place the new node
       const placed: Placed3D = { rect, zLayers: [...attempt.layers] }
       const newIndex = this.placed.push(placed) - 1
+      const isFullStack = attempt.layers.length >= this.layerCount
       for (const z of attempt.layers) {
         const idx = this.placedIndexByLayer[z]
         if (idx) {
@@ -264,6 +268,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
             minY: rect.y,
             maxX: rect.x + rect.width,
             maxY: rect.y + rect.height,
+            isFullStack,
           })
         }
       }
