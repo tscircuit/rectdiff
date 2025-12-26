@@ -39,4 +39,5 @@ export type RTreeRect = XYRect & {
   minY: number
   maxX: number
   maxY: number
+  zLayers: number[]
 }

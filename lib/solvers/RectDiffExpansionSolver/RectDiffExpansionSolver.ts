@@ -56,7 +56,10 @@ export class RectDiffExpansionSolver extends BaseSolver {
     for (const placement of this.input.placed) {
       for (const z of placement.zLayers) {
         const placedIndex = this.placedIndexByLayer[z]
-        if (placedIndex) placedIndex.insert(rectToTree(placement.rect))
+        if (placedIndex)
+          placedIndex.insert(
+            rectToTree(placement.rect, { zLayers: placement.zLayers }),
+          )
       }
     }
   }
@@ -104,8 +107,8 @@ export class RectDiffExpansionSolver extends BaseSolver {
       for (const z of p.zLayers) {
         const tree = this.placedIndexByLayer[z]
         if (tree) {
-          tree.remove(rectToTree(oldRect), sameTreeRect)
-          tree.insert(rectToTree(expanded))
+          tree.remove(rectToTree(oldRect, { zLayers: p.zLayers }), sameTreeRect)
+          tree.insert(rectToTree(expanded, { zLayers: p.zLayers }))
         }
       }
 

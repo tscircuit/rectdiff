@@ -21,6 +21,7 @@ import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { getColorForZLayer } from "lib/utils/getColorForZLayer"
 import RBush from "rbush"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import { rectToTree } from "lib/utils/rectToTree"
 
 export type RectDiffSeedingSolverInput = {
   simpleRouteJson: SimpleRouteJson
@@ -258,13 +259,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
       for (const z of attempt.layers) {
         const idx = this.placedIndexByLayer[z]
         if (idx) {
-          idx.insert({
-            ...rect,
-            minX: rect.x,
-            minY: rect.y,
-            maxX: rect.x + rect.width,
-            maxY: rect.y + rect.height,
-          })
+          idx.insert(rectToTree(rect, { zLayers: placed.zLayers }))
         }
       }
 
