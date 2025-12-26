@@ -238,23 +238,17 @@ export class RectDiffSeedingSolver extends BaseSolver {
     const ordered = preferMultiLayer ? attempts : attempts.reverse()
 
     for (const attempt of ordered) {
-      // HARD blockers only: obstacles on those layers + full-stack nodes
-      const hardBlockers: XYRect[] = []
-      for (const z of attempt.layers) {
-        const obstacleLayer = this.input.obstacleIndexByLayer[z]
-        if (obstacleLayer) hardBlockers.push(...obstacleLayer.all())
-        if (hardPlacedByLayer[z]) hardBlockers.push(...hardPlacedByLayer[z]!)
-      }
-
       const rect = expandRectFromSeed({
         startX: cand.x,
         startY: cand.y,
         gridSize: grid,
         bounds: this.bounds,
-        blockers: hardBlockers,
+        obsticalIndexByLayer: this.input.obstacleIndexByLayer,
+        placedIndexByLayer: this.placedIndexByLayer,
         initialCellRatio,
         maxAspectRatio,
         minReq: attempt.minReq,
+        zLayers: attempt.layers,
       })
       if (!rect) continue
 

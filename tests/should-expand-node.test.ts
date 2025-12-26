@@ -1,11 +1,13 @@
 import { expect, test } from "bun:test"
-import { getSvgFromGraphicsObject } from "graphics-debug"
+import { getSvgFromGraphicsObject, mergeGraphics } from "graphics-debug"
 import { RectDiffExpansionSolver } from "lib/solvers/RectDiffExpansionSolver/RectDiffExpansionSolver"
 import { createTwoNodeExpansionInput } from "lib/fixtures/twoNodeExpansionFixture"
 import { makeCapacityMeshNodeWithLayerInfo } from "./fixtures/makeCapacityMeshNodeWithLayerInfo"
+import { makeSimpleRouteOutlineGraphics } from "./fixtures/makeSimpleRouteOutlineGraphics"
 
 test("RectDiff expansion reproduces the two-node gap fixture", async () => {
-  const solver = new RectDiffExpansionSolver(createTwoNodeExpansionInput())
+  const input = createTwoNodeExpansionInput()
+  const solver = new RectDiffExpansionSolver(input)
 
   solver.solve()
 
@@ -13,8 +15,9 @@ test("RectDiff expansion reproduces the two-node gap fixture", async () => {
   expect(meshNodes.length).toBeGreaterThanOrEqual(2)
 
   const finalGraphics = makeCapacityMeshNodeWithLayerInfo(meshNodes)
+  const outline = makeSimpleRouteOutlineGraphics(input.srj)
   const svg = getSvgFromGraphicsObject(
-    { rects: finalGraphics.values().toArray().flat() },
+    mergeGraphics({ rects: finalGraphics.values().toArray().flat() }, outline),
     {
       svgWidth: 640,
       svgHeight: 480,

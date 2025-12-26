@@ -3,28 +3,21 @@ import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode, RTreeRect } from "lib/types/capacity-mesh-types"
 import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
 import { finalizeRects } from "../../utils/finalizeRects"
-import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { rectsToMeshNodes } from "./rectsToMeshNodes"
 import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
 import type { SimpleRouteJson } from "lib/types/srj-types"
-import {
-  buildZIndexMap,
-  obstacleToXYRect,
-  obstacleZs,
-} from "../RectDiffSeedingSolver/layers"
 import RBush from "rbush"
 import { rectToTree } from "../../utils/rectToTree"
 import { sameTreeRect } from "../../utils/sameTreeRect"
 
-export type RectDiffExpansionSolverSnapshot = {
+export type RectDiffExpansionSolverInput = {
   srj: SimpleRouteJson
   layerNames: string[]
   layerCount: number
   bounds: XYRect
   options: {
     gridSizes: number[]
-    // the engine only uses gridSizes here, other options are ignored
     [key: string]: any
   }
   boardVoidRects: XYRect[]
@@ -35,10 +28,6 @@ export type RectDiffExpansionSolverSnapshot = {
   edgeAnalysisDone: boolean
   totalSeedsThisGrid: number
   consumedSeedsThisGrid: number
-}
-
-export type RectDiffExpansionSolverInput = {
-  initialSnapshot: RectDiffExpansionSolverSnapshot
   obstacleIndexByLayer: Array<RBush<RTreeRect>>
 }
 
@@ -49,74 +38,25 @@ export type RectDiffExpansionSolverInput = {
  * and runs the EXPANSION phase, then finalizes to capacity mesh nodes.
  */
 export class RectDiffExpansionSolver extends BaseSolver {
-  // Engine fields (same shape used by rectdiff/engine.ts)
-  private srj!: SimpleRouteJson
-  private layerNames!: string[]
-  private layerCount!: number
-  private bounds!: XYRect
-  private options!: {
-    gridSizes: number[]
-    // the engine only uses gridSizes here, other options are ignored
-    [key: string]: any
-  }
-  private boardVoidRects!: XYRect[]
-  private gridIndex!: number
-  private candidates!: Candidate3D[]
-  private placed!: Placed3D[]
-  private placedIndexByLayer!: Array<RBush<RTreeRect>>
-  private expansionIndex!: number
-  private edgeAnalysisDone!: boolean
-  private totalSeedsThisGrid!: number
-  private consumedSeedsThisGrid!: number
-
-  private _meshNodes: CapacityMeshNode[] = []
-
+  placedIndexByLayer: Array<RBush<RTreeRect>> = []
+  _meshNodes: CapacityMeshNode[] = []
   constructor(private input: RectDiffExpansionSolverInput) {
     super()
-    // Copy engine snapshot fields directly onto this solver instance
-    Object.assign(this, this.input.initialSnapshot)
   }
 
   override _setup() {
     this.stats = {
-      gridIndex: this.gridIndex,
-    }
-
-    if (this.input.obstacleIndexByLayer) {
-    } else {
-      const { zIndexByName } = buildZIndexMap(this.srj)
-      this.input.obstacleIndexByLayer = Array.from(
-        { length: this.layerCount },
-        () => new RBush<RTreeRect>(),
-      )
-      const insertObstacle = (rect: XYRect, z: number) => {
-        const tree = this.input.obstacleIndexByLayer[z]
-        if (tree) tree.insert(rectToTree(rect))
-      }
-      for (const voidRect of this.boardVoidRects ?? []) {
-        for (let z = 0; z < this.layerCount; z++) insertObstacle(voidRect, z)
-      }
-      for (const obstacle of this.srj.obstacles ?? []) {
-        const rect = obstacleToXYRect(obstacle as any)
-        if (!rect) continue
-        const zLayers =
-          obstacle.zLayers?.length && obstacle.zLayers.length > 0
-            ? obstacle.zLayers
-            : obstacleZs(obstacle as any, zIndexByName)
-        zLayers.forEach((z) => {
-          if (z >= 0 && z < this.layerCount) insertObstacle(rect, z)
-        })
-      }
+      gridIndex: this.input.gridIndex,
     }
 
     this.placedIndexByLayer = Array.from(
-      { length: this.layerCount },
+      { length: this.input.layerCount },
       () => new RBush<RTreeRect>(),
     )
-    for (const placement of this.placed ?? []) {
+    for (const placement of this.input.placed) {
       for (const z of placement.zLayers) {
-        const tree = this.placedIndexByLayer[z]
-        if (tree) tree.insert(rectToTree(placement.rect))
+        const placedIndex = this.placedIndexByLayer[z]
+        if (placedIndex) placedIndex.insert(rectToTree(placement.rect))
       }
     }
   }
@@ -126,51 +66,41 @@ export class RectDiffExpansionSolver extends BaseSolver {
 
     this._stepExpansion()
 
-    this.stats.gridIndex = this.gridIndex
-    this.stats.placed = this.placed.length
+    this.stats.gridIndex = this.input.gridIndex
+    this.stats.placed = this.input.placed.length
 
-    if (this.expansionIndex >= this.placed.length) {
+    if (this.input.expansionIndex >= this.input.placed.length) {
       this.finalizeIfNeeded()
     }
   }
 
   private _stepExpansion(): void {
-    if (this.expansionIndex >= this.placed.length) {
+    if (this.input.expansionIndex >= this.input.placed.length) {
       return
     }
 
-    const idx = this.expansionIndex
-    const p = this.placed[idx]!
-    const lastGrid = this.options.gridSizes[this.options.gridSizes.length - 1]!
-
-    const hardPlacedByLayer = allLayerNode({
-      layerCount: this.layerCount,
-      placed: this.placed,
-    })
-
-    // HARD blockers only: obstacles on p.zLayers + full-stack nodes
-    const hardBlockers: XYRect[] = []
-    for (const z of p.zLayers) {
-      const obstacleTree = this.input.obstacleIndexByLayer[z]
-      if (obstacleTree) hardBlockers.push(...obstacleTree.all())
-      hardBlockers.push(...(hardPlacedByLayer[z] ?? []))
-    }
+    const idx = this.input.expansionIndex
+    const p = this.input.placed[idx]!
+    const lastGrid =
+      this.input.options.gridSizes[this.input.options.gridSizes.length - 1]!
 
     const oldRect = p.rect
     const expanded = expandRectFromSeed({
       startX: p.rect.x + p.rect.width / 2,
       startY: p.rect.y + p.rect.height / 2,
       gridSize: lastGrid,
-      bounds: this.bounds,
-      blockers: hardBlockers,
+      bounds: this.input.bounds,
+      obsticalIndexByLayer: this.input.obstacleIndexByLayer,
+      placedIndexByLayer: this.placedIndexByLayer,
       initialCellRatio: 0,
       maxAspectRatio: null,
       minReq: { width: p.rect.width, height: p.rect.height },
+      zLayers: p.zLayers,
     })
 
     if (expanded) {
       // Update placement + per-layer index (replace old rect object)
-      this.placed[idx] = { rect: expanded, zLayers: p.zLayers }
+      this.input.placed[idx] = { rect: expanded, zLayers: p.zLayers }
       for (const z of p.zLayers) {
         const tree = this.placedIndexByLayer[z]
         if (tree) {
@@ -182,25 +112,25 @@ export class RectDiffExpansionSolver extends BaseSolver {
       // Carve overlapped soft neighbors (respect full-stack nodes)
       resizeSoftOverlaps(
         {
-          layerCount: this.layerCount,
-          placed: this.placed,
-          options: this.options,
+          layerCount: this.input.layerCount,
+          placed: this.input.placed,
+          options: this.input.options,
           placedIndexByLayer: this.placedIndexByLayer,
         },
         idx,
       )
     }
 
-    this.expansionIndex += 1
+    this.input.expansionIndex += 1
   }
 
   private finalizeIfNeeded() {
     if (this.solved) return
 
     const rects = finalizeRects({
-      placed: this.placed,
-      srj: this.srj,
-      boardVoidRects: this.boardVoidRects,
+      placed: this.input.placed,
+      srj: this.input.srj,
+      boardVoidRects: this.input.boardVoidRects,
     })
     this._meshNodes = rectsToMeshNodes(rects)
     this.solved = true
@@ -208,25 +138,39 @@ export class RectDiffExpansionSolver extends BaseSolver {
 
   computeProgress(): number {
     if (this.solved) return 1
-    const grids = this.options.gridSizes.length
+    const grids = this.input.options.gridSizes.length
     const base = grids / (grids + 1)
-    const denom = Math.max(1, this.placed.length)
-    const frac = denom ? this.expansionIndex / denom : 1
+    const denom = Math.max(1, this.input.placed.length)
+    const frac = denom ? this.input.expansionIndex / denom : 1
     return Math.min(0.999, base + frac * (1 / (grids + 1)))
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    if (!this.solved && this._meshNodes.length === 0) {
-      this.finalizeIfNeeded()
-    }
-    return { meshNodes: this._meshNodes }
+    if (this.solved) return { meshNodes: this._meshNodes }
+
+    // Provide a live preview of the placements before finalization so debuggers
+    // can inspect intermediary states without forcing the solver to finish.
+    const previewNodes: CapacityMeshNode[] = this.input.placed.map(
+      (placement, idx) => ({
+        capacityMeshNodeId: `expand-preview-${idx}`,
+        center: {
+          x: placement.rect.x + placement.rect.width / 2,
+          y: placement.rect.y + placement.rect.height / 2,
+        },
+        width: placement.rect.width,
+        height: placement.rect.height,
+        availableZ: placement.zLayers.slice(),
+        layer: `z${placement.zLayers.join(",")}`,
+      }),
+    )
+    return { meshNodes: previewNodes }
   }
 
   /** Simple visualization of expanded placements. */
   override visualize(): GraphicsObject {
     const rects: NonNullable<GraphicsObject["rects"]> = []
 
-    for (const placement of this.placed ?? []) {
+    for (const placement of this.input.placed ?? []) {
       rects.push({
         center: {
           x: placement.rect.x + placement.rect.width / 2,
