@@ -238,7 +238,6 @@ export class RectDiffSeedingSolver extends BaseSolver {
     const ordered = preferMultiLayer ? attempts : attempts.reverse()
 
     for (const attempt of ordered) {
-
       const rect = expandRectFromSeed({
         startX: cand.x,
         startY: cand.y,

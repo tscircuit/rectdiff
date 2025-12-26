@@ -209,7 +209,8 @@ export function expandRectFromSeed(params: {
     for (const z of params.zLayers) {
       const blockersIndex = obsticalIndexByLayer[z]
       if (blockersIndex) {
-        for (const entry of blockersIndex.search(query)) addBlocker(toRect(entry))
+        for (const entry of blockersIndex.search(query))
+          addBlocker(toRect(entry))
       }
 
       const placedLayer = placedIndexByLayer[z]
