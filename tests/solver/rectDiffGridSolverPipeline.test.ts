@@ -3,17 +3,21 @@ import srj from "test-assets/bugreport11-b2de3c.json"
 import {
   getBounds,
   getSvgFromGraphicsObject,
+  mergeGraphics,
   stackGraphicsVertically,
   type GraphicsObject,
   type Rect,
 } from "graphics-debug"
 import { RectDiffPipeline } from "lib/RectDiffPipeline"
 import { makeCapacityMeshNodeWithLayerInfo } from "tests/fixtures/makeCapacityMeshNodeWithLayerInfo"
+import { makeSimpleRouteOutlineGraphics } from "tests/fixtures/makeSimpleRouteOutlineGraphics"
 
 test("RectDiffPipeline mesh layer snapshots", async () => {
   const solver = new RectDiffPipeline({
     simpleRouteJson: srj.simple_route_json,
   })
+
+  const outline = makeSimpleRouteOutlineGraphics(srj.simple_route_json)
 
   solver.solve()
 
@@ -67,7 +71,7 @@ test("RectDiffPipeline mesh layer snapshots", async () => {
       lines: [],
     }
 
-    allGraphicsObjects.push(graphics)
+    allGraphicsObjects.push(mergeGraphics(graphics, outline))
   }
 
   const stackedGraphics = stackGraphicsVertically(allGraphicsObjects)
