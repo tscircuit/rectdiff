@@ -1,6 +1,6 @@
 {
   "name": "@tscircuit/rectdiff",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
