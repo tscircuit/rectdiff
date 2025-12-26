@@ -1,6 +1,10 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
-import type { CapacityMeshNode, RTreeRect } from "lib/types/capacity-mesh-types"
+import type {
+  CapacityMeshNode,
+  MightBeFullStackRect,
+  RTreeRect,
+} from "lib/types/capacity-mesh-types"
 import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
 import { finalizeRects } from "../../utils/finalizeRects"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
@@ -38,7 +42,7 @@ export type RectDiffExpansionSolverInput = {
  * and runs the EXPANSION phase, then finalizes to capacity mesh nodes.
  */
 export class RectDiffExpansionSolver extends BaseSolver {
-  placedIndexByLayer: Array<RBush<RTreeRect>> = []
+  placedIndexByLayer: Array<RBush<MightBeFullStackRect>> = []
   _meshNodes: CapacityMeshNode[] = []
   constructor(private input: RectDiffExpansionSolverInput) {
     super()
@@ -51,12 +55,14 @@ export class RectDiffExpansionSolver extends BaseSolver {
 
     this.placedIndexByLayer = Array.from(
       { length: this.input.layerCount },
-      () => new RBush<RTreeRect>(),
+      () => new RBush<MightBeFullStackRect>(),
     )
     for (const placement of this.input.placed) {
+      const isFullStack = placement.zLayers.length >= this.input.layerCount
       for (const z of placement.zLayers) {
         const placedIndex = this.placedIndexByLayer[z]
-        if (placedIndex) placedIndex.insert(rectToTree(placement.rect))
+        if (placedIndex)
+          placedIndex.insert({ ...rectToTree(placement.rect), isFullStack })
       }
     }
   }
@@ -85,6 +91,8 @@ export class RectDiffExpansionSolver extends BaseSolver {
       this.input.options.gridSizes[this.input.options.gridSizes.length - 1]!
 
     const oldRect = p.rect
+    const zLayers = p.zLayers
+    const isFullStack = zLayers.length >= this.input.layerCount
     const expanded = expandRectFromSeed({
       startX: p.rect.x + p.rect.width / 2,
       startY: p.rect.y + p.rect.height / 2,
@@ -95,17 +103,17 @@ export class RectDiffExpansionSolver extends BaseSolver {
       initialCellRatio: 0,
       maxAspectRatio: null,
       minReq: { width: p.rect.width, height: p.rect.height },
-      zLayers: p.zLayers,
+      zLayers,
     })
 
     if (expanded) {
       // Update placement + per-layer index (replace old rect object)
-      this.input.placed[idx] = { rect: expanded, zLayers: p.zLayers }
-      for (const z of p.zLayers) {
+      this.input.placed[idx] = { rect: expanded, zLayers }
+      for (const z of zLayers) {
         const tree = this.placedIndexByLayer[z]
         if (tree) {
           tree.remove(rectToTree(oldRect), sameTreeRect)
-          tree.insert(rectToTree(expanded))
+          tree.insert({ ...rectToTree(expanded), isFullStack })
         }
       }
 

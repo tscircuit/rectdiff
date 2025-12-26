@@ -1,10 +1,13 @@
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import type {
+  MightBeFullStackRect,
+  RTreeRect,
+} from "lib/types/capacity-mesh-types"
 import RBush from "rbush"
 
 export type OccupancyParams = {
   layerCount: number
   obstacleIndexByLayer: Array<RBush<RTreeRect> | undefined>
-  placedIndexByLayer: Array<RBush<RTreeRect> | undefined>
+  placedIndexByLayer: Array<RBush<MightBeFullStackRect> | undefined>
   point: { x: number; y: number }
 }
 

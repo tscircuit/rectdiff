@@ -3,7 +3,10 @@ import { EPS, distancePointToRectEdges } from "../../utils/rectdiff-geometry"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import type RBush from "rbush"
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import type {
+  MightBeFullStackRect,
+  RTreeRect,
+} from "lib/types/capacity-mesh-types"
 
 /**
  * Compute exact uncovered segments along a 1D line.
@@ -82,7 +85,7 @@ export function computeEdgeCandidates3D(params: {
   minSize: number
   layerCount: number
   obstacleIndexByLayer: Array<RBush<RTreeRect> | undefined>
-  placedIndexByLayer: Array<RBush<RTreeRect> | undefined>
+  placedIndexByLayer: Array<RBush<MightBeFullStackRect> | undefined>
   hardPlacedByLayer: XYRect[][]
 }): Candidate3D[] {
   const {

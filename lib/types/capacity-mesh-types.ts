@@ -40,3 +40,8 @@ export type RTreeRect = XYRect & {
   maxX: number
   maxY: number
 }
+
+export type MightBeFullStackRect = RTreeRect & {
+  // if it covers all layers
+  isFullStack?: boolean
+}
