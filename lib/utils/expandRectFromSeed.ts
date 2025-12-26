@@ -3,6 +3,12 @@ import type { XYRect } from "../rectdiff-types"
 import { EPS, gt, gte, lt, lte, overlaps } from "./rectdiff-geometry"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
 import { isSelfRect } from "./isSelfRect"
+import {
+  searchStripDown,
+  searchStripLeft,
+  searchStripRight,
+  searchStripUp,
+} from "./searchStrip"
 
 type ExpandDirectionParams = {
   r: XYRect
@@ -151,6 +157,35 @@ function maxExpandUp(params: ExpandDirectionParams) {
   return Math.max(0, e)
 }
 
+const toRect = (tree: RTreeRect): XYRect => ({
+  x: tree.minX,
+  y: tree.minY,
+  width: tree.maxX - tree.minX,
+  height: tree.maxY - tree.minY,
+})
+
+const addBlocker = (params: {
+  rect: XYRect
+  seen: Set<string>
+  blockers: XYRect[]
+}) => {
+  const { rect, seen, blockers } = params
+  const key = `${rect.x}|${rect.y}|${rect.width}|${rect.height}`
+  if (seen.has(key)) return
+  seen.add(key)
+  blockers.push(rect)
+}
+
+const toQueryRect = (params: { bounds: XYRect; rect: XYRect }) => {
+  const { bounds, rect } = params
+  const minX = Math.max(bounds.x, rect.x)
+  const minY = Math.max(bounds.y, rect.y)
+  const maxX = Math.min(bounds.x + bounds.width, rect.x + rect.width)
+  const maxY = Math.min(bounds.y + bounds.height, rect.y + rect.height)
+  if (maxX <= minX + EPS || maxY <= minY + EPS) return null
+  return { minX, minY, maxX, maxY }
+}
+
 /** Grow a rect around a seed point, honoring bounds/blockers/aspect/min sizes. */
 export function expandRectFromSeed(params: {
   startX: number
@@ -181,36 +216,17 @@ export function expandRectFromSeed(params: {
   const initialH = Math.max(minSide, minReq.height)
   const blockers: XYRect[] = []
   const seen = new Set<string>()
-  const toRect = (tree: RTreeRect): XYRect => ({
-    x: tree.minX,
-    y: tree.minY,
-    width: tree.maxX - tree.minX,
-    height: tree.maxY - tree.minY,
-  })
+
   // Ignore the existing placement we are expanding so it doesn't self-block.
 
-  const addBlocker = (rect: XYRect) => {
-    const key = `${rect.x}|${rect.y}|${rect.width}|${rect.height}`
-    if (seen.has(key)) return
-    seen.add(key)
-    blockers.push(rect)
-  }
-  const toQueryRect = (rect: XYRect) => {
-    const minX = Math.max(bounds.x, rect.x)
-    const minY = Math.max(bounds.y, rect.y)
-    const maxX = Math.min(bounds.x + bounds.width, rect.x + rect.width)
-    const maxY = Math.min(bounds.y + bounds.height, rect.y + rect.height)
-    if (maxX <= minX + EPS || maxY <= minY + EPS) return null
-    return { minX, minY, maxX, maxY }
-  }
   const collectBlockers = (searchRect: XYRect) => {
-    const query = toQueryRect(searchRect)
+    const query = toQueryRect({ bounds, rect: searchRect })
     if (!query) return
     for (const z of params.zLayers) {
       const blockersIndex = obsticalIndexByLayer[z]
       if (blockersIndex) {
         for (const entry of blockersIndex.search(query))
-          addBlocker(toRect(entry))
+          addBlocker({ rect: toRect(entry), seen, blockers })
       }
 
       const placedLayer = placedIndexByLayer[z]
@@ -227,35 +243,11 @@ export function expandRectFromSeed(params: {
             })
           )
             continue
-          addBlocker(rect)
+          addBlocker({ rect, seen, blockers })
         }
       }
     }
   }
-  const searchStripRight = (rect: XYRect): XYRect => ({
-    x: rect.x,
-    y: rect.y,
-    width: bounds.x + bounds.width - rect.x,
-    height: rect.height,
-  })
-  const searchStripDown = (rect: XYRect): XYRect => ({
-    x: rect.x,
-    y: rect.y,
-    width: rect.width,
-    height: bounds.y + bounds.height - rect.y,
-  })
-  const searchStripLeft = (rect: XYRect): XYRect => ({
-    x: bounds.x,
-    y: rect.y,
-    width: rect.x - bounds.x,
-    height: rect.height,
-  })
-  const searchStripUp = (rect: XYRect): XYRect => ({
-    x: rect.x,
-    y: bounds.y,
-    width: rect.width,
-    height: rect.y - bounds.y,
-  })
 
   const strategies = [
     { ox: 0, oy: 0 },
@@ -296,7 +288,7 @@ export function expandRectFromSeed(params: {
       improved = false
       const commonParams = { bounds, blockers, maxAspect: maxAspectRatio }
 
-      collectBlockers(searchStripRight(r))
+      collectBlockers(searchStripRight({ rect: r, bounds }))
       const eR = maxExpandRight({ ...commonParams, r })
       if (eR > 0) {
         r = { ...r, width: r.width + eR }
@@ -304,7 +296,7 @@ export function expandRectFromSeed(params: {
         improved = true
       }
 
-      collectBlockers(searchStripDown(r))
+      collectBlockers(searchStripDown({ rect: r, bounds }))
       const eD = maxExpandDown({ ...commonParams, r })
       if (eD > 0) {
         r = { ...r, height: r.height + eD }
@@ -312,7 +304,7 @@ export function expandRectFromSeed(params: {
         improved = true
       }
 
-      collectBlockers(searchStripLeft(r))
+      collectBlockers(searchStripLeft({ rect: r, bounds }))
       const eL = maxExpandLeft({ ...commonParams, r })
       if (eL > 0) {
         r = { x: r.x - eL, y: r.y, width: r.width + eL, height: r.height }
@@ -320,7 +312,7 @@ export function expandRectFromSeed(params: {
         improved = true
       }
 
-      collectBlockers(searchStripUp(r))
+      collectBlockers(searchStripUp({ rect: r, bounds }))
       const eU = maxExpandUp({ ...commonParams, r })
       if (eU > 0) {
         r = { x: r.x, y: r.y - eU, width: r.width, height: r.height + eU }
