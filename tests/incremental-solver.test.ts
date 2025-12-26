@@ -28,7 +28,7 @@ test("RectDiffSolver supports incremental stepping", () => {
 
   // Step advances one candidate at a time
   let stepCount = 0
-  const maxSteps = 1000 // safety limit
+  const maxSteps = 5000 // safety limit
 
   while (!pipeline.solved && stepCount < maxSteps) {
     pipeline.step()

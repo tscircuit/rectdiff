@@ -48,15 +48,30 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
     definePipelineStep(
       "rectDiffExpansionSolver",
       RectDiffExpansionSolver,
-      (pipeline: RectDiffGridSolverPipeline) => [
-        {
-          initialSnapshot: {
-            ...pipeline.rectDiffSeedingSolver!.getOutput(),
+      (pipeline: RectDiffGridSolverPipeline) => {
+        const output = pipeline.rectDiffSeedingSolver?.getOutput()
+        if (!output) {
+          throw new Error("RectDiffSeedingSolver did not produce output")
+        }
+        return [
+          {
+            srj: pipeline.inputProblem.simpleRouteJson,
+            layerNames: output.layerNames ?? [],
             boardVoidRects: pipeline.inputProblem.boardVoidRects ?? [],
+            layerCount: pipeline.inputProblem.simpleRouteJson.layerCount,
+            bounds: output.bounds!,
+            candidates: output.candidates,
+            consumedSeedsThisGrid: output.placed.length,
+            totalSeedsThisGrid: output.candidates.length,
+            placed: output.placed,
+            edgeAnalysisDone: output.edgeAnalysisDone,
+            gridIndex: output.gridIndex,
+            expansionIndex: output.expansionIndex,
+            obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
+            options: output.options,
           },
-          obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
-        },
-      ],
+        ]
+      },
     ),
   ]
 
