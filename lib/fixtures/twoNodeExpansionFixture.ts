@@ -1,5 +1,8 @@
 import RBush from "rbush"
-import type { RectDiffExpansionSolverInput } from "../solvers/RectDiffExpansionSolver/RectDiffExpansionSolver"
+import type {
+  RectDiffExpansionSolverInput,
+  RectDiffExpansionSolverSnapshot,
+} from "../solvers/RectDiffExpansionSolver/RectDiffExpansionSolver"
 import type { SimpleRouteJson } from "../types/srj-types"
 import type { XYRect } from "../rectdiff-types"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
@@ -31,7 +34,7 @@ export const createTwoNodeExpansionInput = (): RectDiffExpansionSolverInput => {
   )
   // Start with all-empty obstacle indexes for a "clean" scenario
 
-  return {
+  const initialSnapshot: RectDiffExpansionSolverSnapshot = {
     srj,
     layerNames: ["top"],
     layerCount,
@@ -54,6 +57,10 @@ export const createTwoNodeExpansionInput = (): RectDiffExpansionSolverInput => {
     edgeAnalysisDone: true,
     totalSeedsThisGrid: 0,
     consumedSeedsThisGrid: 0,
+  }
+
+  return {
+    initialSnapshot,
     obstacleIndexByLayer,
   }
 }
