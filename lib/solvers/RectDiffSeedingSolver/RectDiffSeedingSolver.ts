@@ -251,10 +251,12 @@ export class RectDiffSeedingSolver extends BaseSolver {
         startY: cand.y,
         gridSize: grid,
         bounds: this.bounds,
-        blockers: hardBlockers,
+        obsticalIndexByLayer: this.input.obstacleIndexByLayer,
+        placedIndexByLayer: this.placedIndexByLayer,
         initialCellRatio,
         maxAspectRatio,
         minReq: attempt.minReq,
+        zLayers: attempt.layers,
       })
       if (!rect) continue
 
