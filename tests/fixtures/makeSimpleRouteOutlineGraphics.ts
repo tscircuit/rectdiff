@@ -1,4 +1,4 @@
-import type { GraphicsObject } from "graphics-debug"
+import type { GraphicsObject, Line } from "graphics-debug"
 import type { SimpleRouteJson } from "lib/types/srj-types"
 
 /**
@@ -7,7 +7,7 @@ import type { SimpleRouteJson } from "lib/types/srj-types"
 export const makeSimpleRouteOutlineGraphics = (
   srj: SimpleRouteJson,
 ): GraphicsObject => {
-  const lines: NonNullable<GraphicsObject["lines"]> = []
+  const lines: NonNullable<Line[]> = []
 
   if (srj.outline && srj.outline.length > 1) {
     lines.push({
