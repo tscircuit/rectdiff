@@ -1,0 +1,44 @@
+<svg width="640" height="1600" viewBox="0 0 640 1600" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="white"/><g><polyline data-points="-10,-10 10,-10 10,10 -10,10 -10,-10" data-type="line" data-label="bounds" points="40,722.2299999999999 600,722.2299999999999 600,162.2299999999999 40,162.2299999999999 40,722.2299999999999" fill="none" stroke="#111827" stroke-width="2.8000000000000003"/></g><g><polyline data-points="-10,-37.775 10,-37.775 10,-17.775 -10,-17.775 -10,-37.775" data-type="line" data-label="bounds" points="40,1499.9299999999998 600,1499.9299999999998 600,939.9299999999998 40,939.9299999999998 40,1499.9299999999998" fill="none" stroke="#111827" stroke-width="2.8000000000000003"/></g><g><rect data-type="rect" data-label="node" data-x="0" data-y="-5.16" x="40" y="451.18999999999994" width="560" height="271.03999999999996" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="-5.39" data-y="4.84" x="40" y="162.2299999999999" width="258.16" height="288.96000000000004" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="4.61" data-y="5.16" x="298.16" y="162.2299999999999" width="301.84" height="271.03999999999996" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="3.1800000000000006" data-y="-1.1102230246251565e-16" x="379.92" y="433.2699999999999" width="58.24000000000001" height="17.920000000000016" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="1.46" data-y="-1.1102230246251565e-16" x="341.84" y="433.2699999999999" width="38.08000000000004" height="17.920000000000016" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="6.93" data-y="-1.1102230246251565e-16" x="481.84" y="433.2699999999999" width="64.40000000000003" height="17.920000000000016" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="9.040000000000001" data-y="-1.1102230246251565e-16" x="546.24" y="433.2699999999999" width="53.75999999999999" height="17.920000000000016" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="0" data-y="-1.1102230246251565e-16" x="313.28" y="433.2699999999999" width="13.440000000000055" height="17.920000000000016" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="5" data-y="-1.1102230246251565e-16" x="453.28" y="433.2699999999999" width="13.440000000000055" height="17.920000000000016" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="-0.51" data-y="0" x="298.16" y="433.2699999999999" width="15.119999999999948" height="17.91999999999996" fill="red" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="0.51" data-y="0" x="326.72" y="433.2699999999999" width="15.119999999999948" height="17.91999999999996" fill="red" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="4.49" data-y="0" x="438.16" y="433.2699999999999" width="15.119999999999948" height="17.91999999999996" fill="red" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="5.51" data-y="0" x="466.72" y="433.2699999999999" width="15.119999999999948" height="17.91999999999996" fill="red" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="0" data-y="-32.935" x="40" y="1228.8899999999999" width="560" height="271.0400000000004" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="-5.39" data-y="-22.935" x="40" y="939.9299999999998" width="258.16" height="288.96000000000004" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="4.61" data-y="-22.615" x="298.16" y="939.9299999999998" width="301.84" height="271.03999999999996" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="3.1800000000000006" data-y="-27.775" x="379.92" y="1210.9699999999998" width="58.24000000000001" height="17.920000000000073" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="1.46" data-y="-27.775" x="341.84" y="1210.9699999999998" width="38.08000000000004" height="17.920000000000073" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="6.93" data-y="-27.775" x="481.84" y="1210.9699999999998" width="64.40000000000003" height="17.920000000000073" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="9.040000000000001" data-y="-27.775" x="546.24" y="1210.9699999999998" width="53.75999999999999" height="17.920000000000073" fill="#dbeafe" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="3.3306690738754696e-16" data-y="-27.775" x="298.16" y="1210.9699999999998" width="43.67999999999995" height="17.920000000000073" fill="#fef3c7" stroke="black" stroke-width="0.03571428571428571"/></g><g><rect data-type="rect" data-label="node" data-x="5" data-y="-27.775" x="438.16" y="1210.9699999999998" width="43.67999999999995" height="17.920000000000073" fill="#fef3c7" stroke="black" stroke-width="0.03571428571428571"/></g><text data-type="text" data-label="Layer z=0" data-x="0" data-y="11.719999999999999" x="320" y="114.06999999999994" fill="black" font-size="14" font-family="sans-serif" text-anchor="end" dominant-baseline="text-before-edge">Layer z=0</text><text data-type="text" data-label="Layer z=1" data-x="0" data-y="-16.055" x="320" y="891.7699999999999" fill="black" font-size="14" font-family="sans-serif" text-anchor="end" dominant-baseline="text-before-edge">Layer z=1</text><g id="crosshair" style="display: none"><line id="crosshair-h" y1="0" y2="1600" stroke="#666" stroke-width="0.5"/><line id="crosshair-v" x1="0" x2="640" stroke="#666" stroke-width="0.5"/><text id="coordinates" font-family="monospace" font-size="12" fill="#666"></text></g><script><![CDATA[
+              document.currentScript.parentElement.addEventListener('mousemove', (e) => {
+                const svg = e.currentTarget;
+                const rect = svg.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const crosshair = svg.getElementById('crosshair');
+                const h = svg.getElementById('crosshair-h');
+                const v = svg.getElementById('crosshair-v');
+                const coords = svg.getElementById('coordinates');
+                
+                crosshair.style.display = 'block';
+                h.setAttribute('x1', '0');
+                h.setAttribute('x2', '640');
+                h.setAttribute('y1', y);
+                h.setAttribute('y2', y);
+                v.setAttribute('x1', x);
+                v.setAttribute('x2', x);
+                v.setAttribute('y1', '0');
+                v.setAttribute('y2', '1600');
+
+                // Calculate real coordinates using inverse transformation
+                const matrix = {"a":28,"c":0,"e":320,"b":0,"d":-28,"f":442.2299999999999};
+                // Manually invert and apply the affine transform
+                // Since we only use translate and scale, we can directly compute:
+                // x' = (x - tx) / sx
+                // y' = (y - ty) / sy
+                const sx = matrix.a;
+                const sy = matrix.d;
+                const tx = matrix.e; 
+                const ty = matrix.f;
+                const realPoint = {
+                  x: (x - tx) / sx,
+                  y: (y - ty) / sy // Flip y back since we used negative scale
+                }
+                
+                coords.textContent = `(${realPoint.x.toFixed(2)}, ${realPoint.y.toFixed(2)})`;
+                coords.setAttribute('x', (x + 5).toString());
+                coords.setAttribute('y', (y - 5).toString());
+              });
+              document.currentScript.parentElement.addEventListener('mouseleave', () => {
+                document.currentScript.parentElement.getElementById('crosshair').style.display = 'none';
+              });
+            ]]></script></svg>
