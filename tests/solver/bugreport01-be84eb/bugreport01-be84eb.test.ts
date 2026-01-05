@@ -27,7 +27,7 @@ test("bugreport01-be84eb", async () => {
   const rectsByCombo = makeCapacityMeshNodeWithLayerInfo(meshNodes)
   const allGraphicsObjects: GraphicsObject[] = []
 
-  for (const z of Array.from({length: srj.layerCount}, (_, index) => index)) {
+  for (const z of Array.from({ length: srj.layerCount }, (_, index) => index)) {
     const layerRects: Rect[] = []
 
     for (const [key, rects] of rectsByCombo) {
@@ -91,4 +91,3 @@ test("bugreport01-be84eb", async () => {
   })
   await expect(svg).toMatchSvgSnapshot(import.meta.path)
 })
-
