@@ -51,19 +51,16 @@ export const buildObstacleIndexesByLayer = (params: {
     const rect = obstacleToXYRect(obstacle as any)
     if (!rect) continue
     const zLayers = obstacleZs(obstacle as any, zIndexByName)
-    const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
-    if (invalidZs.length) {
-      throw new Error(
-        `RectDiff: obstacle uses z-layer indices ${invalidZs.join(",")} outside 0-${layerCount - 1}`,
-      )
-    }
+    // Filter out z-layers outside the valid range instead of throwing an error
+    const validZLayers = zLayers.filter((z) => z >= 0 && z < layerCount)
+    if (validZLayers.length === 0) continue
     if (
       (!obstacle.zLayers || obstacle.zLayers.length === 0) &&
-      zLayers.length
+      validZLayers.length
     ) {
-      obstacle.zLayers = zLayers
+      obstacle.zLayers = validZLayers
     }
-    for (const z of zLayers) insertObstacle(rect, z)
+    for (const z of validZLayers) insertObstacle(rect, z)
   }
 
   return { obstacleIndexByLayer }
