@@ -16,6 +16,7 @@ export type RectDiffGridSolverPipelineInput = {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
   boardVoidRects?: XYRect[]
+  obstacleClearance?: number
 }
 
 export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridSolverPipelineInput> {
@@ -28,7 +29,9 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
     const { obstacleIndexByLayer } = buildObstacleIndexesByLayer({
       srj: inputProblem.simpleRouteJson,
       boardVoidRects: inputProblem.boardVoidRects,
+      obstacleClearance: inputProblem.obstacleClearance,
     })
+
     this.obstacleIndexByLayer = obstacleIndexByLayer
   }
 

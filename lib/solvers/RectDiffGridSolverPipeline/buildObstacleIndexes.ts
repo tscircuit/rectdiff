@@ -12,10 +12,11 @@ import type { RTreeRect } from "lib/types/capacity-mesh-types"
 export const buildObstacleIndexesByLayer = (params: {
   srj: SimpleRouteJson
   boardVoidRects?: XYRect[]
+  obstacleClearance?: number
 }): {
   obstacleIndexByLayer: Array<RBush<RTreeRect>>
 } => {
-  const { srj, boardVoidRects } = params
+  const { srj, boardVoidRects, obstacleClearance } = params
   const { layerNames, zIndexByName } = buildZIndexMap(srj)
   const layerCount = Math.max(1, layerNames.length, srj.layerCount || 1)
   const bounds: XYRect = {
@@ -30,12 +31,19 @@ export const buildObstacleIndexesByLayer = (params: {
   )
 
   const insertObstacle = (rect: XYRect, z: number) => {
+    const clearance = obstacleClearance ?? 0
+    const expandedRect: XYRect = {
+      x: rect.x - clearance,
+      y: rect.y - clearance,
+      width: rect.width + clearance * 2,
+      height: rect.height + clearance * 2,
+    }
     const treeRect: RTreeRect = {
-      ...rect,
-      minX: rect.x,
-      minY: rect.y,
-      maxX: rect.x + rect.width,
-      maxY: rect.y + rect.height,
+      ...expandedRect,
+      minX: expandedRect.x,
+      minY: expandedRect.y,
+      maxX: expandedRect.x + expandedRect.width,
+      maxY: expandedRect.y + expandedRect.height,
       zLayers: [z],
     }
     obstacleIndexByLayer[z]?.insert(treeRect)

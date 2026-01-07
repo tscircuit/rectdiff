@@ -15,6 +15,7 @@ import { computeInverseRects } from "./solvers/RectDiffSeedingSolver/computeInve
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
+  obstacleClearance?: number
 }
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
@@ -31,6 +32,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
           gridOptions: rectDiffPipeline.inputProblem.gridOptions,
           boardVoidRects: rectDiffPipeline.boardVoidRects,
+          obstacleClearance: rectDiffPipeline.inputProblem.obstacleClearance,
         },
       ],
     ),
