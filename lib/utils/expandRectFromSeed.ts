@@ -286,14 +286,20 @@ export function expandRectFromSeed(params: {
     for (const b of blockers) if (overlaps(r, b)) continue STRATS
 
     // greedy expansions in 4 directions
+    // Use a minimum expansion threshold to avoid infinitesimal improvements
+    // that can occur with mixed-precision floating point coordinates
+    const MIN_EXPANSION = 1e-6
+    const MAX_ITERATIONS = 1000
     let improved = true
-    while (improved) {
+    let iterations = 0
+    while (improved && iterations < MAX_ITERATIONS) {
+      iterations++
       improved = false
       const commonParams = { bounds, blockers, maxAspect: maxAspectRatio }
 
       collectBlockers(searchStripRight({ rect: r, bounds }))
       const eR = maxExpandRight({ ...commonParams, r })
-      if (eR > 0) {
+      if (eR > MIN_EXPANSION) {
         r = { ...r, width: r.width + eR }
         collectBlockers(r)
         improved = true
@@ -301,7 +307,7 @@ export function expandRectFromSeed(params: {
 
       collectBlockers(searchStripDown({ rect: r, bounds }))
       const eD = maxExpandDown({ ...commonParams, r })
-      if (eD > 0) {
+      if (eD > MIN_EXPANSION) {
         r = { ...r, height: r.height + eD }
         collectBlockers(r)
         improved = true
@@ -309,7 +315,7 @@ export function expandRectFromSeed(params: {
 
       collectBlockers(searchStripLeft({ rect: r, bounds }))
       const eL = maxExpandLeft({ ...commonParams, r })
-      if (eL > 0) {
+      if (eL > MIN_EXPANSION) {
         r = { x: r.x - eL, y: r.y, width: r.width + eL, height: r.height }
         collectBlockers(r)
         improved = true
@@ -317,7 +323,7 @@ export function expandRectFromSeed(params: {
 
       collectBlockers(searchStripUp({ rect: r, bounds }))
       const eU = maxExpandUp({ ...commonParams, r })
-      if (eU > 0) {
+      if (eU > MIN_EXPANSION) {
         r = { x: r.x, y: r.y - eU, width: r.width, height: r.height + eU }
         collectBlockers(r)
         improved = true

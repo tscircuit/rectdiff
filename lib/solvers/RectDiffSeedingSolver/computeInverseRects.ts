@@ -7,6 +7,31 @@ import {
 import { isPointInPolygon } from "./isPointInPolygon"
 
 /**
+ * Simplify a polygon by reducing coordinate precision to avoid excessive grid cells.
+ * This rounds coordinates to a grid and removes duplicates.
+ */
+function simplifyPolygon(
+  polygon: Array<{ x: number; y: number }>,
+  precision: number,
+): Array<{ x: number; y: number }> {
+  const round = (v: number) => Math.round(v / precision) * precision
+  const seen = new Set<string>()
+  const result: Array<{ x: number; y: number }> = []
+
+  for (const p of polygon) {
+    const rx = round(p.x)
+    const ry = round(p.y)
+    const key = `${rx},${ry}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push({ x: rx, y: ry })
+    }
+  }
+
+  return result
+}
+
+/**
  * Decompose the empty space inside 'bounds' but outside 'polygon' into rectangles.
  * This uses a coordinate grid approach, ideal for rectilinear polygons.
  */
@@ -16,10 +41,21 @@ export function computeInverseRects(
 ): XYRect[] {
   if (!polygon || polygon.length < 3) return []
 
+  // Simplify polygon if it has too many points to avoid O(n^2) performance issues
+  // A polygon with 350+ points (like rounded corners) creates too many grid cells
+  const MAX_POLYGON_POINTS = 100
+  const workingPolygon =
+    polygon.length > MAX_POLYGON_POINTS
+      ? simplifyPolygon(
+          polygon,
+          Math.max(bounds.width, bounds.height) / MAX_POLYGON_POINTS,
+        )
+      : polygon
+
   // 1. Collect unique sorted X and Y coordinates
   const xs = new Set<number>([bounds.x, bounds.x + bounds.width])
   const ys = new Set<number>([bounds.y, bounds.y + bounds.height])
-  for (const p of polygon) {
+  for (const p of workingPolygon) {
     xs.add(p.x)
     ys.add(p.y)
   }
