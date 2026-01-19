@@ -602,7 +602,7 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   useEffect(() => {
     const interval = setInterval(() => {
       // Only update if solver has output available
-      if (solver.solved || (solver).stats?.placed > 0) {
+      if (solver.solved || solver.stats?.placed > 0) {
         updateMeshNodes()
       }
     }, 100) // Poll every 100ms during active solving
