@@ -45,6 +45,7 @@ export function createBaseVisualization(
   // Draw obstacles
   for (const obstacle of srj.obstacles ?? []) {
     if (obstacle.type === "rect" || obstacle.type === "oval") {
+      const layerLabel = (obstacle.zLayers ?? []).join(",") || "all"
       rects.push({
         center: { x: obstacle.center.x, y: obstacle.center.y },
         width: obstacle.width,
@@ -52,7 +53,7 @@ export function createBaseVisualization(
         fill: "#fee2e2",
         stroke: "#ef4444",
         layer: "obstacle",
-        label: "obstacle",
+        label: `obstacle\nz:${layerLabel}`,
       })
     }
   }

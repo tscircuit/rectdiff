@@ -15,7 +15,15 @@ test("RectDiff expansion reproduces the two-node gap fixture", async () => {
   expect(meshNodes.length).toBeGreaterThanOrEqual(2)
 
   const finalGraphics = makeCapacityMeshNodeWithLayerInfo(meshNodes)
-  const outline = makeSimpleRouteOutlineGraphics(input.srj)
+  const outline = makeSimpleRouteOutlineGraphics({
+    bounds: {
+      minX: input.bounds.x,
+      maxX: input.bounds.x + input.bounds.width,
+      minY: input.bounds.y,
+      maxY: input.bounds.y + input.bounds.height,
+    },
+    outline: undefined,
+  })
   const svg = getSvgFromGraphicsObject(
     mergeGraphics({ rects: finalGraphics.values().toArray().flat() }, outline),
     {

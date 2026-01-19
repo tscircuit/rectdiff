@@ -1,11 +1,15 @@
 import type { GraphicsObject, Line } from "graphics-debug"
 import type { SimpleRouteJson } from "lib/types/srj-types"
+export type SimpleRouteOutlineInput = {
+  bounds: SimpleRouteJson["bounds"]
+  outline?: SimpleRouteJson["outline"]
+}
 
 /**
  * Creates a GraphicsObject that draws the SRJ outline (or bounds fallback).
  */
 export const makeSimpleRouteOutlineGraphics = (
-  srj: SimpleRouteJson,
+  srj: SimpleRouteOutlineInput,
 ): GraphicsObject => {
   const lines: NonNullable<Line[]> = []
 

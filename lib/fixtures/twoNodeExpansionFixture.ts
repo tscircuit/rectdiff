@@ -3,6 +3,7 @@ import type { RectDiffExpansionSolverInput } from "../solvers/RectDiffExpansionS
 import type { SimpleRouteJson } from "../types/srj-types"
 import type { XYRect } from "../rectdiff-types"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import { buildZIndexMap } from "../solvers/RectDiffSeedingSolver/layers"
 
 /**
  * Builds a minimal RectDiffExpansionSolver snapshot with exactly two nodes
@@ -31,9 +32,13 @@ export const createTwoNodeExpansionInput = (): RectDiffExpansionSolverInput => {
   )
   // Start with all-empty obstacle indexes for a "clean" scenario
 
+  const { zIndexByName, layerNames } = buildZIndexMap({
+    obstacles: srj.obstacles,
+    layerCount: srj.layerCount,
+  })
+
   return {
-    srj,
-    layerNames: ["top"],
+    layerNames,
     layerCount,
     bounds,
     options: { gridSizes: [1] },
@@ -55,5 +60,8 @@ export const createTwoNodeExpansionInput = (): RectDiffExpansionSolverInput => {
     totalSeedsThisGrid: 0,
     consumedSeedsThisGrid: 0,
     obstacleIndexByLayer,
+    zIndexByName,
+    layerNamesCanonical: layerNames,
+    obstacles: srj.obstacles,
   }
 }

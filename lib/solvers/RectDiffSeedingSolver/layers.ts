@@ -21,11 +21,15 @@ export function canonicalizeLayerOrder(names: string[]) {
   })
 }
 
-export function buildZIndexMap(srj: SimpleRouteJson) {
+// TODO: should not take a srj
+export function buildZIndexMap(params: {
+  obstacles?: Obstacle[]
+  layerCount?: number
+}) {
   const names = canonicalizeLayerOrder(
-    (srj.obstacles ?? []).flatMap((o) => o.layers ?? []),
+    (params.obstacles ?? []).flatMap((o) => o.layers ?? []),
   )
-  const declaredLayerCount = Math.max(1, srj.layerCount || names.length || 1)
+  const declaredLayerCount = Math.max(1, params.layerCount || names.length || 1)
   const fallback = Array.from({ length: declaredLayerCount }, (_, i) =>
     i === 0 ? "top" : i === declaredLayerCount - 1 ? "bottom" : `inner${i}`,
   )
@@ -78,8 +82,8 @@ export function obstacleZs(ob: Obstacle, zIndexByName: Map<string, number>) {
 }
 
 export function obstacleToXYRect(ob: Obstacle): XYRect | null {
-  const w = ob.width as any
-  const h = ob.height as any
+  const w = ob.width
+  const h = ob.height
   if (typeof w !== "number" || typeof h !== "number") return null
   return { x: ob.center.x - w / 2, y: ob.center.y - h / 2, width: w, height: h }
 }

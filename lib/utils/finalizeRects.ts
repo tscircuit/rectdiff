@@ -1,15 +1,16 @@
+import type { Obstacle } from "lib/types/srj-types"
 import type { Placed3D, Rect3d, XYRect } from "../rectdiff-types"
-import type { SimpleRouteJson } from "../types/srj-types"
 import {
-  buildZIndexMap,
   obstacleToXYRect,
   obstacleZs,
 } from "../solvers/RectDiffSeedingSolver/layers"
 
 export function finalizeRects(params: {
   placed: Placed3D[]
-  srj: SimpleRouteJson
+  obstacles: Obstacle[]
   boardVoidRects: XYRect[]
+  zIndexByName: Map<string, number>
+  obstacleClearance?: number
 }): Rect3d[] {
   // Convert all placed (free space) nodes to output format
   const out: Rect3d[] = params.placed.map((p) => ({
@@ -20,23 +21,30 @@ export function finalizeRects(params: {
     zLayers: [...p.zLayers].sort((a, b) => a - b),
   }))
 
-  const { zIndexByName } = buildZIndexMap(params.srj)
   const layersByKey = new Map<string, { rect: XYRect; layers: Set<number> }>()
 
-  for (const obstacle of params.srj.obstacles ?? []) {
-    const rect = obstacleToXYRect(obstacle as any)
-    if (!rect) continue
+  for (const obstacle of params.obstacles ?? []) {
+    const baseRect = obstacleToXYRect(obstacle)
+    if (!baseRect) continue
+    const rect = params.obstacleClearance
+      ? {
+          x: baseRect.x - params.obstacleClearance,
+          y: baseRect.y - params.obstacleClearance,
+          width: baseRect.width + 2 * params.obstacleClearance,
+          height: baseRect.height + 2 * params.obstacleClearance,
+        }
+      : baseRect
     const zLayers =
       obstacle.zLayers?.length && obstacle.zLayers.length > 0
         ? obstacle.zLayers
-        : obstacleZs(obstacle as any, zIndexByName)
+        : obstacleZs(obstacle, params.zIndexByName)
     const key = `${rect.x}:${rect.y}:${rect.width}:${rect.height}`
     let entry = layersByKey.get(key)
     if (!entry) {
       entry = { rect, layers: new Set() }
       layersByKey.set(key, entry)
     }
-    zLayers.forEach((layer) => entry!.layers.add(layer))
+    zLayers.forEach((layer: number) => entry!.layers.add(layer))
   }
 
   for (const { rect, layers } of layersByKey.values()) {

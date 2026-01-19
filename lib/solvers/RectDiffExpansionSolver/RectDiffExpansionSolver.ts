@@ -6,13 +6,12 @@ import { finalizeRects } from "../../utils/finalizeRects"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { rectsToMeshNodes } from "./rectsToMeshNodes"
 import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
-import type { SimpleRouteJson } from "lib/types/srj-types"
+import type { Obstacle } from "lib/types/srj-types"
 import RBush from "rbush"
 import { rectToTree } from "../../utils/rectToTree"
 import { sameTreeRect } from "../../utils/sameTreeRect"
 
 export type RectDiffExpansionSolverInput = {
-  srj: SimpleRouteJson
   layerNames: string[]
   layerCount: number
   bounds: XYRect
@@ -29,6 +28,10 @@ export type RectDiffExpansionSolverInput = {
   totalSeedsThisGrid: number
   consumedSeedsThisGrid: number
   obstacleIndexByLayer: Array<RBush<RTreeRect>>
+  zIndexByName: Map<string, number>
+  layerNamesCanonical: string[]
+  obstacles: Obstacle[]
+  obstacleClearance?: number
 }
 
 /**
@@ -132,8 +135,10 @@ export class RectDiffExpansionSolver extends BaseSolver {
 
     const rects = finalizeRects({
       placed: this.input.placed,
-      srj: this.input.srj,
+      obstacles: this.input.obstacles,
+      zIndexByName: this.input.zIndexByName,
       boardVoidRects: this.input.boardVoidRects,
+      obstacleClearance: this.input.obstacleClearance,
     })
     this._meshNodes = rectsToMeshNodes(rects)
     this.solved = true

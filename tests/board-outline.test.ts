@@ -6,7 +6,7 @@ import { makeCapacityMeshNodeWithLayerInfo } from "./fixtures/makeCapacityMeshNo
 
 test("board outline snapshot", async () => {
   const solver = new RectDiffPipeline({
-    simpleRouteJson: boardWithCutout as any,
+    simpleRouteJson: boardWithCutout,
   })
 
   // Run to completion
