@@ -17,6 +17,16 @@ type ExpandDirectionParams = {
   maxAspect: number | null | undefined
 }
 
+const quantize = (value: number, precision = 1e-6) =>
+  Math.round(value / precision) * precision
+
+const quantizeRect = (rect: XYRect): XYRect => ({
+  x: quantize(rect.x),
+  y: quantize(rect.y),
+  width: quantize(rect.width),
+  height: quantize(rect.height),
+})
+
 function maxExpandRight(params: ExpandDirectionParams) {
   const { r, bounds, blockers, maxAspect } = params
   // Start with board boundary
@@ -333,7 +343,7 @@ export function expandRectFromSeed(params: {
     if (r.width + EPS >= minReq.width && r.height + EPS >= minReq.height) {
       const area = r.width * r.height
       if (area > bestArea) {
-        best = r
+        best = quantizeRect(r)
         bestArea = area
       }
     }
