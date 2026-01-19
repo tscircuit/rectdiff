@@ -1,15 +1,12 @@
+import type { Obstacle } from "lib/types/srj-types"
 import type { Placed3D, Rect3d, XYRect } from "../rectdiff-types"
-import type { SimpleRouteJson } from "../types/srj-types"
-import {
-  buildZIndexMap,
-  obstacleToXYRect,
-  obstacleZs,
-} from "../solvers/RectDiffSeedingSolver/layers"
+import { obstacleToXYRect, obstacleZs } from "../solvers/RectDiffSeedingSolver/layers"
 
 export function finalizeRects(params: {
   placed: Placed3D[]
-  srj: SimpleRouteJson
+  obstacles: Obstacle[]
   boardVoidRects: XYRect[]
+  zIndexByName: Map<string, number>
 }): Rect3d[] {
   // Convert all placed (free space) nodes to output format
   const out: Rect3d[] = params.placed.map((p) => ({
@@ -20,23 +17,22 @@ export function finalizeRects(params: {
     zLayers: [...p.zLayers].sort((a, b) => a - b),
   }))
 
-  const { zIndexByName } = buildZIndexMap(params.srj)
   const layersByKey = new Map<string, { rect: XYRect; layers: Set<number> }>()
 
-  for (const obstacle of params.srj.obstacles ?? []) {
+  for (const obstacle of params.obstacles ?? []) {
     const rect = obstacleToXYRect(obstacle as any)
     if (!rect) continue
     const zLayers =
       obstacle.zLayers?.length && obstacle.zLayers.length > 0
         ? obstacle.zLayers
-        : obstacleZs(obstacle as any, zIndexByName)
+        : obstacleZs(obstacle as any, params.zIndexByName)
     const key = `${rect.x}:${rect.y}:${rect.width}:${rect.height}`
     let entry = layersByKey.get(key)
     if (!entry) {
       entry = { rect, layers: new Set() }
       layersByKey.set(key, entry)
     }
-    zLayers.forEach((layer) => entry!.layers.add(layer))
+    zLayers.forEach((layer: number) => entry!.layers.add(layer))
   }
 
   for (const { rect, layers } of layersByKey.values()) {

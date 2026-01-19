@@ -11,6 +11,7 @@ import { GapFillSolverPipeline } from "./solvers/GapFillSolver/GapFillSolverPipe
 import { RectDiffGridSolverPipeline } from "./solvers/RectDiffGridSolverPipeline/RectDiffGridSolverPipeline"
 import { createBaseVisualization } from "./rectdiff-visualization"
 import { computeInverseRects } from "./solvers/RectDiffSeedingSolver/computeInverseRects"
+import { buildZIndexMap } from "./solvers/RectDiffSeedingSolver/layers"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -21,6 +22,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   rectDiffGridSolverPipeline?: RectDiffGridSolverPipeline
   gapFillSolver?: GapFillSolverPipeline
   boardVoidRects: XYRect[] | undefined
+  zIndexByName?: Map<string, number>
+  layerNames?: string[]
 
   override pipelineDef: PipelineStep<any>[] = [
     definePipelineStep(
@@ -31,6 +34,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
           gridOptions: rectDiffPipeline.inputProblem.gridOptions,
           boardVoidRects: rectDiffPipeline.boardVoidRects,
+          layerNames: rectDiffPipeline.layerNames,
+          zIndexByName: rectDiffPipeline.zIndexByName,
         },
       ],
     ),
@@ -53,6 +58,12 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   ]
 
   override _setup(): void {
+    const { zIndexByName, layerNames } = buildZIndexMap({
+      obstacles: this.inputProblem.simpleRouteJson.obstacles,
+      layerCount: this.inputProblem.simpleRouteJson.layerCount,
+    })
+    this.zIndexByName = zIndexByName
+    this.layerNames = layerNames
     if (this.inputProblem.simpleRouteJson.outline) {
       this.boardVoidRects = computeInverseRects(
         {

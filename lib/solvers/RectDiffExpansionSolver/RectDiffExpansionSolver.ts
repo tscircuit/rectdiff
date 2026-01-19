@@ -3,6 +3,7 @@ import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode, RTreeRect } from "lib/types/capacity-mesh-types"
 import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
 import { finalizeRects } from "../../utils/finalizeRects"
+import { buildZIndexMap } from "../RectDiffSeedingSolver/layers"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { rectsToMeshNodes } from "./rectsToMeshNodes"
 import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
@@ -29,6 +30,8 @@ export type RectDiffExpansionSolverInput = {
   totalSeedsThisGrid: number
   consumedSeedsThisGrid: number
   obstacleIndexByLayer: Array<RBush<RTreeRect>>
+  zIndexByName: Map<string, number>
+  layerNamesCanonical: string[]
 }
 
 /**
@@ -132,7 +135,8 @@ export class RectDiffExpansionSolver extends BaseSolver {
 
     const rects = finalizeRects({
       placed: this.input.placed,
-      srj: this.input.srj,
+      obstacles: this.input.srj.obstacles,
+      zIndexByName: this.input.zIndexByName,
       boardVoidRects: this.input.boardVoidRects,
     })
     this._meshNodes = rectsToMeshNodes(rects)

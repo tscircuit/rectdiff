@@ -21,11 +21,15 @@ export function canonicalizeLayerOrder(names: string[]) {
   })
 }
 
-export function buildZIndexMap(srj: SimpleRouteJson) {
+// TODO: should not take a srj
+export function buildZIndexMap(params: {
+  obstacles?: Obstacle[]
+  layerCount?: number
+}) {
   const names = canonicalizeLayerOrder(
-    (srj.obstacles ?? []).flatMap((o) => o.layers ?? []),
+    (params.obstacles ?? []).flatMap((o) => o.layers ?? []),
   )
-  const declaredLayerCount = Math.max(1, srj.layerCount || names.length || 1)
+  const declaredLayerCount = Math.max(1, params.layerCount || names.length || 1)
   const fallback = Array.from({ length: declaredLayerCount }, (_, i) =>
     i === 0 ? "top" : i === declaredLayerCount - 1 ? "bottom" : `inner${i}`,
   )

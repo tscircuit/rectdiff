@@ -16,20 +16,26 @@ export type RectDiffGridSolverPipelineInput = {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
   boardVoidRects?: XYRect[]
+  layerNames?: string[]
+  zIndexByName?: Map<string, number>
 }
 
 export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridSolverPipelineInput> {
   rectDiffSeedingSolver?: RectDiffSeedingSolver
   rectDiffExpansionSolver?: RectDiffExpansionSolver
   private obstacleIndexByLayer: Array<RBush<RTreeRect>>
+  private layerNames: string[]
+  private zIndexByName: Map<string, number>
 
   constructor(inputProblem: RectDiffGridSolverPipelineInput) {
     super(inputProblem)
-    const { obstacleIndexByLayer } = buildObstacleIndexesByLayer({
+    const { obstacleIndexByLayer, layerNames, zIndexByName } = buildObstacleIndexesByLayer({
       srj: inputProblem.simpleRouteJson,
       boardVoidRects: inputProblem.boardVoidRects,
     })
     this.obstacleIndexByLayer = obstacleIndexByLayer
+    this.layerNames = inputProblem.layerNames ?? layerNames
+    this.zIndexByName = inputProblem.zIndexByName ?? zIndexByName
   }
 
   override pipelineDef: PipelineStep<any>[] = [
@@ -42,6 +48,8 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
           gridOptions: pipeline.inputProblem.gridOptions,
           obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
           boardVoidRects: pipeline.inputProblem.boardVoidRects,
+          layerNames: pipeline.layerNames,
+          zIndexByName: pipeline.zIndexByName,
         },
       ],
     ),
@@ -69,6 +77,8 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
             expansionIndex: output.expansionIndex,
             obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
             options: output.options,
+            zIndexByName: pipeline.zIndexByName,
+            layerNamesCanonical: pipeline.layerNames,
           },
         ]
       },

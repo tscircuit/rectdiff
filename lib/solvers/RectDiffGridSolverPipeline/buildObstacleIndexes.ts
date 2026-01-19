@@ -14,9 +14,14 @@ export const buildObstacleIndexesByLayer = (params: {
   boardVoidRects?: XYRect[]
 }): {
   obstacleIndexByLayer: Array<RBush<RTreeRect>>
+  layerNames: string[]
+  zIndexByName: Map<string, number>
 } => {
   const { srj, boardVoidRects } = params
-  const { layerNames, zIndexByName } = buildZIndexMap(srj)
+  const { layerNames, zIndexByName } = buildZIndexMap({
+    obstacles: srj.obstacles,
+    layerCount: srj.layerCount,
+  })
   const layerCount = Math.max(1, layerNames.length, srj.layerCount || 1)
   const bounds: XYRect = {
     x: srj.bounds.minX,
@@ -66,5 +71,5 @@ export const buildObstacleIndexesByLayer = (params: {
     for (const z of zLayers) insertObstacle(rect, z)
   }
 
-  return { obstacleIndexByLayer }
+  return { obstacleIndexByLayer, layerNames, zIndexByName }
 }

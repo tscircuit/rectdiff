@@ -28,6 +28,8 @@ export type RectDiffSeedingSolverInput = {
   obstacleIndexByLayer: Array<RBush<RTreeRect>>
   gridOptions?: Partial<GridFill3DOptions>
   boardVoidRects?: XYRect[]
+  layerNames: string[]
+  zIndexByName: Map<string, number>
 }
 
 /**
@@ -67,7 +69,13 @@ export class RectDiffSeedingSolver extends BaseSolver {
     const srj = this.input.simpleRouteJson
     const opts = this.input.gridOptions ?? {}
 
-    const { layerNames, zIndexByName } = buildZIndexMap(srj)
+    const precomputed = this.input.layerNames && this.input.zIndexByName
+    const { layerNames, zIndexByName } = precomputed
+      ? { layerNames: this.input.layerNames!, zIndexByName: this.input.zIndexByName! }
+      : buildZIndexMap({
+          obstacles: srj.obstacles,
+          layerCount: srj.layerCount,
+        })
     const layerCount = Math.max(1, layerNames.length, srj.layerCount || 1)
 
     const bounds: XYRect = {
