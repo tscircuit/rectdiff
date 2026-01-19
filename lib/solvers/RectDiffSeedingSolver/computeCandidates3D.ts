@@ -4,6 +4,8 @@ import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import type RBush from "rbush"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
+const quantize = (value: number, precision = 1e-6) =>
+  Math.round(value / precision) * precision
 
 /**
  * Compute candidate seed points for a given grid size.
@@ -83,13 +85,14 @@ export function computeCandidates3D(params: {
           ? hardAtZ.map((b) => distancePointToRectEdges({ x, y }, b))
           : [Infinity]),
       )
+      const distance = quantize(d)
 
       const k = `${x.toFixed(6)}|${y.toFixed(6)}`
       const cand: Candidate3D = {
         x,
         y,
         z: anchorZ,
-        distance: d,
+        distance,
         zSpanLen: bestSpan.length,
       }
       const prev = out.get(k)
@@ -104,6 +107,13 @@ export function computeCandidates3D(params: {
   }
 
   const arr = Array.from(out.values())
-  arr.sort((a, b) => b.zSpanLen! - a.zSpanLen! || b.distance - a.distance)
+  arr.sort(
+    (a, b) =>
+      b.zSpanLen! - a.zSpanLen! ||
+      b.distance - a.distance ||
+      a.z - b.z ||
+      a.x - b.x ||
+      a.y - b.y,
+  )
   return arr
 }

@@ -4,6 +4,8 @@ import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import type RBush from "rbush"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
+const quantize = (value: number, precision = 1e-6) =>
+  Math.round(value / precision) * precision
 
 /**
  * Compute exact uncovered segments along a 1D line.
@@ -15,14 +17,23 @@ function computeUncoveredSegments(params: {
   minSegmentLength: number
 }): Array<{ start: number; end: number; center: number }> {
   const { lineStart, lineEnd, coveringIntervals, minSegmentLength } = params
+  const lineStartQ = quantize(lineStart)
+  const lineEndQ = quantize(lineEnd)
+  const normalizedIntervals = coveringIntervals
+    .map((i) => {
+      const s = quantize(i.start)
+      const e = quantize(i.end)
+      return { start: Math.min(s, e), end: Math.max(s, e) }
+    })
+    .filter((i) => i.end > i.start + EPS)
 
-  if (coveringIntervals.length === 0) {
-    const center = (lineStart + lineEnd) / 2
-    return [{ start: lineStart, end: lineEnd, center }]
+  if (normalizedIntervals.length === 0) {
+    const center = (lineStartQ + lineEndQ) / 2
+    return [{ start: lineStartQ, end: lineEndQ, center }]
   }
 
   // Sort intervals by start position
-  const sorted = [...coveringIntervals].sort((a, b) => a.start - b.start)
+  const sorted = [...normalizedIntervals].sort((a, b) => a.start - b.start)
 
   // Merge overlapping intervals
   const merged: Array<{ start: number; end: number }> = []
@@ -45,8 +56,8 @@ function computeUncoveredSegments(params: {
   const uncovered: Array<{ start: number; end: number; center: number }> = []
 
   // Check gap before first interval
-  if (merged[0]!.start > lineStart + EPS) {
-    const start = lineStart
+  if (merged[0]!.start > lineStartQ + EPS) {
+    const start = lineStartQ
     const end = merged[0]!.start
     if (end - start >= minSegmentLength) {
       uncovered.push({ start, end, center: (start + end) / 2 })
@@ -63,9 +74,9 @@ function computeUncoveredSegments(params: {
   }
 
   // Check gap after last interval
-  if (merged[merged.length - 1]!.end < lineEnd - EPS) {
+  if (merged[merged.length - 1]!.end < lineEndQ - EPS) {
     const start = merged[merged.length - 1]!.end
-    const end = lineEnd
+    const end = lineEndQ
     if (end - start >= minSegmentLength) {
       uncovered.push({ start, end, center: (start + end) / 2 })
     }
@@ -111,7 +122,11 @@ export function computeEdgeCandidates3D(params: {
   }
 
   function pushIfFree(p: { x: number; y: number; z: number }) {
-    const { x, y, z } = p
+    const qx = quantize(p.x)
+    const qy = quantize(p.y)
+    const { z } = p
+    const x = qx
+    const y = qy
     if (
       x < bounds.x + EPS ||
       y < bounds.y + EPS ||
@@ -125,13 +140,19 @@ export function computeEdgeCandidates3D(params: {
     const hard = [
       ...(obstacleIndexByLayer[z]?.all() ?? []),
       ...(hardPlacedByLayer[z] ?? []),
-    ]
+    ].map((b) => ({
+      x: quantize(b.x),
+      y: quantize(b.y),
+      width: quantize(b.width),
+      height: quantize(b.height),
+    }))
     const d = Math.min(
       distancePointToRectEdges({ x, y }, bounds),
       ...(hard.length
         ? hard.map((b) => distancePointToRectEdges({ x, y }, b))
         : [Infinity]),
     )
+    const distance = quantize(d)
 
     const k = key({ x, y, z })
     if (dedup.has(k)) return
@@ -148,14 +169,26 @@ export function computeEdgeCandidates3D(params: {
       obstacleIndexByLayer,
       additionalBlockersByLayer: hardPlacedByLayer,
     })
-    out.push({ x, y, z, distance: d, zSpanLen: span.length, isEdgeSeed: true })
+    out.push({
+      x,
+      y,
+      z,
+      distance,
+      zSpanLen: span.length,
+      isEdgeSeed: true,
+    })
   }
 
   for (let z = 0; z < layerCount; z++) {
     const blockers = [
       ...(obstacleIndexByLayer[z]?.all() ?? []),
       ...(hardPlacedByLayer[z] ?? []),
-    ]
+    ].map((b) => ({
+      x: quantize(b.x),
+      y: quantize(b.y),
+      width: quantize(b.width),
+      height: quantize(b.height),
+    }))
 
     // 1) Board edges — find exact uncovered segments along each edge
 
@@ -372,6 +405,13 @@ export function computeEdgeCandidates3D(params: {
   }
 
   // Strong multi-layer preference then distance.
-  out.sort((a, b) => b.zSpanLen! - a.zSpanLen! || b.distance - a.distance)
+  out.sort(
+    (a, b) =>
+      b.zSpanLen! - a.zSpanLen! ||
+      b.distance - a.distance ||
+      a.z - b.z ||
+      a.x - b.x ||
+      a.y - b.y,
+  )
   return out
 }
