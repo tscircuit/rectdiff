@@ -30,7 +30,7 @@ export const buildFinalRectDiffVisualization = ({
       ? "#fca5a5"
       : getColorForZLayer(node.availableZ).fill,
     layer: `z${node.availableZ.join(",")}`,
-    label: `node ${node.capacityMeshNodeId}`,
+    label: `node ${node.capacityMeshNodeId}\nz:${node.availableZ.join(",")}`,
   }))
 
   const nodesGraphic: GraphicsObject = {
