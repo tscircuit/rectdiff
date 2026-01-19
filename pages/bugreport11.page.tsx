@@ -8,7 +8,7 @@ export default () => {
     () =>
       new RectDiffPipeline({
         simpleRouteJson: simpleRouteJson.simple_route_json,
-        obstacleClearance: 0.015
+        obstacleClearance: 0.015,
       }),
     [],
   )

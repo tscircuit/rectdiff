@@ -36,7 +36,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
         {
           bounds: rectDiffPipeline.inputProblem.simpleRouteJson.bounds,
           obstacles: rectDiffPipeline.inputProblem.simpleRouteJson.obstacles,
-          connections: rectDiffPipeline.inputProblem.simpleRouteJson.connections,
+          connections:
+            rectDiffPipeline.inputProblem.simpleRouteJson.connections,
           outline: rectDiffPipeline.inputProblem.simpleRouteJson.outline
             ? { outline: rectDiffPipeline.inputProblem.simpleRouteJson.outline }
             : undefined,
@@ -45,7 +46,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           boardVoidRects: rectDiffPipeline.boardVoidRects,
           layerNames: rectDiffPipeline.layerNames,
           zIndexByName: rectDiffPipeline.zIndexByName,
-          minTraceWidth: rectDiffPipeline.inputProblem.simpleRouteJson.minTraceWidth,
+          minTraceWidth:
+            rectDiffPipeline.inputProblem.simpleRouteJson.minTraceWidth,
           obstacleClearance: rectDiffPipeline.inputProblem.obstacleClearance,
         },
       ],
@@ -135,7 +137,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           `node ${node.capacityMeshNodeId}`,
           `z:${node.availableZ.join(",")}`,
         ].join("\n"),
-      }))
+      })),
     }
 
     return mergeGraphics(mergeGraphics(base, clearance), nodeRects)
@@ -168,14 +170,16 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           width: node.width,
           height: node.height,
           stroke: isExpanded ? "rgba(0, 128, 0, 0.8)" : "rgba(0, 0, 0, 0.3)",
-          fill: isExpanded ? "rgba(0, 200, 0, 0.3)" : "rgba(100, 100, 100, 0.1)",
+          fill: isExpanded
+            ? "rgba(0, 200, 0, 0.3)"
+            : "rgba(100, 100, 100, 0.1)",
           layer: `z${node.availableZ.join(",")}`,
           label: [
             `${isExpanded ? "[expanded] " : ""}node ${node.capacityMeshNodeId}`,
             `z:${node.availableZ.join(",")}`,
           ].join("\n"),
         }
-      })
+      }),
     }
 
     return mergeGraphics(mergeGraphics(base, clearance), nodeRects)

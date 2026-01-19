@@ -1,6 +1,9 @@
 import type { Obstacle } from "lib/types/srj-types"
 import type { Placed3D, Rect3d, XYRect } from "../rectdiff-types"
-import { obstacleToXYRect, obstacleZs } from "../solvers/RectDiffSeedingSolver/layers"
+import {
+  obstacleToXYRect,
+  obstacleZs,
+} from "../solvers/RectDiffSeedingSolver/layers"
 
 export function finalizeRects(params: {
   placed: Placed3D[]

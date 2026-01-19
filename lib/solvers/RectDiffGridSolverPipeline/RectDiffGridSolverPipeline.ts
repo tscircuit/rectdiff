@@ -3,7 +3,11 @@ import {
   definePipelineStep,
   type PipelineStep,
 } from "@tscircuit/solver-utils"
-import type { Obstacle, SimpleRouteConnection, SimpleRouteJson } from "lib/types/srj-types"
+import type {
+  Obstacle,
+  SimpleRouteConnection,
+  SimpleRouteJson,
+} from "lib/types/srj-types"
 import type { GridFill3DOptions, XYRect } from "lib/rectdiff-types"
 import type { CapacityMeshNode, RTreeRect } from "lib/types/capacity-mesh-types"
 import { RectDiffSeedingSolver } from "lib/solvers/RectDiffSeedingSolver/RectDiffSeedingSolver"
@@ -36,18 +40,19 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
 
   constructor(inputProblem: RectDiffGridSolverPipelineInput) {
     super(inputProblem)
-    const { obstacleIndexByLayer, layerNames, zIndexByName } = buildObstacleIndexesByLayer({
-      srj: {
-        bounds: inputProblem.bounds,
-        obstacles: inputProblem.obstacles,
-        connections: inputProblem.connections as any,
-        outline: inputProblem.outline?.outline,
-        layerCount: inputProblem.layerCount,
-        minTraceWidth: inputProblem.minTraceWidth,
-      },
-      boardVoidRects: inputProblem.boardVoidRects,
-      obstacleClearance: inputProblem.obstacleClearance,
-    })
+    const { obstacleIndexByLayer, layerNames, zIndexByName } =
+      buildObstacleIndexesByLayer({
+        srj: {
+          bounds: inputProblem.bounds,
+          obstacles: inputProblem.obstacles,
+          connections: inputProblem.connections as any,
+          outline: inputProblem.outline?.outline,
+          layerCount: inputProblem.layerCount,
+          minTraceWidth: inputProblem.minTraceWidth,
+        },
+        boardVoidRects: inputProblem.boardVoidRects,
+        obstacleClearance: inputProblem.obstacleClearance,
+      })
     this.obstacleIndexByLayer = obstacleIndexByLayer
     this.layerNames = inputProblem.layerNames ?? layerNames
     this.zIndexByName = inputProblem.zIndexByName ?? zIndexByName

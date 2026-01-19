@@ -72,7 +72,10 @@ export class RectDiffSeedingSolver extends BaseSolver {
 
     const precomputed = this.input.layerNames && this.input.zIndexByName
     const { layerNames, zIndexByName } = precomputed
-      ? { layerNames: this.input.layerNames!, zIndexByName: this.input.zIndexByName! }
+      ? {
+          layerNames: this.input.layerNames!,
+          zIndexByName: this.input.zIndexByName!,
+        }
       : buildZIndexMap({
           obstacles: srj.obstacles,
           layerCount: srj.layerCount,
@@ -400,7 +403,10 @@ export class RectDiffSeedingSolver extends BaseSolver {
           height: obstacle.height + 2 * pad,
         }
         rects.push({
-          center: { x: expanded.x + expanded.width / 2, y: expanded.y + expanded.height / 2 },
+          center: {
+            x: expanded.x + expanded.width / 2,
+            y: expanded.y + expanded.height / 2,
+          },
           width: expanded.width,
           height: expanded.height,
           fill: "rgba(234, 179, 8, 0.15)",
