@@ -8,16 +8,18 @@ import {
 } from "lib/solvers/RectDiffSeedingSolver/layers"
 import type { XYRect } from "lib/rectdiff-types"
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import { padRect } from "lib/utils/padRect"
 
 export const buildObstacleIndexesByLayer = (params: {
   srj: SimpleRouteJson
   boardVoidRects?: XYRect[]
+  obstacleClearance?: number
 }): {
   obstacleIndexByLayer: Array<RBush<RTreeRect>>
   layerNames: string[]
   zIndexByName: Map<string, number>
 } => {
-  const { srj, boardVoidRects } = params
+  const { srj, boardVoidRects, obstacleClearance } = params
   const { layerNames, zIndexByName } = buildZIndexMap({
     obstacles: srj.obstacles,
     layerCount: srj.layerCount,
@@ -53,8 +55,9 @@ export const buildObstacleIndexesByLayer = (params: {
   }
 
   for (const obstacle of srj.obstacles ?? []) {
-    const rect = obstacleToXYRect(obstacle as any)
-    if (!rect) continue
+    const rectBase = obstacleToXYRect(obstacle)
+    if (!rectBase) continue
+    const rect = padRect(rectBase, obstacleClearance ?? 0)
     const zLayers = obstacleZs(obstacle as any, zIndexByName)
     const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
     if (invalidZs.length) {

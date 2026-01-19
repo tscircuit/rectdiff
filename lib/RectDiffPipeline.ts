@@ -12,10 +12,13 @@ import { RectDiffGridSolverPipeline } from "./solvers/RectDiffGridSolverPipeline
 import { createBaseVisualization } from "./rectdiff-visualization"
 import { computeInverseRects } from "./solvers/RectDiffSeedingSolver/computeInverseRects"
 import { buildZIndexMap } from "./solvers/RectDiffSeedingSolver/layers"
+import { buildObstacleClearanceGraphics } from "./utils/renderObstacleClearance"
+import { mergeGraphics } from "graphics-debug"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
+  obstacleClearance?: number
 }
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
@@ -43,6 +46,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           layerNames: rectDiffPipeline.layerNames,
           zIndexByName: rectDiffPipeline.zIndexByName,
           minTraceWidth: rectDiffPipeline.inputProblem.simpleRouteJson.minTraceWidth,
+          obstacleClearance: rectDiffPipeline.inputProblem.obstacleClearance,
         },
       ],
     ),
@@ -104,17 +108,23 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override initialVisualize(): GraphicsObject {
-    const graphics = createBaseVisualization(
+    const base = createBaseVisualization(
       this.inputProblem.simpleRouteJson,
       "RectDiffPipeline - Initial",
     )
+    const clearance = buildObstacleClearanceGraphics({
+      srj: this.inputProblem.simpleRouteJson,
+      clearance: this.inputProblem.obstacleClearance,
+    })
 
     // Show initial mesh nodes from grid pipeline if available
     const initialNodes =
       this.rectDiffGridSolverPipeline?.getOutput().meshNodes ?? []
 
-    for (const node of initialNodes) {
-      graphics.rects!.push({
+    const nodeRects: GraphicsObject = {
+      title: "Initial Nodes",
+      coordinateSystem: "cartesian",
+      rects: initialNodes.map((node) => ({
         center: node.center,
         width: node.width,
         height: node.height,
@@ -125,17 +135,21 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           `node ${node.capacityMeshNodeId}`,
           `z:${node.availableZ.join(",")}`,
         ].join("\n"),
-      })
+      }))
     }
 
-    return graphics
+    return mergeGraphics(mergeGraphics(base, clearance), nodeRects)
   }
 
   override finalVisualize(): GraphicsObject {
-    const graphics = createBaseVisualization(
+    const base = createBaseVisualization(
       this.inputProblem.simpleRouteJson,
       "RectDiffPipeline - Final",
     )
+    const clearance = buildObstacleClearanceGraphics({
+      srj: this.inputProblem.simpleRouteJson,
+      clearance: this.inputProblem.obstacleClearance,
+    })
 
     const { meshNodes: outputNodes } = this.getOutput()
     const initialNodeIds = new Set(
@@ -144,22 +158,26 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
       ),
     )
 
-    for (const node of outputNodes) {
-      const isExpanded = !initialNodeIds.has(node.capacityMeshNodeId)
-      graphics.rects!.push({
-        center: node.center,
-        width: node.width,
-        height: node.height,
-        stroke: isExpanded ? "rgba(0, 128, 0, 0.8)" : "rgba(0, 0, 0, 0.3)",
-        fill: isExpanded ? "rgba(0, 200, 0, 0.3)" : "rgba(100, 100, 100, 0.1)",
-        layer: `z${node.availableZ.join(",")}`,
-        label: [
-          `${isExpanded ? "[expanded] " : ""}node ${node.capacityMeshNodeId}`,
-          `z:${node.availableZ.join(",")}`,
-        ].join("\n"),
+    const nodeRects: GraphicsObject = {
+      title: "Final Nodes",
+      coordinateSystem: "cartesian",
+      rects: outputNodes.map((node) => {
+        const isExpanded = !initialNodeIds.has(node.capacityMeshNodeId)
+        return {
+          center: node.center,
+          width: node.width,
+          height: node.height,
+          stroke: isExpanded ? "rgba(0, 128, 0, 0.8)" : "rgba(0, 0, 0, 0.3)",
+          fill: isExpanded ? "rgba(0, 200, 0, 0.3)" : "rgba(100, 100, 100, 0.1)",
+          layer: `z${node.availableZ.join(",")}`,
+          label: [
+            `${isExpanded ? "[expanded] " : ""}node ${node.capacityMeshNodeId}`,
+            `z:${node.availableZ.join(",")}`,
+          ].join("\n"),
+        }
       })
     }
 
-    return graphics
+    return mergeGraphics(mergeGraphics(base, clearance), nodeRects)
   }
 }

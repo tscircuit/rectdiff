@@ -7,6 +7,7 @@ export function finalizeRects(params: {
   obstacles: Obstacle[]
   boardVoidRects: XYRect[]
   zIndexByName: Map<string, number>
+  obstacleClearance?: number
 }): Rect3d[] {
   // Convert all placed (free space) nodes to output format
   const out: Rect3d[] = params.placed.map((p) => ({
@@ -20,8 +21,16 @@ export function finalizeRects(params: {
   const layersByKey = new Map<string, { rect: XYRect; layers: Set<number> }>()
 
   for (const obstacle of params.obstacles ?? []) {
-    const rect = obstacleToXYRect(obstacle as any)
-    if (!rect) continue
+    const baseRect = obstacleToXYRect(obstacle)
+    if (!baseRect) continue
+    const rect = params.obstacleClearance
+      ? {
+          x: baseRect.x - params.obstacleClearance,
+          y: baseRect.y - params.obstacleClearance,
+          width: baseRect.width + 2 * params.obstacleClearance,
+          height: baseRect.height + 2 * params.obstacleClearance,
+        }
+      : baseRect
     const zLayers =
       obstacle.zLayers?.length && obstacle.zLayers.length > 0
         ? obstacle.zLayers

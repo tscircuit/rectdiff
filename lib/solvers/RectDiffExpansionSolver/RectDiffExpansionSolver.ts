@@ -31,6 +31,7 @@ export type RectDiffExpansionSolverInput = {
   zIndexByName: Map<string, number>
   layerNamesCanonical: string[]
   obstacles: Obstacle[]
+  obstacleClearance?: number
 }
 
 /**
@@ -137,6 +138,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
       obstacles: this.input.obstacles,
       zIndexByName: this.input.zIndexByName,
       boardVoidRects: this.input.boardVoidRects,
+      obstacleClearance: this.input.obstacleClearance,
     })
     this._meshNodes = rectsToMeshNodes(rects)
     this.solved = true
