@@ -42,10 +42,11 @@ test("clearance-param vs padded-obstacles produce equivalent free space capacity
   const capA = getTotalCapacity(outA)
   const capB = getTotalCapacity(outB)
 
-  console.log(`capacity A: ${capA.toFixed(6)}, capacity B: ${capB.toFixed(6)}, diff: ${Math.abs(capA - capB).toFixed(10)}`)
+  console.log(
+    `capacity A: ${capA.toFixed(6)}, capacity B: ${capB.toFixed(6)}, diff: ${Math.abs(capA - capB).toFixed(10)}`,
+  )
   console.log(`node count A: ${outA.length}, node count B: ${outB.length}`)
 
   const tolerance = 1e-6
   expect(Math.abs(capA - capB)).toBeLessThan(tolerance)
 })
-

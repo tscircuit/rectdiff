@@ -340,13 +340,13 @@ export function expandRectFromSeed(params: {
       }
     }
 
-  if (r.width + EPS >= minReq.width && r.height + EPS >= minReq.height) {
-    const area = r.width * r.height
-    if (area > bestArea) {
-      best = quantizeRect(r)
-      bestArea = area
+    if (r.width + EPS >= minReq.width && r.height + EPS >= minReq.height) {
+      const area = r.width * r.height
+      if (area > bestArea) {
+        best = quantizeRect(r)
+        bestArea = area
+      }
     }
-  }
   }
 
   return best
