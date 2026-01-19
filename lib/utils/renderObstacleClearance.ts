@@ -15,11 +15,6 @@ export const buildObstacleClearanceGraphics = (params: {
       title: "Obstacle Clearance",
       coordinateSystem: "cartesian",
       rects: [],
-      points: [],
-      lines: [],
-      circles: [],
-      arrows: [],
-      texts: [],
     }
   }
 
@@ -43,7 +38,7 @@ export const buildObstacleClearanceGraphics = (params: {
       stroke: "rgba(202, 138, 4, 0.9)",
       fill: "rgba(234, 179, 8, 0.15)",
       layer: "obstacle-clearance",
-      label: "clearance",
+      label: `clearance\nz:${(obstacle.zLayers ?? []).join(",") || "all"}`,
     })
   }
 
@@ -51,10 +46,5 @@ export const buildObstacleClearanceGraphics = (params: {
     title: "Obstacle Clearance",
     coordinateSystem: "cartesian",
     rects,
-    points: [],
-    lines: [],
-    circles: [],
-    arrows: [],
-    texts: [],
   }
 }
