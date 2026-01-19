@@ -461,10 +461,8 @@ export class RectDiffSeedingSolver extends BaseSolver {
         points.push({
           x: cand.x,
           y: cand.y,
-          fill: "#9333ea",
-          stroke: "#6b21a8",
           label: `z:${cand.z}`,
-        } as any)
+        })
       }
     }
 

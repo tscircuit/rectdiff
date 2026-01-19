@@ -37,7 +37,7 @@ export function finalizeRects(params: {
     const zLayers =
       obstacle.zLayers?.length && obstacle.zLayers.length > 0
         ? obstacle.zLayers
-        : obstacleZs(obstacle as any, params.zIndexByName)
+        : obstacleZs(obstacle, params.zIndexByName)
     const key = `${rect.x}:${rect.y}:${rect.width}:${rect.height}`
     let entry = layersByKey.get(key)
     if (!entry) {

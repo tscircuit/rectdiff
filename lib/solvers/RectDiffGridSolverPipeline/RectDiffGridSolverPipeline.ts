@@ -45,7 +45,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
         srj: {
           bounds: inputProblem.bounds,
           obstacles: inputProblem.obstacles,
-          connections: inputProblem.connections as any,
+          connections: inputProblem.connections,
           outline: inputProblem.outline?.outline,
           layerCount: inputProblem.layerCount,
           minTraceWidth: inputProblem.minTraceWidth,
@@ -67,7 +67,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
           simpleRouteJson: {
             bounds: pipeline.inputProblem.bounds,
             obstacles: pipeline.inputProblem.obstacles,
-            connections: pipeline.inputProblem.connections as any,
+            connections: pipeline.inputProblem.connections,
             outline: pipeline.inputProblem.outline?.outline,
             layerCount: pipeline.inputProblem.layerCount,
             minTraceWidth: pipeline.inputProblem.minTraceWidth,

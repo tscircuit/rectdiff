@@ -58,7 +58,7 @@ export const buildObstacleIndexesByLayer = (params: {
     const rectBase = obstacleToXYRect(obstacle)
     if (!rectBase) continue
     const rect = padRect(rectBase, obstacleClearance ?? 0)
-    const zLayers = obstacleZs(obstacle as any, zIndexByName)
+    const zLayers = obstacleZs(obstacle, zIndexByName)
     const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
     if (invalidZs.length) {
       throw new Error(
