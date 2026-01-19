@@ -318,7 +318,6 @@ export class RectDiffSeedingSolver extends BaseSolver {
    */
   override getOutput() {
     return {
-      srj: this.srj,
       layerNames: this.layerNames,
       layerCount: this.layerCount,
       bounds: this.bounds,
@@ -331,6 +330,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
       edgeAnalysisDone: this.edgeAnalysisDone,
       totalSeedsThisGrid: this.totalSeedsThisGrid,
       consumedSeedsThisGrid: this.consumedSeedsThisGrid,
+      obstacles: this.srj.obstacles,
     }
   }
 

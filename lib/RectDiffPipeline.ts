@@ -31,11 +31,18 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
       RectDiffGridSolverPipeline,
       (rectDiffPipeline: RectDiffPipeline) => [
         {
-          simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
+          bounds: rectDiffPipeline.inputProblem.simpleRouteJson.bounds,
+          obstacles: rectDiffPipeline.inputProblem.simpleRouteJson.obstacles,
+          connections: rectDiffPipeline.inputProblem.simpleRouteJson.connections,
+          outline: rectDiffPipeline.inputProblem.simpleRouteJson.outline
+            ? { outline: rectDiffPipeline.inputProblem.simpleRouteJson.outline }
+            : undefined,
+          layerCount: rectDiffPipeline.inputProblem.simpleRouteJson.layerCount,
           gridOptions: rectDiffPipeline.inputProblem.gridOptions,
           boardVoidRects: rectDiffPipeline.boardVoidRects,
           layerNames: rectDiffPipeline.layerNames,
           zIndexByName: rectDiffPipeline.zIndexByName,
+          minTraceWidth: rectDiffPipeline.inputProblem.simpleRouteJson.minTraceWidth,
         },
       ],
     ),

@@ -38,7 +38,6 @@ export const createTwoNodeExpansionInput = (): RectDiffExpansionSolverInput => {
   })
 
   return {
-    srj,
     layerNames,
     layerCount,
     bounds,
@@ -63,5 +62,6 @@ export const createTwoNodeExpansionInput = (): RectDiffExpansionSolverInput => {
     obstacleIndexByLayer,
     zIndexByName,
     layerNamesCanonical: layerNames,
+    obstacles: srj.obstacles,
   }
 }

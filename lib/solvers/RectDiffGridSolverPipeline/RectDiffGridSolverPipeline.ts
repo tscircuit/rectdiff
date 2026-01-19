@@ -3,7 +3,7 @@ import {
   definePipelineStep,
   type PipelineStep,
 } from "@tscircuit/solver-utils"
-import type { SimpleRouteJson } from "lib/types/srj-types"
+import type { Obstacle, SimpleRouteConnection, SimpleRouteJson } from "lib/types/srj-types"
 import type { GridFill3DOptions, XYRect } from "lib/rectdiff-types"
 import type { CapacityMeshNode, RTreeRect } from "lib/types/capacity-mesh-types"
 import { RectDiffSeedingSolver } from "lib/solvers/RectDiffSeedingSolver/RectDiffSeedingSolver"
@@ -11,9 +11,15 @@ import { RectDiffExpansionSolver } from "lib/solvers/RectDiffExpansionSolver/Rec
 import type { GraphicsObject } from "graphics-debug"
 import RBush from "rbush"
 import { buildObstacleIndexesByLayer } from "./buildObstacleIndexes"
+import type { Bounds } from "@tscircuit/math-utils"
 
 export type RectDiffGridSolverPipelineInput = {
-  simpleRouteJson: SimpleRouteJson
+  bounds: Bounds
+  obstacles: Obstacle[]
+  connections: SimpleRouteConnection[]
+  outline?: Pick<SimpleRouteJson, "outline">
+  layerCount: number
+  minTraceWidth: number
   gridOptions?: Partial<GridFill3DOptions>
   boardVoidRects?: XYRect[]
   layerNames?: string[]
@@ -30,7 +36,14 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
   constructor(inputProblem: RectDiffGridSolverPipelineInput) {
     super(inputProblem)
     const { obstacleIndexByLayer, layerNames, zIndexByName } = buildObstacleIndexesByLayer({
-      srj: inputProblem.simpleRouteJson,
+      srj: {
+        bounds: inputProblem.bounds,
+        obstacles: inputProblem.obstacles,
+        connections: inputProblem.connections as any,
+        outline: inputProblem.outline?.outline,
+        layerCount: inputProblem.layerCount,
+        minTraceWidth: inputProblem.minTraceWidth,
+      },
       boardVoidRects: inputProblem.boardVoidRects,
     })
     this.obstacleIndexByLayer = obstacleIndexByLayer
@@ -44,7 +57,14 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
       RectDiffSeedingSolver,
       (pipeline: RectDiffGridSolverPipeline) => [
         {
-          simpleRouteJson: pipeline.inputProblem.simpleRouteJson,
+          simpleRouteJson: {
+            bounds: pipeline.inputProblem.bounds,
+            obstacles: pipeline.inputProblem.obstacles,
+            connections: pipeline.inputProblem.connections as any,
+            outline: pipeline.inputProblem.outline?.outline,
+            layerCount: pipeline.inputProblem.layerCount,
+            minTraceWidth: pipeline.inputProblem.minTraceWidth,
+          },
           gridOptions: pipeline.inputProblem.gridOptions,
           obstacleIndexByLayer: pipeline.obstacleIndexByLayer,
           boardVoidRects: pipeline.inputProblem.boardVoidRects,
@@ -63,10 +83,9 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
         }
         return [
           {
-            srj: pipeline.inputProblem.simpleRouteJson,
             layerNames: output.layerNames ?? [],
             boardVoidRects: pipeline.inputProblem.boardVoidRects ?? [],
-            layerCount: pipeline.inputProblem.simpleRouteJson.layerCount,
+            layerCount: pipeline.inputProblem.layerCount,
             bounds: output.bounds!,
             candidates: output.candidates,
             consumedSeedsThisGrid: output.placed.length,
@@ -79,6 +98,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
             options: output.options,
             zIndexByName: pipeline.zIndexByName,
             layerNamesCanonical: pipeline.layerNames,
+            obstacles: pipeline.inputProblem.obstacles,
           },
         ]
       },
