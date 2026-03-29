@@ -27,6 +27,10 @@ export function computeCandidates3D(params: {
     hardPlacedByLayer,
   } = params
   const out = new Map<string, Candidate3D>() // key by (x,y)
+  const hardRectsByLayer = Array.from({ length: layerCount }, (_, z) => [
+    ...(obstacleIndexByLayer[z]?.all() ?? []),
+    ...(hardPlacedByLayer[z] ?? []),
+  ])
 
   for (let x = bounds.x; x < bounds.x + bounds.width; x += gridSize) {
     for (let y = bounds.y; y < bounds.y + bounds.height; y += gridSize) {
@@ -75,16 +79,11 @@ export function computeCandidates3D(params: {
         : bestZ
 
       // Distance heuristic against hard blockers only (obstacles + full-stack)
-      const hardAtZ = [
-        ...(obstacleIndexByLayer[anchorZ]?.all() ?? []),
-        ...(hardPlacedByLayer[anchorZ] ?? []),
-      ]
-      const d = Math.min(
-        distancePointToRectEdges({ x, y }, bounds),
-        ...(hardAtZ.length
-          ? hardAtZ.map((b) => distancePointToRectEdges({ x, y }, b))
-          : [Infinity]),
-      )
+      const hardAtZ = hardRectsByLayer[anchorZ] ?? []
+      let d = distancePointToRectEdges({ x, y }, bounds)
+      for (const blocker of hardAtZ) {
+        d = Math.min(d, distancePointToRectEdges({ x, y }, blocker))
+      }
       const distance = quantize(d)
 
       const k = `${x.toFixed(6)}|${y.toFixed(6)}`

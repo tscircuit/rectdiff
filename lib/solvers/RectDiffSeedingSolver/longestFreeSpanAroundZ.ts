@@ -35,7 +35,7 @@ export function longestFreeSpanAroundZ(params: {
       maxY: y,
     }
     const obstacleIdx = obstacleIndexByLayer[layer]
-    if (obstacleIdx && obstacleIdx.search(query).length > 0) return false
+    if (obstacleIdx && obstacleIdx.collides(query)) return false
 
     const extras = additionalBlockersByLayer?.[layer] ?? []
     return !extras.some((b) => containsPoint(b, { x, y }))

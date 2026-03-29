@@ -17,10 +17,10 @@ export function isFullyOccupiedAtPoint(params: OccupancyParams): boolean {
   }
   for (let z = 0; z < params.layerCount; z++) {
     const obstacleIdx = params.obstacleIndexByLayer[z]
-    const hasObstacle = !!obstacleIdx && obstacleIdx.search(query).length > 0
+    const hasObstacle = !!obstacleIdx && obstacleIdx.collides(query)
 
     const placedIdx = params.placedIndexByLayer[z]
-    const hasPlaced = !!placedIdx && placedIdx.search(query).length > 0
+    const hasPlaced = !!placedIdx && placedIdx.collides(query)
 
     if (!hasObstacle && !hasPlaced) return false
   }

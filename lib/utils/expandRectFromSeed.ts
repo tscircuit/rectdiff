@@ -175,14 +175,13 @@ const toRect = (tree: RTreeRect): XYRect => ({
 })
 
 const addBlocker = (params: {
-  rect: XYRect
-  seen: Set<string>
+  rect: RTreeRect
+  seen: Set<RTreeRect>
   blockers: XYRect[]
 }) => {
   const { rect, seen, blockers } = params
-  const key = `${rect.x}|${rect.y}|${rect.width}|${rect.height}`
-  if (seen.has(key)) return
-  seen.add(key)
+  if (seen.has(rect)) return
+  seen.add(rect)
   blockers.push(rect)
 }
 
@@ -225,7 +224,7 @@ export function expandRectFromSeed(params: {
   const initialW = Math.max(minSide, minReq.width)
   const initialH = Math.max(minSide, minReq.height)
   const blockers: XYRect[] = []
-  const seen = new Set<string>()
+  const seen = new Set<RTreeRect>()
   const totalLayers = placedIndexByLayer.length
 
   // Ignore the existing placement we are expanding so it doesn't self-block.
@@ -237,7 +236,7 @@ export function expandRectFromSeed(params: {
       const blockersIndex = obsticalIndexByLayer[z]
       if (blockersIndex) {
         for (const entry of blockersIndex.search(query))
-          addBlocker({ rect: toRect(entry), seen, blockers })
+          addBlocker({ rect: entry, seen, blockers })
       }
 
       const placedLayer = placedIndexByLayer[z]
@@ -245,10 +244,9 @@ export function expandRectFromSeed(params: {
         for (const entry of placedLayer.search(query)) {
           const isFullStack = entry.zLayers.length >= totalLayers
           if (!isFullStack) continue
-          const rect = toRect(entry)
           if (
             isSelfRect({
-              rect,
+              rect: entry,
               startX,
               startY,
               initialW,
@@ -256,7 +254,7 @@ export function expandRectFromSeed(params: {
             })
           )
             continue
-          addBlocker({ rect, seen, blockers })
+          addBlocker({ rect: entry, seen, blockers })
         }
       }
     }

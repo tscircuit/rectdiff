@@ -30,27 +30,20 @@ export function distancePointToRectEdges(
   p: { x: number; y: number },
   r: XYRect,
 ) {
-  const edges: [number, number, number, number][] = [
-    [r.x, r.y, r.x + r.width, r.y],
-    [r.x + r.width, r.y, r.x + r.width, r.y + r.height],
-    [r.x + r.width, r.y + r.height, r.x, r.y + r.height],
-    [r.x, r.y + r.height, r.x, r.y],
-  ]
-  let best = Infinity
-  for (const [x1, y1, x2, y2] of edges) {
-    const A = p.x - x1,
-      B = p.y - y1,
-      C = x2 - x1,
-      D = y2 - y1
-    const dot = A * C + B * D
-    const lenSq = C * C + D * D
-    let t = lenSq !== 0 ? dot / lenSq : 0
-    t = clamp(t, 0, 1)
-    const xx = x1 + t * C
-    const yy = y1 + t * D
-    best = Math.min(best, Math.hypot(p.x - xx, p.y - yy))
+  const minX = r.x
+  const maxX = r.x + r.width
+  const minY = r.y
+  const maxY = r.y + r.height
+
+  if (p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY) {
+    return Math.min(p.x - minX, maxX - p.x, p.y - minY, maxY - p.y)
   }
-  return best
+
+  const dx = p.x < minX ? minX - p.x : p.x > maxX ? p.x - maxX : 0
+  const dy = p.y < minY ? minY - p.y : p.y > maxY ? p.y - maxY : 0
+  if (dx === 0) return dy
+  if (dy === 0) return dx
+  return Math.hypot(dx, dy)
 }
 
 /** Find the intersection of two 1D intervals, or null if they don't overlap. */

@@ -57,6 +57,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
   private candidates!: Candidate3D[]
   private placed!: Placed3D[]
   private placedIndexByLayer!: Array<RBush<RTreeRect>>
+  private hardPlacedByLayer!: XYRect[][]
   private expansionIndex!: number
   private edgeAnalysisDone!: boolean
   private totalSeedsThisGrid!: number
@@ -131,6 +132,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
       { length: layerCount },
       () => new RBush<RTreeRect>(),
     )
+    this.hardPlacedByLayer = Array.from({ length: layerCount }, () => [])
     this.expansionIndex = 0
     this.edgeAnalysisDone = false
     this.totalSeedsThisGrid = 0
@@ -164,19 +166,13 @@ export class RectDiffSeedingSolver extends BaseSolver {
     } = this.options
     const grid = gridSizes[this.gridIndex]!
 
-    // Build hard-placed map once per micro-step (cheap)
-    const hardPlacedByLayer = allLayerNode({
-      layerCount: this.layerCount,
-      placed: this.placed,
-    })
-
     // Ensure candidates exist for this grid
     if (this.candidates.length === 0 && this.consumedSeedsThisGrid === 0) {
       this.candidates = computeCandidates3D({
         bounds: this.bounds,
         gridSize: grid,
         layerCount: this.layerCount,
-        hardPlacedByLayer,
+        hardPlacedByLayer: this.hardPlacedByLayer,
         obstacleIndexByLayer: this.input.obstacleIndexByLayer,
         placedIndexByLayer: this.placedIndexByLayer,
       })
@@ -185,9 +181,10 @@ export class RectDiffSeedingSolver extends BaseSolver {
     }
 
     // If no candidates remain, advance grid or run edge pass or switch phase
-    if (this.candidates.length === 0) {
+    if (this.consumedSeedsThisGrid >= this.candidates.length) {
       if (this.gridIndex + 1 < gridSizes.length) {
         this.gridIndex += 1
+        this.candidates = []
         this.totalSeedsThisGrid = 0
         this.consumedSeedsThisGrid = 0
         return
@@ -200,13 +197,14 @@ export class RectDiffSeedingSolver extends BaseSolver {
             layerCount: this.layerCount,
             obstacleIndexByLayer: this.input.obstacleIndexByLayer,
             placedIndexByLayer: this.placedIndexByLayer,
-            hardPlacedByLayer,
+            hardPlacedByLayer: this.hardPlacedByLayer,
           })
           this.edgeAnalysisDone = true
           this.totalSeedsThisGrid = this.candidates.length
           this.consumedSeedsThisGrid = 0
           return
         }
+        this.candidates = []
         this.solved = true
         this.expansionIndex = 0
         return
@@ -214,8 +212,17 @@ export class RectDiffSeedingSolver extends BaseSolver {
     }
 
     // Consume exactly one candidate
-    const cand = this.candidates.shift()!
-    this.consumedSeedsThisGrid += 1
+    const cand = this.candidates[this.consumedSeedsThisGrid++]!
+    if (
+      isFullyOccupiedAtPoint({
+        layerCount: this.layerCount,
+        obstacleIndexByLayer: this.input.obstacleIndexByLayer,
+        placedIndexByLayer: this.placedIndexByLayer,
+        point: { x: cand.x, y: cand.y },
+      })
+    ) {
+      return
+    }
 
     // Evaluate attempts — multi-layer span first (computed ignoring soft nodes)
     const span = longestFreeSpanAroundZ({
@@ -226,7 +233,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
       minSpan: minMulti.minLayers,
       maxSpan: maxMultiLayerSpan,
       obstacleIndexByLayer: this.input.obstacleIndexByLayer,
-      additionalBlockersByLayer: hardPlacedByLayer,
+      additionalBlockersByLayer: this.hardPlacedByLayer,
     })
 
     const attempts: Array<{
@@ -285,17 +292,10 @@ export class RectDiffSeedingSolver extends BaseSolver {
         },
         newIndex,
       )
-
-      // New: relax candidate culling — only drop seeds that became fully occupied
-      this.candidates = this.candidates.filter(
-        (c) =>
-          !isFullyOccupiedAtPoint({
-            layerCount: this.layerCount,
-            obstacleIndexByLayer: this.input.obstacleIndexByLayer,
-            placedIndexByLayer: this.placedIndexByLayer,
-            point: { x: c.x, y: c.y },
-          }),
-      )
+      this.hardPlacedByLayer = allLayerNode({
+        layerCount: this.layerCount,
+        placed: this.placed,
+      })
 
       return // processed one candidate
     }

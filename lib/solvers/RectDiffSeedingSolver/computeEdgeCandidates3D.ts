@@ -109,6 +109,10 @@ export function computeEdgeCandidates3D(params: {
   // Use small inset from edges for placement
   const δ = Math.max(minSize * 0.15, EPS * 3)
   const dedup = new Set<string>()
+  const hardRectsByLayer = Array.from({ length: layerCount }, (_, z) => [
+    ...(obstacleIndexByLayer[z]?.all() ?? []),
+    ...(hardPlacedByLayer[z] ?? []),
+  ])
   const key = (p: { x: number; y: number; z: number }) =>
     `${p.z}|${p.x.toFixed(6)}|${p.y.toFixed(6)}`
 
@@ -137,21 +141,24 @@ export function computeEdgeCandidates3D(params: {
     if (fullyOcc({ x, y })) return // new rule: only drop if truly impossible
 
     // Distance uses obstacles + hard nodes (soft nodes ignored for ranking)
-    const hard = [
-      ...(obstacleIndexByLayer[z]?.all() ?? []),
-      ...(hardPlacedByLayer[z] ?? []),
-    ].map((b) => ({
-      x: quantize(b.x),
-      y: quantize(b.y),
-      width: quantize(b.width),
-      height: quantize(b.height),
-    }))
-    const d = Math.min(
-      distancePointToRectEdges({ x, y }, bounds),
-      ...(hard.length
-        ? hard.map((b) => distancePointToRectEdges({ x, y }, b))
-        : [Infinity]),
-    )
+    const hard = hardRectsByLayer[z] ?? []
+    let d = distancePointToRectEdges({ x, y }, bounds)
+    for (const blocker of hard) {
+      d = Math.min(
+        d,
+        distancePointToRectEdges(
+          { x, y },
+          {
+            x: "minX" in blocker ? blocker.minX : blocker.x,
+            y: "minY" in blocker ? blocker.minY : blocker.y,
+            width:
+              "maxX" in blocker ? blocker.maxX - blocker.minX : blocker.width,
+            height:
+              "maxY" in blocker ? blocker.maxY - blocker.minY : blocker.height,
+          },
+        ),
+      )
+    }
     const distance = quantize(d)
 
     const k = key({ x, y, z })
@@ -180,14 +187,11 @@ export function computeEdgeCandidates3D(params: {
   }
 
   for (let z = 0; z < layerCount; z++) {
-    const blockers = [
-      ...(obstacleIndexByLayer[z]?.all() ?? []),
-      ...(hardPlacedByLayer[z] ?? []),
-    ].map((b) => ({
-      x: quantize(b.x),
-      y: quantize(b.y),
-      width: quantize(b.width),
-      height: quantize(b.height),
+    const blockers = (hardRectsByLayer[z] ?? []).map((b) => ({
+      x: quantize("minX" in b ? b.minX : b.x),
+      y: quantize("minY" in b ? b.minY : b.y),
+      width: quantize("maxX" in b ? b.maxX - b.minX : b.width),
+      height: quantize("maxY" in b ? b.maxY - b.minY : b.height),
     }))
 
     // 1) Board edges — find exact uncovered segments along each edge
