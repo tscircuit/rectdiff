@@ -7,6 +7,16 @@ import type { RTreeRect } from "lib/types/capacity-mesh-types"
 const quantize = (value: number, precision = 1e-6) =>
   Math.round(value / precision) * precision
 
+const toRect = (rect: XYRect | RTreeRect): XYRect =>
+  "minX" in rect
+    ? {
+        x: rect.minX,
+        y: rect.minY,
+        width: rect.maxX - rect.minX,
+        height: rect.maxY - rect.minY,
+      }
+    : rect
+
 /**
  * Compute exact uncovered segments along a 1D line.
  */
@@ -109,6 +119,12 @@ export function computeEdgeCandidates3D(params: {
   // Use small inset from edges for placement
   const δ = Math.max(minSize * 0.15, EPS * 3)
   const dedup = new Set<string>()
+  const hardRectsByLayer = Array.from({ length: layerCount }, (_, z) =>
+    [
+      ...(obstacleIndexByLayer[z]?.all() ?? []),
+      ...(hardPlacedByLayer[z] ?? []),
+    ].map(toRect),
+  )
   const key = (p: { x: number; y: number; z: number }) =>
     `${p.z}|${p.x.toFixed(6)}|${p.y.toFixed(6)}`
 
@@ -137,21 +153,11 @@ export function computeEdgeCandidates3D(params: {
     if (fullyOcc({ x, y })) return // new rule: only drop if truly impossible
 
     // Distance uses obstacles + hard nodes (soft nodes ignored for ranking)
-    const hard = [
-      ...(obstacleIndexByLayer[z]?.all() ?? []),
-      ...(hardPlacedByLayer[z] ?? []),
-    ].map((b) => ({
-      x: quantize(b.x),
-      y: quantize(b.y),
-      width: quantize(b.width),
-      height: quantize(b.height),
-    }))
-    const d = Math.min(
-      distancePointToRectEdges({ x, y }, bounds),
-      ...(hard.length
-        ? hard.map((b) => distancePointToRectEdges({ x, y }, b))
-        : [Infinity]),
-    )
+    const hard = hardRectsByLayer[z] ?? []
+    let d = distancePointToRectEdges({ x, y }, bounds)
+    for (const blocker of hard) {
+      d = Math.min(d, distancePointToRectEdges({ x, y }, blocker))
+    }
     const distance = quantize(d)
 
     const k = key({ x, y, z })
@@ -180,10 +186,7 @@ export function computeEdgeCandidates3D(params: {
   }
 
   for (let z = 0; z < layerCount; z++) {
-    const blockers = [
-      ...(obstacleIndexByLayer[z]?.all() ?? []),
-      ...(hardPlacedByLayer[z] ?? []),
-    ].map((b) => ({
+    const blockers = (hardRectsByLayer[z] ?? []).map((b) => ({
       x: quantize(b.x),
       y: quantize(b.y),
       width: quantize(b.width),
