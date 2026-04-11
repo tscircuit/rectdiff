@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "start": "cosmos",
-    "build": "tsup ./lib/index.ts --format esm --dts",
+    "build": "tsup-node ./lib/index.ts --format esm --dts",
     "build:site": "cosmos-export",
     "benchmark:slow-problem": "bun scripts/benchmark-slow-problem.ts test-assets/keyboard4.json",
     "format": "biome format --write .",
