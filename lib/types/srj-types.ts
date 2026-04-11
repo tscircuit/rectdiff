@@ -19,6 +19,7 @@ export interface Obstacle {
   height: number
   connectedTo: TraceId[]
   netIsAssignable?: boolean
+  isCopperPour?: boolean
   offBoardConnectsTo?: TraceId[]
 }
 
