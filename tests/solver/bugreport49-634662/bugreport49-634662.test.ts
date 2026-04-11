@@ -14,6 +14,47 @@ import { makeSimpleRouteOutlineGraphics } from "tests/fixtures/makeSimpleRouteOu
 
 const srj = bugreport49.simple_route_json ?? bugreport49
 
+test("bugreport49-634662 promotes contained outer-layer free nodes through copper pours", () => {
+  const solver = new RectDiffPipeline({
+    simpleRouteJson: srj,
+  })
+
+  solver.solve()
+
+  const { meshNodes } = solver.getOutput()
+  const bridgedNodes = meshNodes.filter(
+    (node) =>
+      node.availableZ.join(",") === "0,3" &&
+      !node._containsObstacle &&
+      !node._containsTarget,
+  )
+  const remainingTopOnlyFreeNodes = meshNodes.filter(
+    (node) =>
+      node.availableZ.join(",") === "0" &&
+      !node._containsObstacle &&
+      !node._containsTarget,
+  )
+  const obstacleNodesOnBottom = meshNodes.filter(
+    (node) => node._containsObstacle && node.availableZ.includes(3),
+  )
+  const maxBottomOnlyArea = Math.max(
+    0,
+    ...meshNodes
+      .filter(
+        (node) =>
+          node.availableZ.join(",") === "3" &&
+          !node._containsObstacle &&
+          !node._containsTarget,
+      )
+      .map((node) => node.width * node.height),
+  )
+
+  expect(bridgedNodes.length).toBeGreaterThan(0)
+  expect(remainingTopOnlyFreeNodes.length).toBe(0)
+  expect(obstacleNodesOnBottom.length).toBe(0)
+  expect(maxBottomOnlyArea).toBeLessThan(1)
+})
+
 test("bugreport49-634662", async () => {
   const solver = new RectDiffPipeline({
     simpleRouteJson: srj,
