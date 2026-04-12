@@ -7,6 +7,7 @@ import type { SimpleRouteJson } from "./types/srj-types"
 import type { GridFill3DOptions, XYRect } from "./rectdiff-types"
 import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
+import { AdjacentLayerContainmentMergeSolver } from "./solvers/AdjacentLayerContainmentMergeSolver/AdjacentLayerContainmentMergeSolver"
 import { GapFillSolverPipeline } from "./solvers/GapFillSolver/GapFillSolverPipeline"
 import { OuterLayerContainmentMergeSolver } from "./solvers/OuterLayerContainmentMergeSolver/OuterLayerContainmentMergeSolver"
 import { RectDiffGridSolverPipeline } from "./solvers/RectDiffGridSolverPipeline/RectDiffGridSolverPipeline"
@@ -27,6 +28,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   rectDiffGridSolverPipeline?: RectDiffGridSolverPipeline
   gapFillSolver?: GapFillSolverPipeline
   outerLayerContainmentMergeSolver?: OuterLayerContainmentMergeSolver
+  adjacentLayerContainmentMergeSolver?: AdjacentLayerContainmentMergeSolver
   boardVoidRects: XYRect[] | undefined
   zIndexByName?: Map<string, number>
   layerNames?: string[]
@@ -87,6 +89,22 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
         },
       ],
     ),
+    definePipelineStep(
+      "adjacentLayerContainmentMergeSolver",
+      AdjacentLayerContainmentMergeSolver,
+      (rectDiffPipeline: RectDiffPipeline) => [
+        {
+          meshNodes:
+            rectDiffPipeline.outerLayerContainmentMergeSolver?.getOutput()
+              .outputNodes ??
+            rectDiffPipeline.gapFillSolver?.getOutput().outputNodes ??
+            rectDiffPipeline.rectDiffGridSolverPipeline?.getOutput()
+              .meshNodes ??
+            [],
+          simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
+        },
+      ],
+    ),
   ]
 
   override _setup(): void {
@@ -118,6 +136,11 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
+    const adjacentLayerMergeOutput =
+      this.adjacentLayerContainmentMergeSolver?.getOutput()
+    if (adjacentLayerMergeOutput) {
+      return { meshNodes: adjacentLayerMergeOutput.outputNodes }
+    }
     const outerLayerMergeOutput =
       this.outerLayerContainmentMergeSolver?.getOutput()
     if (outerLayerMergeOutput) {
