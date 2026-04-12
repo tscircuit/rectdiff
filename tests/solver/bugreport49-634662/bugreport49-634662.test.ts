@@ -22,7 +22,8 @@ test("bugreport49-634662 promotes contained outer-layer free nodes through coppe
   solver.solve()
 
   const { meshNodes } = solver.getOutput()
-  const nodeArea = (node: (typeof meshNodes)[number]) => node.width * node.height
+  const nodeArea = (node: (typeof meshNodes)[number]) =>
+    node.width * node.height
   const bridgedNodes = meshNodes.filter(
     (node) =>
       node.availableZ.join(",") === "0,3" &&
