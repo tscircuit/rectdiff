@@ -28,6 +28,7 @@ const nodeToRect = (node: CapacityMeshNode): XYRect => ({
 })
 
 const rectArea = (rect: XYRect) => rect.width * rect.height
+const MIN_OUTER_LAYER_MERGE_AREA_MM2 = 1
 
 const cloneNode = (node: CapacityMeshNode): CapacityMeshNode => ({
   ...node,
@@ -144,7 +145,9 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
     const candidateNodes = mutableOuterNodes
       .filter(
         (node) =>
-          node.width + EPS >= viaMinSize && node.height + EPS >= viaMinSize,
+          node.width + EPS >= viaMinSize &&
+          node.height + EPS >= viaMinSize &&
+          rectArea(nodeToRect(node)) > MIN_OUTER_LAYER_MERGE_AREA_MM2 + EPS,
       )
       .sort((a, b) => rectArea(nodeToRect(b)) - rectArea(nodeToRect(a)))
 

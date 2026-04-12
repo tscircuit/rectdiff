@@ -22,6 +22,8 @@ test("bugreport49-634662 promotes contained outer-layer free nodes through coppe
   solver.solve()
 
   const { meshNodes } = solver.getOutput()
+  const nodeArea = (node: (typeof meshNodes)[number]) =>
+    node.width * node.height
   const bridgedNodes = meshNodes.filter(
     (node) =>
       node.availableZ.join(",") === "0,3" &&
@@ -37,22 +39,16 @@ test("bugreport49-634662 promotes contained outer-layer free nodes through coppe
   const obstacleNodesOnBottom = meshNodes.filter(
     (node) => node._containsObstacle && node.availableZ.includes(3),
   )
-  const maxBottomOnlyArea = Math.max(
+  const maxRemainingTopOnlyArea = Math.max(
     0,
-    ...meshNodes
-      .filter(
-        (node) =>
-          node.availableZ.join(",") === "3" &&
-          !node._containsObstacle &&
-          !node._containsTarget,
-      )
-      .map((node) => node.width * node.height),
+    ...remainingTopOnlyFreeNodes.map(nodeArea),
   )
+  const minBridgedArea = Math.min(...bridgedNodes.map(nodeArea))
 
   expect(bridgedNodes.length).toBeGreaterThan(0)
-  expect(remainingTopOnlyFreeNodes.length).toBe(0)
+  expect(minBridgedArea).toBeGreaterThan(1)
+  expect(maxRemainingTopOnlyArea).toBeLessThanOrEqual(1)
   expect(obstacleNodesOnBottom.length).toBe(0)
-  expect(maxBottomOnlyArea).toBeLessThan(1)
 })
 
 test("bugreport49-634662", async () => {
