@@ -1,9 +1,8 @@
 {
   "name": "@tscircuit/rectdiff",
-  "version": "0.0.28",
+  "version": "0.0.25",
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "scripts": {
     "start": "cosmos",
     "build": "tsup-node ./lib/index.ts --format esm --dts",
