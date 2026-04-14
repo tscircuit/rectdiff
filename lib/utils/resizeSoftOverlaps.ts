@@ -1,6 +1,11 @@
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
 import type { Placed3D } from "../rectdiff-types"
-import { overlaps, subtractRect2D, EPS } from "./rectdiff-geometry"
+import {
+  overlaps,
+  subtractRect2D,
+  intersectRect2D,
+  EPS,
+} from "./rectdiff-geometry"
 import type RBush from "rbush"
 import { rectToTree } from "./rectToTree"
 
@@ -30,18 +35,40 @@ export function resizeSoftOverlaps(
     if (sharedZ.length === 0) continue
     if (!overlaps(old.rect, newR)) continue
 
-    // Carve the overlap on the shared layers
+    // Carve only the shared layers. Non-overlapped pieces keep the full
+    // original layer set, and the overlapped core keeps only unaffected layers.
     const parts = subtractRect2D(old.rect, newR)
+    const overlapCore = intersectRect2D(old.rect, newR)
+    const unaffectedZ = old.zLayers.filter((z) => !newZs.includes(z))
+
+    if (
+      process.env.RECTDIFF_DEBUG_OVERLAPS === "1" &&
+      old.zLayers.length > 1 &&
+      newZs.length === 1
+    ) {
+      console.log(
+        "[resizeSoftOverlaps] carving multi-layer node",
+        JSON.stringify(
+          {
+            oldRect: old.rect,
+            oldZs: old.zLayers,
+            newcomerRect: newR,
+            newcomerZs: newZs,
+            sharedZ,
+            unaffectedZ,
+            partsCount: parts.length,
+            hasOverlapCore: Boolean(overlapCore),
+          },
+          null,
+          2,
+        ),
+      )
+    }
 
     // We will replace `old` entirely; re-add unaffected layers (same rect object).
     removeIdx.push(i)
 
-    const unaffectedZ = old.zLayers.filter((z) => !newZs.includes(z))
-    if (unaffectedZ.length > 0) {
-      toAdd.push({ rect: old.rect, zLayers: unaffectedZ })
-    }
-
-    // Re-add carved pieces for affected layers, dropping tiny slivers
+    // Outside the overlap, the old node still exists on all of its layers.
     const minW = Math.min(
       params.options.minSingle.width,
       params.options.minMulti.width,
@@ -52,9 +79,86 @@ export function resizeSoftOverlaps(
     )
     for (const p of parts) {
       if (p.width + EPS >= minW && p.height + EPS >= minH) {
-        toAdd.push({ rect: p, zLayers: sharedZ.slice() })
+        toAdd.push({ rect: p, zLayers: old.zLayers.slice() })
       }
     }
+
+    // Inside the overlap, only the old node's non-shared layers remain.
+    if (
+      overlapCore &&
+      unaffectedZ.length > 0 &&
+      overlapCore.width + EPS >= minW &&
+      overlapCore.height + EPS >= minH
+    ) {
+      toAdd.push({ rect: overlapCore, zLayers: unaffectedZ })
+    }
+
+    // If the overlap core is too small to keep as a standalone unaffected node,
+    // the newcomer fully consumes that shared region for practical purposes.
+    if (
+      process.env.RECTDIFF_DEBUG_OVERLAPS === "1" &&
+      overlapCore &&
+      unaffectedZ.length > 0 &&
+      (overlapCore.width + EPS < minW || overlapCore.height + EPS < minH)
+    ) {
+      console.log(
+        "[resizeSoftOverlaps] dropped tiny overlap core",
+        JSON.stringify(
+          {
+            overlapCore,
+            unaffectedZ,
+            minW,
+            minH,
+          },
+          null,
+          2,
+        ),
+      )
+    }
+  }
+
+  for (const p of toAdd) {
+    p.zLayers = Array.from(new Set(p.zLayers)).sort((a, b) => a - b)
+    if (p.zLayers.length === 0) {
+      throw new Error("resizeSoftOverlaps produced an empty zLayers placement")
+    }
+  }
+
+  const mergedToAdd: typeof params.placed = []
+  const seenReplacements = new Map<string, Placed3D>()
+  for (const p of toAdd) {
+    const key = [
+      p.rect.x.toFixed(9),
+      p.rect.y.toFixed(9),
+      p.rect.width.toFixed(9),
+      p.rect.height.toFixed(9),
+    ].join(":")
+    const existing = seenReplacements.get(key)
+    if (!existing) {
+      seenReplacements.set(key, {
+        rect: p.rect,
+        zLayers: p.zLayers.slice(),
+      })
+      continue
+    }
+
+    for (const z of p.zLayers) {
+      if (!existing.zLayers.includes(z)) existing.zLayers.push(z)
+    }
+    existing.zLayers.sort((a, b) => a - b)
+  }
+
+  for (const merged of seenReplacements.values()) {
+    if (
+      process.env.RECTDIFF_DEBUG_OVERLAPS === "1" &&
+      merged.zLayers.length > 1
+    ) {
+      console.log(
+        "[resizeSoftOverlaps] merged replacement",
+        JSON.stringify(merged, null, 2),
+      )
+    }
+    mergedToAdd.push(merged)
   }
 
   // Remove fully overlapped nodes and keep indexes in sync
@@ -81,7 +185,7 @@ export function resizeSoftOverlaps(
     })
 
   // Add replacements
-  for (const p of toAdd) {
+  for (const p of mergedToAdd) {
     params.placed.push(p)
     for (const z of p.zLayers) {
       if (params.placedIndexByLayer) {

@@ -85,3 +85,20 @@ export function subtractRect2D(A: XYRect, B: XYRect): XYRect[] {
 
   return out.filter((r) => r.width > EPS && r.height > EPS)
 }
+
+export function intersectRect2D(A: XYRect, B: XYRect): XYRect | null {
+  const Xi = intersect1D([A.x, A.x + A.width], [B.x, B.x + B.width])
+  const Yi = intersect1D([A.y, A.y + A.height], [B.y, B.y + B.height])
+  if (!Xi || !Yi) return null
+
+  const [minX, maxX] = Xi
+  const [minY, maxY] = Yi
+  if (maxX - minX <= EPS || maxY - minY <= EPS) return null
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  }
+}

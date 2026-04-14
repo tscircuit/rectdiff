@@ -20,6 +20,13 @@ test("node-solver input repro snapshot", async () => {
   solver.solve()
 
   const { meshNodes } = solver.getOutput()
+  const freeNodes = meshNodes.filter((node) => !node._containsObstacle)
+  const merged01FreeNodes = freeNodes.filter(
+    (node) => node.availableZ.join(",") === "0,1",
+  )
+
+  expect(merged01FreeNodes.length).toBeGreaterThan(0)
+
   const rectsByCombo = makeCapacityMeshNodeWithLayerInfo(meshNodes)
   const allGraphicsObjects: GraphicsObject[] = []
 
