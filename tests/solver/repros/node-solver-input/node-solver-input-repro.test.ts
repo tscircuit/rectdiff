@@ -25,7 +25,7 @@ test("node-solver input repro snapshot", async () => {
     (node) => node.availableZ.join(",") === "0,1",
   )
 
-  expect(merged01FreeNodes.length).toBeGreaterThan(0)
+  expect(merged01FreeNodes.length).toBeGreaterThan(10)
 
   const rectsByCombo = makeCapacityMeshNodeWithLayerInfo(meshNodes)
   const allGraphicsObjects: GraphicsObject[] = []
