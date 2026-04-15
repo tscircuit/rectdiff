@@ -14,6 +14,7 @@ import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
 import { computeDefaultGridSizes } from "./computeDefaultGridSizes"
 import { computeCandidates3D } from "./computeCandidates3D"
 import { computeEdgeCandidates3D } from "./computeEdgeCandidates3D"
+import { computeConnectionCandidates3D } from "./computeConnectionCandidates3D"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
@@ -191,7 +192,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
       } else {
         if (!this.edgeAnalysisDone) {
           const minSize = Math.min(minSingle.width, minSingle.height)
-          this.candidates = computeEdgeCandidates3D({
+          const edgeCandidates = computeEdgeCandidates3D({
             bounds: this.bounds,
             minSize,
             layerCount: this.layerCount,
@@ -199,6 +200,20 @@ export class RectDiffSeedingSolver extends BaseSolver {
             placedIndexByLayer: this.placedIndexByLayer,
             hardPlacedByLayer: this.hardPlacedByLayer,
           })
+          const connectionCandidates = computeConnectionCandidates3D({
+            bounds: this.bounds,
+            simpleRouteJson: this.srj,
+            minSize,
+            layerCount: this.layerCount,
+            obstacleIndexByLayer: this.input.obstacleIndexByLayer,
+            placedIndexByLayer: this.placedIndexByLayer,
+            hardPlacedByLayer: this.hardPlacedByLayer,
+            zIndexByName: this.input.zIndexByName,
+            obstacleClearance: this.input.obstacleClearance,
+          })
+          // Process generic edge candidates first, then let connection-point
+          // seeds carve back finer escape regions near pads and ports.
+          this.candidates = [...edgeCandidates, ...connectionCandidates]
           this.edgeAnalysisDone = true
           this.totalSeedsThisGrid = this.candidates.length
           this.consumedSeedsThisGrid = 0
