@@ -1,6 +1,6 @@
 import type { RTreeRect } from "lib/types/capacity-mesh-types"
 import type { Placed3D } from "../rectdiff-types"
-import { overlaps, subtractRect2D, EPS } from "./rectdiff-geometry"
+import { overlaps, subtractRect2D, intersect1D, EPS } from "./rectdiff-geometry"
 import type RBush from "rbush"
 import { rectToTree } from "./rectToTree"
 
@@ -30,18 +30,37 @@ export function resizeSoftOverlaps(
     if (sharedZ.length === 0) continue
     if (!overlaps(old.rect, newR)) continue
 
-    // Carve the overlap on the shared layers
+    // Carve only the shared layers. Non-overlapped pieces keep the full
+    // original layer set, and the overlapped core keeps only unaffected layers.
     const parts = subtractRect2D(old.rect, newR)
+    const Xi = intersect1D(
+      [old.rect.x, old.rect.x + old.rect.width],
+      [newR.x, newR.x + newR.width],
+    )
+    const Yi = intersect1D(
+      [old.rect.y, old.rect.y + old.rect.height],
+      [newR.y, newR.y + newR.height],
+    )
+    let overlapCore: {
+      x: number
+      y: number
+      width: number
+      height: number
+    } | null = null
+    if (Xi && Yi && Xi[1] - Xi[0] > EPS && Yi[1] - Yi[0] > EPS) {
+      overlapCore = {
+        x: Xi[0],
+        y: Yi[0],
+        width: Xi[1] - Xi[0],
+        height: Yi[1] - Yi[0],
+      }
+    }
+    const unaffectedZ = old.zLayers.filter((z) => !newZs.includes(z))
 
-    // We will replace `old` entirely; re-add unaffected layers (same rect object).
+    // We will replace `old` entirely and rebuild it from parts.
     removeIdx.push(i)
 
-    const unaffectedZ = old.zLayers.filter((z) => !newZs.includes(z))
-    if (unaffectedZ.length > 0) {
-      toAdd.push({ rect: old.rect, zLayers: unaffectedZ })
-    }
-
-    // Re-add carved pieces for affected layers, dropping tiny slivers
+    // Outside the overlap, the old node still exists on all of its layers.
     const minW = Math.min(
       params.options.minSingle.width,
       params.options.minMulti.width,
@@ -52,8 +71,18 @@ export function resizeSoftOverlaps(
     )
     for (const p of parts) {
       if (p.width + EPS >= minW && p.height + EPS >= minH) {
-        toAdd.push({ rect: p, zLayers: sharedZ.slice() })
+        toAdd.push({ rect: p, zLayers: old.zLayers.slice() })
       }
+    }
+
+    // Inside the overlap, only the old node's non-shared layers remain.
+    if (
+      overlapCore &&
+      unaffectedZ.length > 0 &&
+      overlapCore.width + EPS >= minW &&
+      overlapCore.height + EPS >= minH
+    ) {
+      toAdd.push({ rect: overlapCore, zLayers: unaffectedZ })
     }
   }
 
