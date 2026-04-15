@@ -4,7 +4,10 @@ import {
   obstacleToXYRect,
   obstacleZs,
 } from "../solvers/RectDiffSeedingSolver/layers"
+import { canonicalizeLayeredRects } from "./canonicalizeLayeredRects"
+import { intersect1D, subtractRect2D, EPS } from "./rectdiff-geometry"
 
+/** Finalize free-space and obstacle rectangles. */
 export function finalizeRects(params: {
   placed: Placed3D[]
   obstacles: Obstacle[]
@@ -12,8 +15,120 @@ export function finalizeRects(params: {
   zIndexByName: Map<string, number>
   obstacleClearance?: number
 }): Rect3d[] {
-  // Convert all placed (free space) nodes to output format
-  const out: Rect3d[] = params.placed.map((p) => ({
+  const promotedRects = canonicalizeLayeredRects(params.placed).filter(
+    (rect) => rect.zLayers.length > 1,
+  )
+
+  let freePlacements: Placed3D[] = params.placed.map((placement) => ({
+    rect: { ...placement.rect },
+    zLayers: placement.zLayers.slice().sort((a, b) => a - b),
+  }))
+
+  for (const promoted of promotedRects) {
+    const promotedRect: XYRect = {
+      x: promoted.minX,
+      y: promoted.minY,
+      width: promoted.maxX - promoted.minX,
+      height: promoted.maxY - promoted.minY,
+    }
+
+    const nextPlacements: Placed3D[] = []
+
+    for (const placement of freePlacements) {
+      const sharedZ = placement.zLayers.filter((z) =>
+        promoted.zLayers.includes(z),
+      )
+      if (sharedZ.length === 0) {
+        nextPlacements.push(placement)
+        continue
+      }
+
+      const Xi = intersect1D(
+        [placement.rect.x, placement.rect.x + placement.rect.width],
+        [promotedRect.x, promotedRect.x + promotedRect.width],
+      )
+      const Yi = intersect1D(
+        [placement.rect.y, placement.rect.y + placement.rect.height],
+        [promotedRect.y, promotedRect.y + promotedRect.height],
+      )
+      let overlapCore: {
+        x: number
+        y: number
+        width: number
+        height: number
+      } | null = null
+      if (Xi && Yi && Xi[1] - Xi[0] > EPS && Yi[1] - Yi[0] > EPS) {
+        overlapCore = {
+          x: Xi[0],
+          y: Yi[0],
+          width: Xi[1] - Xi[0],
+          height: Yi[1] - Yi[0],
+        }
+      }
+      if (!overlapCore) {
+        nextPlacements.push(placement)
+        continue
+      }
+
+      const outsideParts = subtractRect2D(placement.rect, promotedRect)
+      for (const part of outsideParts) {
+        if (part.width > EPS && part.height > EPS) {
+          nextPlacements.push({
+            rect: part,
+            zLayers: placement.zLayers.slice(),
+          })
+        }
+      }
+
+      const unaffectedZ = placement.zLayers.filter(
+        (z) => !promoted.zLayers.includes(z),
+      )
+      if (
+        unaffectedZ.length > 0 &&
+        overlapCore.width > EPS &&
+        overlapCore.height > EPS
+      ) {
+        nextPlacements.push({
+          rect: overlapCore,
+          zLayers: unaffectedZ,
+        })
+      }
+    }
+
+    nextPlacements.push({
+      rect: promotedRect,
+      zLayers: promoted.zLayers.slice(),
+    })
+
+    const deduped = new Map<string, Placed3D>()
+    for (const placement of nextPlacements) {
+      if (placement.rect.width <= EPS || placement.rect.height <= EPS) continue
+      placement.zLayers = Array.from(new Set(placement.zLayers)).sort(
+        (a, b) => a - b,
+      )
+      if (placement.zLayers.length === 0) continue
+
+      const key = [
+        placement.rect.x.toFixed(9),
+        placement.rect.y.toFixed(9),
+        placement.rect.width.toFixed(9),
+        placement.rect.height.toFixed(9),
+      ].join(":")
+      const existing = deduped.get(key)
+      if (!existing) {
+        deduped.set(key, placement)
+        continue
+      }
+      for (const z of placement.zLayers) {
+        if (!existing.zLayers.includes(z)) existing.zLayers.push(z)
+      }
+      existing.zLayers.sort((a, b) => a - b)
+    }
+
+    freePlacements = Array.from(deduped.values())
+  }
+
+  const out: Rect3d[] = freePlacements.map((p) => ({
     minX: p.rect.x,
     minY: p.rect.y,
     maxX: p.rect.x + p.rect.width,
@@ -44,7 +159,9 @@ export function finalizeRects(params: {
       entry = { rect, layers: new Set() }
       layersByKey.set(key, entry)
     }
-    zLayers.forEach((layer: number) => entry!.layers.add(layer))
+    zLayers.forEach((layer: number) => {
+      entry!.layers.add(layer)
+    })
   }
 
   for (const { rect, layers } of layersByKey.values()) {
