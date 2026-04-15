@@ -4,6 +4,7 @@ import { overlaps, subtractRect2D, intersect1D, EPS } from "./rectdiff-geometry"
 import type RBush from "rbush"
 import { rectToTree } from "./rectToTree"
 
+/** Resize overlaps for a new placement. */
 export function resizeSoftOverlaps(
   params: {
     layerCount: number

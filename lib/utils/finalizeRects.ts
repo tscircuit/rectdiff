@@ -7,6 +7,7 @@ import {
 import { canonicalizeLayeredRects } from "./canonicalizeLayeredRects"
 import { intersect1D, subtractRect2D, EPS } from "./rectdiff-geometry"
 
+/** Finalize free-space and obstacle rectangles. */
 export function finalizeRects(params: {
   placed: Placed3D[]
   obstacles: Obstacle[]
