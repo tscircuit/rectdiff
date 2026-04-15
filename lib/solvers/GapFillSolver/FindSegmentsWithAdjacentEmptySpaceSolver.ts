@@ -1,7 +1,7 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import Flatbush from "flatbush"
 import type { GraphicsObject, NinePointAnchor } from "graphics-debug"
-import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
+import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import { projectToUncoveredSegments } from "./projectToUncoveredSegments"
 import { EDGES } from "./edge-constants"
 import { visuallyOffsetLine } from "./visuallyOffsetLine"
@@ -139,6 +139,8 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
       rects: [],
       points: [],
       lines: [],
+      infiniteLines: [],
+      polygons: [],
       circles: [],
       arrows: [],
       texts: [],

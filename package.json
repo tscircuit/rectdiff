@@ -2,7 +2,12 @@
   "name": "@tscircuit/rectdiff",
   "version": "0.0.29",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "./lib/index.ts",
+  "module": "./lib/index.ts",
+  "types": "./lib/index.ts",
+  "exports": {
+    ".": "./lib/index.ts"
+  },
   "scripts": {
     "start": "cosmos",
     "build": "tsup-node ./lib/index.ts --format esm --dts",
@@ -14,8 +19,6 @@
   "devDependencies": {
     "@biomejs/biome": "^2.3.5",
     "@react-hook/resize-observer": "^2.0.2",
-    "@tscircuit/math-utils": "^0.0.29",
-    "@tscircuit/solver-utils": "^0.0.9",
     "@types/bun": "latest",
     "@types/rbush": "^4.0.0",
     "@types/react": "^18",
@@ -24,8 +27,6 @@
     "@vitejs/plugin-react": "^4",
     "biome": "^0.3.3",
     "bun-match-svg": "^0.0.14",
-    "graphics-debug": "^0.0.76",
-    "rbush": "^4.0.1",
     "react": "18",
     "react-cosmos": "^6.2.3",
     "react-cosmos-plugin-vite": "^6.2.0",
@@ -39,6 +40,10 @@
   },
   "dependencies": {
     "D": "^1.0.0",
-    "flatbush": "^4.5.0"
+    "flatbush": "^4.5.1",
+    "@tscircuit/math-utils": "^0.0.36",
+    "@tscircuit/solver-utils": "^0.0.19",
+    "graphics-debug": "^0.0.91",
+    "rbush": "^4.0.1"
   }
 }
