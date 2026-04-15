@@ -8,7 +8,11 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "paths": {
-      "lib/*": ["./lib/*"]
+      "lib/*": ["./lib/*"],
+      "components/*": ["./components/*"],
+      "tests/*": ["./tests/*"],
+      "pages/*": ["./pages/*"],
+      "utils/*": ["./utils/*"]
     },
     "baseUrl": ".",
 

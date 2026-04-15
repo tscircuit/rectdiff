@@ -41,30 +41,6 @@ export function resizeSoftOverlaps(
     const overlapCore = intersectRect2D(old.rect, newR)
     const unaffectedZ = old.zLayers.filter((z) => !newZs.includes(z))
 
-    if (
-      process.env.RECTDIFF_DEBUG_OVERLAPS === "1" &&
-      old.zLayers.length > 1 &&
-      newZs.length === 1
-    ) {
-      console.log(
-        "[resizeSoftOverlaps] carving multi-layer node",
-        JSON.stringify(
-          {
-            oldRect: old.rect,
-            oldZs: old.zLayers,
-            newcomerRect: newR,
-            newcomerZs: newZs,
-            sharedZ,
-            unaffectedZ,
-            partsCount: parts.length,
-            hasOverlapCore: Boolean(overlapCore),
-          },
-          null,
-          2,
-        ),
-      )
-    }
-
     // We will replace `old` entirely; re-add unaffected layers (same rect object).
     removeIdx.push(i)
 
@@ -95,26 +71,6 @@ export function resizeSoftOverlaps(
 
     // If the overlap core is too small to keep as a standalone unaffected node,
     // the newcomer fully consumes that shared region for practical purposes.
-    if (
-      process.env.RECTDIFF_DEBUG_OVERLAPS === "1" &&
-      overlapCore &&
-      unaffectedZ.length > 0 &&
-      (overlapCore.width + EPS < minW || overlapCore.height + EPS < minH)
-    ) {
-      console.log(
-        "[resizeSoftOverlaps] dropped tiny overlap core",
-        JSON.stringify(
-          {
-            overlapCore,
-            unaffectedZ,
-            minW,
-            minH,
-          },
-          null,
-          2,
-        ),
-      )
-    }
   }
 
   for (const p of toAdd) {
@@ -149,15 +105,6 @@ export function resizeSoftOverlaps(
   }
 
   for (const merged of seenReplacements.values()) {
-    if (
-      process.env.RECTDIFF_DEBUG_OVERLAPS === "1" &&
-      merged.zLayers.length > 1
-    ) {
-      console.log(
-        "[resizeSoftOverlaps] merged replacement",
-        JSON.stringify(merged, null, 2),
-      )
-    }
     mergedToAdd.push(merged)
   }
 
