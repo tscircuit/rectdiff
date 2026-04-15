@@ -12,6 +12,7 @@ export function finalizeRects(params: {
   zIndexByName: Map<string, number>
   obstacleClearance?: number
 }): Rect3d[] {
+  // Convert all placed (free space) nodes to output format
   const out: Rect3d[] = params.placed.map((p) => ({
     minX: p.rect.x,
     minY: p.rect.y,
