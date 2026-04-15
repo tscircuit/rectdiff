@@ -1,6 +1,6 @@
 import type { Rect } from "graphics-debug"
-import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
-import { getColorForZLayer } from "lib/utils/getColorForZLayer"
+import type { CapacityMeshNode } from "../../lib/types/capacity-mesh-types"
+import { getColorForZLayer } from "../../lib/utils/getColorForZLayer"
 
 export const makeCapacityMeshNodeWithLayerInfo = (
   nodes: CapacityMeshNode[],

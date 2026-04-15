@@ -6,7 +6,7 @@ import {
   buildZIndexMap,
   obstacleToXYRect,
   obstacleZs,
-} from "lib/solvers/RectDiffSeedingSolver/layers"
+} from "../../lib/solvers/RectDiffSeedingSolver/layers"
 
 test.skip("example01", () => {
   const solver = new RectDiffPipeline({ simpleRouteJson })

@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
 import srj_json from "./bugreport11-b2de3c.json"
-import { RectDiffPipeline } from "lib/RectDiffPipeline"
+import { RectDiffPipeline } from "../../../lib/RectDiffPipeline"
 import { getSvgFromGraphicsObject, type GraphicsObject } from "graphics-debug"
-import { getColorForZLayer } from "lib/utils/getColorForZLayer"
+import { getColorForZLayer } from "../../../lib/utils/getColorForZLayer"
 
 const srj = srj_json.simple_route_json ?? srj_json.simpleRouteJson ?? srj_json
 const OBSTACLE_CLEARANCE = 0.015

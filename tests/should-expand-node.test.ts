@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { getSvgFromGraphicsObject, mergeGraphics } from "graphics-debug"
-import { RectDiffExpansionSolver } from "lib/solvers/RectDiffExpansionSolver/RectDiffExpansionSolver"
-import { createTwoNodeExpansionInput } from "lib/fixtures/twoNodeExpansionFixture"
+import { RectDiffExpansionSolver } from "../lib/solvers/RectDiffExpansionSolver/RectDiffExpansionSolver"
+import { createTwoNodeExpansionInput } from "../lib/fixtures/twoNodeExpansionFixture"
 import { makeCapacityMeshNodeWithLayerInfo } from "./fixtures/makeCapacityMeshNodeWithLayerInfo"
 import { makeSimpleRouteOutlineGraphics } from "./fixtures/makeSimpleRouteOutlineGraphics"
 

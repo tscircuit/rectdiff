@@ -1,7 +1,7 @@
-import simpleRouteJson from "tests/solver/repros/merge-single-layer-node/merge-single-layer-node.json"
-import { RectDiffPipeline } from "lib/RectDiffPipeline"
+import simpleRouteJson from "../../tests/solver/repros/merge-single-layer-node/merge-single-layer-node.json"
+import { RectDiffPipeline } from "../../lib/RectDiffPipeline"
 import { useMemo } from "react"
-import { SolverDebugger3d } from "components/SolverDebugger3d"
+import { SolverDebugger3d } from "../../components/SolverDebugger3d"
 
 export default () => {
   const problem = simpleRouteJson[0]!

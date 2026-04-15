@@ -8,9 +8,9 @@ import {
   type GraphicsObject,
   type Rect,
 } from "graphics-debug"
-import { RectDiffPipeline } from "lib/RectDiffPipeline"
-import { makeCapacityMeshNodeWithLayerInfo } from "tests/fixtures/makeCapacityMeshNodeWithLayerInfo"
-import { makeSimpleRouteOutlineGraphics } from "tests/fixtures/makeSimpleRouteOutlineGraphics"
+import { RectDiffPipeline } from "../../../lib/RectDiffPipeline"
+import { makeCapacityMeshNodeWithLayerInfo } from "../../fixtures/makeCapacityMeshNodeWithLayerInfo"
+import { makeSimpleRouteOutlineGraphics } from "../../fixtures/makeSimpleRouteOutlineGraphics"
 
 test("both-points-equivalent", async () => {
   const solver = new RectDiffPipeline({

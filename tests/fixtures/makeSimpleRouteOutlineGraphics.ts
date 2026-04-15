@@ -1,5 +1,5 @@
 import type { GraphicsObject, Line } from "graphics-debug"
-import type { SimpleRouteJson } from "lib/types/srj-types"
+import type { SimpleRouteJson } from "../../lib/types/srj-types"
 export type SimpleRouteOutlineInput = {
   bounds: SimpleRouteJson["bounds"]
   outline?: SimpleRouteJson["outline"]
