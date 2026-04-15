@@ -4,6 +4,8 @@ import {
   obstacleToXYRect,
   obstacleZs,
 } from "../solvers/RectDiffSeedingSolver/layers"
+import { canonicalizeLayeredRects } from "./canonicalizeLayeredRects"
+import { intersectRect2D, subtractRect2D, EPS } from "./rectdiff-geometry"
 
 export function finalizeRects(params: {
   placed: Placed3D[]
@@ -12,8 +14,119 @@ export function finalizeRects(params: {
   zIndexByName: Map<string, number>
   obstacleClearance?: number
 }): Rect3d[] {
-  // Convert all placed (free space) nodes to output format
-  const out: Rect3d[] = params.placed.map((p) => ({
+  const promotedRects = canonicalizeLayeredRects(params.placed).filter(
+    (rect) => rect.zLayers.length > 1,
+  )
+
+  let freePlacements: Placed3D[] = params.placed.map((placement) => ({
+    rect: { ...placement.rect },
+    zLayers: placement.zLayers.slice().sort((a, b) => a - b),
+  }))
+
+  for (const promoted of promotedRects) {
+    const promotedRect: XYRect = {
+      x: promoted.minX,
+      y: promoted.minY,
+      width: promoted.maxX - promoted.minX,
+      height: promoted.maxY - promoted.minY,
+    }
+
+    const nextPlacements: Placed3D[] = []
+
+    for (const placement of freePlacements) {
+      const sharedZ = placement.zLayers.filter((z) => promoted.zLayers.includes(z))
+      if (sharedZ.length === 0) {
+        nextPlacements.push(placement)
+        continue
+      }
+
+      const overlapCore = intersectRect2D(placement.rect, promotedRect)
+      if (!overlapCore) {
+        nextPlacements.push(placement)
+        continue
+      }
+
+      const outsideParts = subtractRect2D(placement.rect, promotedRect)
+      for (const part of outsideParts) {
+        if (part.width > EPS && part.height > EPS) {
+          nextPlacements.push({
+            rect: part,
+            zLayers: placement.zLayers.slice(),
+          })
+        }
+      }
+
+      const unaffectedZ = placement.zLayers.filter(
+        (z) => !promoted.zLayers.includes(z),
+      )
+      if (
+        unaffectedZ.length > 0 &&
+        overlapCore.width > EPS &&
+        overlapCore.height > EPS
+      ) {
+        nextPlacements.push({
+          rect: overlapCore,
+          zLayers: unaffectedZ,
+        })
+      }
+    }
+
+    nextPlacements.push({
+      rect: promotedRect,
+      zLayers: promoted.zLayers.slice(),
+    })
+
+    const deduped = new Map<string, Placed3D>()
+    for (const placement of nextPlacements) {
+      if (placement.rect.width <= EPS || placement.rect.height <= EPS) continue
+      placement.zLayers = Array.from(new Set(placement.zLayers)).sort((a, b) => a - b)
+      if (placement.zLayers.length === 0) continue
+
+      const key = [
+        placement.rect.x.toFixed(9),
+        placement.rect.y.toFixed(9),
+        placement.rect.width.toFixed(9),
+        placement.rect.height.toFixed(9),
+      ].join(":")
+      const existing = deduped.get(key)
+      if (!existing) {
+        deduped.set(key, placement)
+        continue
+      }
+      for (const z of placement.zLayers) {
+        if (!existing.zLayers.includes(z)) existing.zLayers.push(z)
+      }
+      existing.zLayers.sort((a, b) => a - b)
+    }
+
+    freePlacements = Array.from(deduped.values())
+  }
+
+  if (process.env.RECTDIFF_DEBUG_FINALIZE === "1") {
+    const countByKey = (items: Array<{ zLayers: number[] }>) => {
+      const counts = new Map<string, number>()
+      for (const item of items) {
+        const key = item.zLayers.join(",")
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+      }
+      return Object.fromEntries(counts)
+    }
+
+    console.log(
+      "[finalizeRects] promoted shared regions",
+      JSON.stringify(
+        {
+          inputCombos: countByKey(params.placed),
+          promotedCombos: countByKey(promotedRects),
+          outputCombos: countByKey(freePlacements),
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  const out: Rect3d[] = freePlacements.map((p) => ({
     minX: p.rect.x,
     minY: p.rect.y,
     maxX: p.rect.x + p.rect.width,
