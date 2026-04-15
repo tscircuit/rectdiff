@@ -6,13 +6,12 @@ import { SolverDebugger3d } from "components/SolverDebugger3d"
 export default () => {
   const problem = simpleRouteJson[0]!
 
-  const solver = useMemo(
-    () =>
-      new RectDiffPipeline(problem),
-    [],
-  )
+  const solver = useMemo(() => new RectDiffPipeline(problem), [])
 
   return (
-    <SolverDebugger3d solver={solver} simpleRouteJson={problem.simpleRouteJson} />
+    <SolverDebugger3d
+      solver={solver}
+      simpleRouteJson={problem.simpleRouteJson}
+    />
   )
 }
