@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import inputProblems from "./node-solver-input.json"
+import inputProblems from "./merge-single-layer-node.json"
 import {
   getBounds,
   getSvgFromGraphicsObject,
