@@ -38,3 +38,4 @@ repomix-output.xml
 *.diff.png
 cosmos-export
 .vercel
+./tscircuit-autorouter
