@@ -9,7 +9,10 @@ import type {
   SimpleRouteJson,
 } from "../../types/srj-types"
 import type { GridFill3DOptions, XYRect } from "../../rectdiff-types"
-import type { CapacityMeshNode, RTreeRect } from "../../types/capacity-mesh-types"
+import type {
+  CapacityMeshNode,
+  RTreeRect,
+} from "../../types/capacity-mesh-types"
 import { RectDiffSeedingSolver } from "../RectDiffSeedingSolver/RectDiffSeedingSolver"
 import { RectDiffExpansionSolver } from "../RectDiffExpansionSolver/RectDiffExpansionSolver"
 import type { GraphicsObject } from "graphics-debug"

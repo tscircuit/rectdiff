@@ -1,6 +1,9 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
-import type { CapacityMeshNode, RTreeRect } from "../../types/capacity-mesh-types"
+import type {
+  CapacityMeshNode,
+  RTreeRect,
+} from "../../types/capacity-mesh-types"
 import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
 import { finalizeRects } from "../../utils/finalizeRects"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
