@@ -1,5 +1,5 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
-import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
+import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
 import type { SegmentWithAdjacentEmptySpace } from "./FindSegmentsWithAdjacentEmptySpaceSolver"
 import type { GraphicsObject } from "graphics-debug"
 import RBush from "rbush"
@@ -7,7 +7,7 @@ import { EDGE_MAP, EDGES } from "./edge-constants"
 import { getBoundsFromCorners } from "./getBoundsFromCorners"
 import type { Bounds } from "@tscircuit/math-utils"
 import { midpoint, segmentToBoxMinDistance } from "@tscircuit/math-utils"
-import type { XYRect } from "../../rectdiff-types"
+import type { XYRect } from "lib/rectdiff-types"
 
 const EPS = 1e-4
 
@@ -212,8 +212,6 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
       rects: [],
       points: [],
       lines: [],
-      infiniteLines: [],
-      polygons: [],
       circles: [],
       arrows: [],
       texts: [],

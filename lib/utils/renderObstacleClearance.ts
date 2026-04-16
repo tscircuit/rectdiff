@@ -1,4 +1,4 @@
-import type { SimpleRouteJson } from "../types/srj-types"
+import type { SimpleRouteJson } from "lib/types/srj-types"
 import type { GraphicsObject } from "graphics-debug"
 
 /**
