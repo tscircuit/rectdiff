@@ -2,7 +2,7 @@ import RBush from "rbush"
 import type { RectDiffExpansionSolverInput } from "../solvers/RectDiffExpansionSolver/RectDiffExpansionSolver"
 import type { SimpleRouteJson } from "../types/srj-types"
 import type { XYRect } from "../rectdiff-types"
-import type { RTreeRect } from "../types/capacity-mesh-types"
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
 import { buildZIndexMap } from "../solvers/RectDiffSeedingSolver/layers"
 
 /**

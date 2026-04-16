@@ -1,5 +1,5 @@
-import type { XYRect } from "../rectdiff-types"
-import type { RTreeRect } from "../types/capacity-mesh-types"
+import type { XYRect } from "lib/rectdiff-types"
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
 
 export const rectToTree = (
   rect: XYRect,

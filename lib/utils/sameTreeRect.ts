@@ -1,4 +1,4 @@
-import type { RTreeRect } from "../types/capacity-mesh-types"
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
 
 export const sameTreeRect = (a: RTreeRect, b: RTreeRect) =>
   a.minX === b.minX &&

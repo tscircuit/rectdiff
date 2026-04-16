@@ -1,4 +1,4 @@
-import type { RTreeRect } from "../types/capacity-mesh-types"
+import type { RTreeRect } from "lib/types/capacity-mesh-types"
 import RBush from "rbush"
 
 export type OccupancyParams = {
