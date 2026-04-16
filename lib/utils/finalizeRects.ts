@@ -1,4 +1,4 @@
-import type { Obstacle } from "lib/types/srj-types"
+import type { Obstacle } from "../types/srj-types"
 import type { Placed3D, Rect3d, XYRect } from "../rectdiff-types"
 import {
   obstacleToXYRect,

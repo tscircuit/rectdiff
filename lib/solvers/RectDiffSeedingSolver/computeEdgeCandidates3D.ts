@@ -3,7 +3,7 @@ import { EPS, distancePointToRectEdges } from "../../utils/rectdiff-geometry"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import type RBush from "rbush"
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import type { RTreeRect } from "../../types/capacity-mesh-types"
 const quantize = (value: number, precision = 1e-6) =>
   Math.round(value / precision) * precision
 

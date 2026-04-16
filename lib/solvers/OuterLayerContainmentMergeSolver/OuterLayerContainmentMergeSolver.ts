@@ -1,12 +1,12 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
-import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
-import type { XYRect } from "lib/rectdiff-types"
-import type { Obstacle, SimpleRouteJson } from "lib/types/srj-types"
+import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
+import type { XYRect } from "../../rectdiff-types"
+import type { Obstacle, SimpleRouteJson } from "../../types/srj-types"
 import { obstacleToXYRect, obstacleZs } from "../RectDiffSeedingSolver/layers"
-import { getColorForZLayer } from "lib/utils/getColorForZLayer"
-import { subtractRect2D, overlaps, EPS } from "lib/utils/rectdiff-geometry"
-import { padRect } from "lib/utils/padRect"
+import { getColorForZLayer } from "../../utils/getColorForZLayer"
+import { subtractRect2D, overlaps, EPS } from "../../utils/rectdiff-geometry"
+import { padRect } from "../../utils/padRect"
 
 type OuterLayerContainmentMergeSolverInput = {
   meshNodes: CapacityMeshNode[]

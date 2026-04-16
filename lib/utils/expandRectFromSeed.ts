@@ -1,7 +1,7 @@
 import type RBush from "rbush"
 import type { XYRect } from "../rectdiff-types"
 import { EPS, gt, gte, lt, lte, overlaps } from "./rectdiff-geometry"
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import type { RTreeRect } from "../types/capacity-mesh-types"
 import { isSelfRect } from "./isSelfRect"
 import {
   searchStripDown,
