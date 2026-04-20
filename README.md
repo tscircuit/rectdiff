@@ -28,6 +28,7 @@ const simpleRouteJson: SimpleRouteJson = {
       center: { x: 2.5, y: 2.5 },
       width: 2,
       height: 2,
+      ccwRotationDegrees: 15,
       connectedTo: [],
     },
   ],
@@ -61,6 +62,7 @@ const solver = new RectDiffSolver({
   simpleRouteJson,
   mode: "grid",
   gridOptions: {
+    rotatedObstacleGridSize: 0.25,
     minSingle: { width: 0.4, height: 0.4 },
     minMulti: { width: 1.0, height: 1.0, minLayers: 2 },
     preferMultiLayer: true,
@@ -121,6 +123,7 @@ for (const node of output.meshNodes) {
 
   - `bounds`: Board boundaries (minX, maxX, minY, maxY)
   - `obstacles`: Array of rectangular obstacles on the board
+    - Obstacles may optionally set `ccwRotationDegrees` to rotate the rectangle around its center
   - `connections`: Connection requirements between points
   - `layerCount`: Number of layers in the board
   - `minTraceWidth`: Minimum trace width for routing
@@ -130,6 +133,7 @@ for (const node of output.meshNodes) {
   - Currently only "grid" mode is implemented
 
 - `gridOptions`: Fine-tune the grid-based expansion algorithm
+  - `rotatedObstacleGridSize`: Optional axis-aligned approximation step for rotated obstacles; smaller values reduce overlap with the true rotated outline at the cost of more blocker rectangles and a finer result
   - `minSingle`: Minimum dimensions for single-layer nodes
   - `minMulti`: Minimum dimensions and layer count for multi-layer nodes
   - `preferMultiLayer`: Whether to prefer multi-layer spanning nodes

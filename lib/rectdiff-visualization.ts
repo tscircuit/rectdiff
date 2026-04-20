@@ -1,6 +1,9 @@
 import type { GraphicsObject } from "graphics-debug"
 import type { SimpleRouteJson } from "./types/srj-types"
-import type { XYRect } from "./rectdiff-types"
+import {
+  getObstacleDisplayRect,
+  isObstacleRotated,
+} from "./utils/obstacleGeometry"
 
 /**
  * Create basic visualization showing board bounds/outline and obstacles.
@@ -44,18 +47,17 @@ export function createBaseVisualization(
 
   // Draw obstacles
   for (const obstacle of srj.obstacles ?? []) {
-    if (obstacle.type === "rect" || obstacle.type === "oval") {
-      const layerLabel = (obstacle.zLayers ?? []).join(",") || "all"
-      rects.push({
-        center: { x: obstacle.center.x, y: obstacle.center.y },
-        width: obstacle.width,
-        height: obstacle.height,
-        fill: "#fee2e2",
-        stroke: "#ef4444",
-        layer: "obstacle",
-        label: `obstacle\nz:${layerLabel}`,
-      })
-    }
+    if (obstacle.type !== "rect") continue
+    const layerLabel = (obstacle.zLayers ?? []).join(",") || "all"
+    const rect = getObstacleDisplayRect(obstacle)
+    if (!rect) continue
+    rects.push({
+      ...rect,
+      fill: "#fee2e2",
+      stroke: isObstacleRotated(obstacle) ? "#b91c1c" : "#ef4444",
+      layer: "obstacle",
+      label: `obstacle\nz:${layerLabel}`,
+    })
   }
 
   return {

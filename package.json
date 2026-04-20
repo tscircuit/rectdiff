@@ -39,11 +39,11 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "D": "^1.0.0",
-    "flatbush": "^4.5.1",
     "@tscircuit/math-utils": "^0.0.36",
     "@tscircuit/solver-utils": "^0.0.19",
-    "graphics-debug": "^0.0.91",
+    "D": "^1.0.0",
+    "flatbush": "^4.5.1",
+    "graphics-debug": "^0.0.93",
     "rbush": "^4.0.1"
   }
 }

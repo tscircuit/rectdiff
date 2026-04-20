@@ -19,6 +19,7 @@ import type { GraphicsObject } from "graphics-debug"
 import RBush from "rbush"
 import { buildObstacleIndexesByLayer } from "./buildObstacleIndexes"
 import type { Bounds } from "@tscircuit/math-utils"
+import { resolveRotatedObstacleGridSize } from "../../utils/obstacleGeometry"
 
 export type RectDiffGridSolverPipelineInput = {
   bounds: Bounds
@@ -40,9 +41,20 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
   private obstacleIndexByLayer: Array<RBush<RTreeRect>>
   private layerNames: string[]
   private zIndexByName: Map<string, number>
+  private rotatedObstacleGridSize: number | undefined
 
   constructor(inputProblem: RectDiffGridSolverPipelineInput) {
     super(inputProblem)
+    const boundsRect: XYRect = {
+      x: inputProblem.bounds.minX,
+      y: inputProblem.bounds.minY,
+      width: inputProblem.bounds.maxX - inputProblem.bounds.minX,
+      height: inputProblem.bounds.maxY - inputProblem.bounds.minY,
+    }
+    this.rotatedObstacleGridSize = resolveRotatedObstacleGridSize({
+      bounds: boundsRect,
+      gridOptions: inputProblem.gridOptions,
+    })
     const { obstacleIndexByLayer, layerNames, zIndexByName } =
       buildObstacleIndexesByLayer({
         srj: {
@@ -55,6 +67,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
         },
         boardVoidRects: inputProblem.boardVoidRects,
         obstacleClearance: inputProblem.obstacleClearance,
+        rotatedObstacleGridSize: this.rotatedObstacleGridSize,
       })
     this.obstacleIndexByLayer = obstacleIndexByLayer
     this.layerNames = inputProblem.layerNames ?? layerNames
@@ -111,6 +124,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
             layerNamesCanonical: pipeline.layerNames,
             obstacles: pipeline.inputProblem.obstacles,
             obstacleClearance: pipeline.inputProblem.obstacleClearance,
+            rotatedObstacleGridSize: pipeline.rotatedObstacleGridSize,
           },
         ]
       },

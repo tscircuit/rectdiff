@@ -1,25 +1,24 @@
 import type { SimpleRouteJson } from "../../types/srj-types"
 import RBush from "rbush"
 import { computeInverseRects } from "../RectDiffSeedingSolver/computeInverseRects"
-import {
-  buildZIndexMap,
-  obstacleToXYRect,
-  obstacleZs,
-} from "../RectDiffSeedingSolver/layers"
+import { buildZIndexMap, obstacleZs } from "../RectDiffSeedingSolver/layers"
 import type { XYRect } from "../../rectdiff-types"
 import type { RTreeRect } from "../../types/capacity-mesh-types"
 import { padRect } from "../../utils/padRect"
+import { getApproximateObstacleRects } from "../../utils/obstacleGeometry"
 
 export const buildObstacleIndexesByLayer = (params: {
   srj: SimpleRouteJson
   boardVoidRects?: XYRect[]
   obstacleClearance?: number
+  rotatedObstacleGridSize?: number
 }): {
   obstacleIndexByLayer: Array<RBush<RTreeRect>>
   layerNames: string[]
   zIndexByName: Map<string, number>
 } => {
-  const { srj, boardVoidRects, obstacleClearance } = params
+  const { srj, boardVoidRects, obstacleClearance, rotatedObstacleGridSize } =
+    params
   const { layerNames, zIndexByName } = buildZIndexMap({
     obstacles: srj.obstacles,
     layerCount: srj.layerCount,
@@ -55,9 +54,10 @@ export const buildObstacleIndexesByLayer = (params: {
   }
 
   for (const obstacle of srj.obstacles ?? []) {
-    const rectBase = obstacleToXYRect(obstacle)
-    if (!rectBase) continue
-    const rect = padRect(rectBase, obstacleClearance ?? 0)
+    const rects = getApproximateObstacleRects(obstacle, {
+      rotatedObstacleGridSize,
+    })
+    if (rects.length === 0) continue
     const zLayers = obstacleZs(obstacle, zIndexByName)
     const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
     if (invalidZs.length) {
@@ -71,7 +71,10 @@ export const buildObstacleIndexesByLayer = (params: {
     ) {
       obstacle.zLayers = zLayers
     }
-    for (const z of zLayers) insertObstacle(rect, z)
+    for (const rectBase of rects) {
+      const rect = padRect(rectBase, obstacleClearance ?? 0)
+      for (const z of zLayers) insertObstacle(rect, z)
+    }
   }
 
   return { obstacleIndexByLayer, layerNames, zIndexByName }

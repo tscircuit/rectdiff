@@ -15,6 +15,7 @@ import { computeInverseRects } from "./solvers/RectDiffSeedingSolver/computeInve
 import { buildZIndexMap } from "./solvers/RectDiffSeedingSolver/layers"
 import { buildObstacleClearanceGraphics } from "./utils/renderObstacleClearance"
 import { mergeGraphics } from "graphics-debug"
+import { resolveRotatedObstacleGridSize } from "./utils/obstacleGeometry"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -28,6 +29,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   boardVoidRects: XYRect[] | undefined
   zIndexByName?: Map<string, number>
   layerNames?: string[]
+  rotatedObstacleGridSize?: number
 
   override pipelineDef: PipelineStep<any>[] = [
     definePipelineStep(
@@ -72,24 +74,29 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   ]
 
   override _setup(): void {
+    const boundsRect: XYRect = {
+      x: this.inputProblem.simpleRouteJson.bounds.minX,
+      y: this.inputProblem.simpleRouteJson.bounds.minY,
+      width:
+        this.inputProblem.simpleRouteJson.bounds.maxX -
+        this.inputProblem.simpleRouteJson.bounds.minX,
+      height:
+        this.inputProblem.simpleRouteJson.bounds.maxY -
+        this.inputProblem.simpleRouteJson.bounds.minY,
+    }
     const { zIndexByName, layerNames } = buildZIndexMap({
       obstacles: this.inputProblem.simpleRouteJson.obstacles,
       layerCount: this.inputProblem.simpleRouteJson.layerCount,
     })
     this.zIndexByName = zIndexByName
     this.layerNames = layerNames
+    this.rotatedObstacleGridSize = resolveRotatedObstacleGridSize({
+      bounds: boundsRect,
+      gridOptions: this.inputProblem.gridOptions,
+    })
     if (this.inputProblem.simpleRouteJson.outline) {
       this.boardVoidRects = computeInverseRects(
-        {
-          x: this.inputProblem.simpleRouteJson.bounds.minX,
-          y: this.inputProblem.simpleRouteJson.bounds.minY,
-          width:
-            this.inputProblem.simpleRouteJson.bounds.maxX -
-            this.inputProblem.simpleRouteJson.bounds.minX,
-          height:
-            this.inputProblem.simpleRouteJson.bounds.maxY -
-            this.inputProblem.simpleRouteJson.bounds.minY,
-        },
+        boundsRect,
         this.inputProblem.simpleRouteJson.outline ?? [],
       )
     }
@@ -118,6 +125,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
     const clearance = buildObstacleClearanceGraphics({
       srj: this.inputProblem.simpleRouteJson,
       clearance: this.inputProblem.obstacleClearance,
+      rotatedObstacleGridSize: this.rotatedObstacleGridSize,
     })
 
     // Show initial mesh nodes from grid pipeline if available
@@ -149,6 +157,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
       srj: this.inputProblem.simpleRouteJson,
       meshNodes: this.getOutput().meshNodes,
       obstacleClearance: this.inputProblem.obstacleClearance,
+      rotatedObstacleGridSize: this.rotatedObstacleGridSize,
     })
   }
 }

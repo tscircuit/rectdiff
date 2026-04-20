@@ -17,6 +17,7 @@ export interface Obstacle {
   center: { x: number; y: number }
   width: number
   height: number
+  ccwRotationDegrees?: number
   connectedTo: TraceId[]
   netIsAssignable?: boolean
   offBoardConnectsTo?: TraceId[]

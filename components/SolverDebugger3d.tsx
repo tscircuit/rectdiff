@@ -5,6 +5,7 @@ import type { CapacityMeshNode } from "../lib/types/capacity-mesh-types"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import type { BaseSolver } from "@tscircuit/solver-utils"
+import { getObstacleRotationRadians } from "../lib/utils/obstacleGeometry"
 
 type SolverDebugger3dProps = {
   solver: BaseSolver
@@ -342,6 +343,30 @@ const ThreeBoardView: React.FC<{
         return group
       }
 
+      function makeObstacleMesh(
+        obstacle: NonNullable<SimpleRouteJson["obstacles"]>[number],
+        z: number,
+      ) {
+        const dx = obstacle.width
+        const dz = obstacle.height
+        const dy = layerThickness
+        const cx = -obstacle.center.x
+        const cz = obstacle.center.y
+        const cy = -(z + 0.5) * layerThickness
+        const geom = new THREE.BoxGeometry(dx, dy, dz)
+        const mat = new THREE.MeshPhongMaterial({
+          color: colorOb,
+          opacity: 0.35,
+          transparent: true,
+          alphaHash: true,
+          alphaToCoverage: true,
+        })
+        const mesh = new THREE.Mesh(geom, mat)
+        mesh.position.set(cx, cy, cz)
+        mesh.rotation.y = -getObstacleRotationRadians(obstacle)
+        return mesh
+      }
+
       // Root wireframe from SRJ bounds
       if (srj && showRoot) {
         const rootBox = {
@@ -359,10 +384,6 @@ const ThreeBoardView: React.FC<{
       if (srj && showObstacles) {
         for (const ob of srj.obstacles ?? []) {
           if (ob.type !== "rect") continue
-          const minX = ob.center.x - ob.width / 2
-          const maxX = ob.center.x + ob.width / 2
-          const minY = ob.center.y - ob.height / 2
-          const maxY = ob.center.y + ob.height / 2
 
           // Prefer explicit zLayers; otherwise map layer names to indices
           const zs =
@@ -374,15 +395,7 @@ const ThreeBoardView: React.FC<{
 
           for (const z of zs) {
             if (z < 0 || z >= layerCount) continue
-            obstaclesGroup.add(
-              makeBoxMesh(
-                { minX, maxX, minY, maxY, z0: z, z1: z + 1 },
-                colorOb,
-                false,
-                0.35,
-                false,
-              ),
-            )
+            obstaclesGroup.add(makeObstacleMesh(ob, z))
           }
         }
       }

@@ -12,6 +12,7 @@ export type Rect3d = {
 
 export type GridFill3DOptions = {
   gridSizes?: number[]
+  rotatedObstacleGridSize?: number
   initialCellRatio?: number
   maxAspectRatio?: number | null
   minSingle: { width: number; height: number }
