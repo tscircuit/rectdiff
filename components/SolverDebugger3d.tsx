@@ -560,7 +560,9 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   defaultWireframeOutput = false,
   style,
 }) => {
-  const [renderMode, setRenderMode] = useState<"2d" | "3d">("2d")
+  const [renderMode, setRenderMode] = useState<"2d" | "3d" | "split">(
+    "split",
+  )
   const [rebuildKey, setRebuildKey] = useState(0)
 
   const [showRoot, setShowRoot] = useState(defaultShowRoot)
@@ -631,7 +633,9 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
             <span style={{ fontWeight: 600, fontSize: 14 }}>Render:</span>
             <select
               value={renderMode}
-              onChange={(e) => setRenderMode(e.target.value as "2d" | "3d")}
+              onChange={(e) =>
+                setRenderMode(e.target.value as "2d" | "3d" | "split")
+              }
               style={{
                 padding: "6px 12px",
                 borderRadius: 6,
@@ -641,12 +645,13 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
                 fontSize: 14,
               }}
             >
-              <option value="2d">2D (Normal)</option>
-              <option value="3d">3D View</option>
+              <option value="split">Split (2D + 3D)</option>
+              <option value="2d">2D Only</option>
+              <option value="3d">3D Only</option>
             </select>
           </label>
 
-          {renderMode === "3d" && (
+          {renderMode !== "2d" && (
             <>
               <button
                 onClick={rebuild}
@@ -728,7 +733,7 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
           )}
         </div>
 
-        {/* Render 2D view */}
+        {/* Render 2D / 3D view */}
         {renderMode === "2d" && (
           <GenericSolverDebugger
             solver={solver}
@@ -736,7 +741,6 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
           />
         )}
 
-        {/* Render 3D view */}
         {renderMode === "3d" && (
           <ThreeBoardView
             key={rebuildKey}
@@ -753,6 +757,41 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
             boxShrinkAmount={boxShrinkAmount}
             showBorders={showBorders}
           />
+        )}
+
+        {renderMode === "split" && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: 12,
+              alignItems: "start",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <GenericSolverDebugger
+                solver={solver}
+                onSolverCompleted={handleSolverCompleted}
+              />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <ThreeBoardView
+                key={rebuildKey}
+                nodes={meshNodes}
+                srj={simpleRouteJson}
+                layerThickness={layerThickness}
+                height={height}
+                showRoot={showRoot}
+                showObstacles={showObstacles}
+                showOutput={showOutput}
+                wireframeOutput={wireframeOutput}
+                meshOpacity={meshOpacity}
+                shrinkBoxes={shrinkBoxes}
+                boxShrinkAmount={boxShrinkAmount}
+                showBorders={showBorders}
+              />
+            </div>
+          </div>
         )}
       </div>
 
