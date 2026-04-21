@@ -71,7 +71,11 @@ export const buildObstacleIndexesByLayer = (params: {
     ) {
       obstacle.zLayers = zLayers
     }
-    for (const z of zLayers) insertObstacle(rect, z)
+    for (const z of zLayers) {
+      const isOuterLayer = z === 0 || z === layerCount - 1
+      if (isOuterLayer && obstacle.isCopperPour) continue
+      insertObstacle(rect, z)
+    }
   }
 
   return { obstacleIndexByLayer, layerNames, zIndexByName }
