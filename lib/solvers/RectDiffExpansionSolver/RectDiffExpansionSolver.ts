@@ -10,6 +10,7 @@ import type { Obstacle } from "lib/types/srj-types"
 import RBush from "rbush"
 import { rectToTree } from "../../utils/rectToTree"
 import { sameTreeRect } from "../../utils/sameTreeRect"
+import { overlaps } from "../../utils/rectdiff-geometry"
 
 export type RectDiffExpansionSolverInput = {
   layerNames: string[]
@@ -104,6 +105,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
       zLayers: p.zLayers,
     })
 
+    const rectToUse = expanded ?? oldRect
     if (expanded) {
       // Update placement + per-layer index (replace old rect object)
       this.input.placed[idx] = { rect: expanded, zLayers: p.zLayers }
@@ -127,7 +129,85 @@ export class RectDiffExpansionSolver extends BaseSolver {
       )
     }
 
+    this.expandPlacementLayers(idx, rectToUse)
+
     this.input.expansionIndex += 1
+  }
+
+  private expandPlacementLayers(idx: number, rect: XYRect) {
+    const placement = this.input.placed[idx]
+    if (!placement) return
+
+    const currentLayers = placement.zLayers.slice().sort((a, b) => a - b)
+    if (currentLayers.length === 0) return
+
+    const query = {
+      minX: rect.x,
+      minY: rect.y,
+      maxX: rect.x + rect.width,
+      maxY: rect.y + rect.height,
+    }
+
+    const isLayerFree = (layer: number) => {
+      const placedIndex = this.placedIndexByLayer[layer]
+      if (placedIndex) {
+        const hits = placedIndex.search(query)
+        for (const hit of hits) {
+          if (!overlaps(rect, hit)) continue
+          if (hit.zLayers.length >= this.input.layerCount) return false
+        }
+      }
+
+      return true
+    }
+
+    const minLayer = currentLayers[0]!
+    const maxLayer = currentLayers[currentLayers.length - 1]!
+    let nextMin = minLayer
+    let nextMax = maxLayer
+
+    while (nextMin - 1 >= 0 && isLayerFree(nextMin - 1)) {
+      nextMin -= 1
+    }
+
+    while (nextMax + 1 < this.input.layerCount && isLayerFree(nextMax + 1)) {
+      nextMax += 1
+    }
+
+    if (nextMin === minLayer && nextMax === maxLayer) return
+
+    const nextLayers: number[] = []
+    for (let z = nextMin; z <= nextMax; z += 1) {
+      nextLayers.push(z)
+    }
+
+    for (const z of currentLayers) {
+      const tree = this.placedIndexByLayer[z]
+      if (tree) {
+        tree.remove(rectToTree(rect, { zLayers: currentLayers }), sameTreeRect)
+        tree.insert(rectToTree(rect, { zLayers: nextLayers }))
+      }
+    }
+
+    for (const z of nextLayers) {
+      if (currentLayers.includes(z)) continue
+      const tree = this.placedIndexByLayer[z]
+      if (tree) {
+        tree.insert(rectToTree(rect, { zLayers: nextLayers }))
+      }
+    }
+
+    this.input.placed[idx] = { rect, zLayers: nextLayers }
+
+    resizeSoftOverlaps(
+      {
+        layerCount: this.input.layerCount,
+        placed: this.input.placed,
+        options: this.input.options,
+        placedIndexByLayer: this.placedIndexByLayer,
+      },
+      idx,
+    )
   }
 
   private finalizeIfNeeded() {
