@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { RectDiffPipeline } from "../lib/RectDiffPipeline"
+import { finalizeRects } from "../lib/utils/finalizeRects"
 import type { SimpleRouteJson } from "../lib/types/srj-types"
 
 test("RectDiffSolver creates mesh nodes with grid-based approach", () => {
@@ -140,4 +141,74 @@ test("multi-layer mesh generation", () => {
   // With no obstacles and multiple layers, we should get multi-layer nodes
   const multiLayerNodes = mesh.filter((n) => (n.availableZ?.length ?? 0) >= 2)
   expect(multiLayerNodes.length).toBeGreaterThan(0)
+})
+
+test("finalizeRects merges identical free-space footprints across layers", () => {
+  const rects = finalizeRects({
+    placed: [
+      {
+        rect: { x: 1, y: 2, width: 3, height: 4 },
+        zLayers: [0],
+      },
+      {
+        rect: { x: 1, y: 2, width: 3, height: 4 },
+        zLayers: [1],
+      },
+    ],
+    obstacles: [],
+    boardVoidRects: [],
+    zIndexByName: new Map(),
+  })
+
+  expect(rects).toEqual([
+    {
+      minX: 1,
+      minY: 2,
+      maxX: 4,
+      maxY: 6,
+      zLayers: [0, 1],
+    },
+  ])
+})
+
+test("finalizeRects partitions overlapping free-space into shared multi-layer coverage", () => {
+  const rects = finalizeRects({
+    placed: [
+      {
+        rect: { x: 0, y: 0, width: 4, height: 2 },
+        zLayers: [0],
+      },
+      {
+        rect: { x: 2, y: 0, width: 4, height: 2 },
+        zLayers: [1],
+      },
+    ],
+    obstacles: [],
+    boardVoidRects: [],
+    zIndexByName: new Map(),
+  })
+
+  expect(rects).toEqual([
+    {
+      minX: 0,
+      minY: 0,
+      maxX: 2,
+      maxY: 2,
+      zLayers: [0],
+    },
+    {
+      minX: 2,
+      minY: 0,
+      maxX: 4,
+      maxY: 2,
+      zLayers: [0, 1],
+    },
+    {
+      minX: 4,
+      minY: 0,
+      maxX: 6,
+      maxY: 2,
+      zLayers: [1],
+    },
+  ])
 })

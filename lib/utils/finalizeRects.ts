@@ -4,6 +4,7 @@ import {
   obstacleToXYRect,
   obstacleZs,
 } from "../solvers/RectDiffSeedingSolver/layers"
+import { partitionPlacedRectsByCoverage } from "./partitionPlacedRectsByCoverage"
 
 export function finalizeRects(params: {
   placed: Placed3D[]
@@ -12,14 +13,9 @@ export function finalizeRects(params: {
   zIndexByName: Map<string, number>
   obstacleClearance?: number
 }): Rect3d[] {
-  // Convert all placed (free space) nodes to output format
-  const out: Rect3d[] = params.placed.map((p) => ({
-    minX: p.rect.x,
-    minY: p.rect.y,
-    maxX: p.rect.x + p.rect.width,
-    maxY: p.rect.y + p.rect.height,
-    zLayers: [...p.zLayers].sort((a, b) => a - b),
-  }))
+  // Re-partition free-space by actual XY coverage so overlapping per-layer
+  // placements become explicit multi-layer nodes in the final mesh.
+  const out: Rect3d[] = partitionPlacedRectsByCoverage(params.placed)
 
   const layersByKey = new Map<string, { rect: XYRect; layers: Set<number> }>()
 
