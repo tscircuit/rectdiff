@@ -16,12 +16,12 @@ import { computeCandidates3D } from "./computeCandidates3D"
 import { computeEdgeCandidates3D } from "./computeEdgeCandidates3D"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
-import { isFullyOccupiedAtPoint } from "lib/utils/isFullyOccupiedAtPoint"
+import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
-import { getColorForZLayer } from "lib/utils/getColorForZLayer"
+import { getColorForZLayer } from "../../utils/getColorForZLayer"
 import RBush from "rbush"
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
-import { rectToTree } from "lib/utils/rectToTree"
+import type { RTreeRect } from "../../types/capacity-mesh-types"
+import { rectToTree } from "../../utils/rectToTree"
 
 export type RectDiffSeedingSolverInput = {
   simpleRouteJson: SimpleRouteJson

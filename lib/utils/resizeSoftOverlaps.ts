@@ -1,4 +1,4 @@
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
+import type { RTreeRect } from "../types/capacity-mesh-types"
 import type { Placed3D } from "../rectdiff-types"
 import { overlaps, subtractRect2D, EPS } from "./rectdiff-geometry"
 import type RBush from "rbush"
