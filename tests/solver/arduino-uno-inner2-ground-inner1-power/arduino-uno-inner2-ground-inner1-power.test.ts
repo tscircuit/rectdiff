@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import srj_json from "./arduino-uno-inner2-ground-inner1-power.json"
+import simpleRouteJson from "../../../test-assets/arduino-uno-inner2-ground-inner1-power.json"
 import {
   getBounds,
   getSvgFromGraphicsObject,
@@ -12,17 +12,12 @@ import { RectDiffPipeline } from "lib/RectDiffPipeline"
 import { makeCapacityMeshNodeWithLayerInfo } from "tests/fixtures/makeCapacityMeshNodeWithLayerInfo"
 import { makeSimpleRouteOutlineGraphics } from "tests/fixtures/makeSimpleRouteOutlineGraphics"
 
-const srj =
-  (Array.isArray(srj_json) ? srj_json[0] : srj_json).simple_route_json ??
-  (Array.isArray(srj_json) ? srj_json[0] : srj_json).simpleRouteJson ??
-  (Array.isArray(srj_json) ? srj_json[0] : srj_json)
-
 test("arduino-uno-inner2-ground-inner1-power", async () => {
   const solver = new RectDiffPipeline({
-    simpleRouteJson: srj,
+    simpleRouteJson,
   })
 
-  const outline = makeSimpleRouteOutlineGraphics(srj)
+  const outline = makeSimpleRouteOutlineGraphics(simpleRouteJson)
 
   solver.solve()
 
@@ -30,7 +25,10 @@ test("arduino-uno-inner2-ground-inner1-power", async () => {
   const rectsByCombo = makeCapacityMeshNodeWithLayerInfo(meshNodes)
   const allGraphicsObjects: GraphicsObject[] = []
 
-  for (const z of Array.from({ length: srj.layerCount }, (_, index) => index)) {
+  for (const z of Array.from(
+    { length: simpleRouteJson.layerCount },
+    (_, index) => index,
+  )) {
     const layerRects: Rect[] = []
 
     for (const [key, rects] of rectsByCombo) {
