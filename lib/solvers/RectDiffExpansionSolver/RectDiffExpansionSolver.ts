@@ -2,9 +2,7 @@ import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
 import type { CapacityMeshNode, RTreeRect } from "lib/types/capacity-mesh-types"
 import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
-import { finalizeRects } from "../../utils/finalizeRects"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
-import { rectsToMeshNodes } from "./rectsToMeshNodes"
 import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
 import type { Obstacle } from "lib/types/srj-types"
 import RBush from "rbush"
@@ -42,7 +40,6 @@ export type RectDiffExpansionSolverInput = {
  */
 export class RectDiffExpansionSolver extends BaseSolver {
   placedIndexByLayer: Array<RBush<RTreeRect>> = []
-  _meshNodes: CapacityMeshNode[] = []
   constructor(private input: RectDiffExpansionSolverInput) {
     super()
   }
@@ -132,15 +129,6 @@ export class RectDiffExpansionSolver extends BaseSolver {
 
   private finalizeIfNeeded() {
     if (this.solved) return
-
-    const rects = finalizeRects({
-      placed: this.input.placed,
-      obstacles: this.input.obstacles,
-      zIndexByName: this.input.zIndexByName,
-      boardVoidRects: this.input.boardVoidRects,
-      obstacleClearance: this.input.obstacleClearance,
-    })
-    this._meshNodes = rectsToMeshNodes(rects)
     this.solved = true
   }
 
@@ -153,11 +141,11 @@ export class RectDiffExpansionSolver extends BaseSolver {
     return Math.min(0.999, base + frac * (1 / (grids + 1)))
   }
 
-  override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    if (this.solved) return { meshNodes: this._meshNodes }
-
-    // Provide a live preview of the placements before finalization so debuggers
-    // can inspect intermediary states without forcing the solver to finish.
+  override getOutput(): {
+    meshNodes: CapacityMeshNode[]
+    placed: Placed3D[]
+    options: RectDiffExpansionSolverInput["options"]
+  } {
     const previewNodes: CapacityMeshNode[] = this.input.placed.map(
       (placement, idx) => ({
         capacityMeshNodeId: `expand-preview-${idx}`,
@@ -171,7 +159,11 @@ export class RectDiffExpansionSolver extends BaseSolver {
         layer: `z${placement.zLayers.join(",")}`,
       }),
     )
-    return { meshNodes: previewNodes }
+    return {
+      meshNodes: previewNodes,
+      placed: this.input.placed,
+      options: this.input.options,
+    }
   }
 
   /** Simple visualization of expanded placements. */
