@@ -40,7 +40,8 @@ export class NodeMergeSolver extends BasePipelineSolver<NodeMergeSolverInput> {
       MaskGenerationSolver,
       (pipeline: NodeMergeSolver) => {
         const output = pipeline.placementDiffSolver?.getOutput()
-        if (!output) throw new Error("PlacementDiffSolver did not produce output")
+        if (!output)
+          throw new Error("PlacementDiffSolver did not produce output")
         return [output]
       },
     ),
@@ -49,7 +50,8 @@ export class NodeMergeSolver extends BasePipelineSolver<NodeMergeSolverInput> {
       CoverageMergeSolver,
       (pipeline: NodeMergeSolver) => {
         const output = pipeline.maskGenerationSolver?.getOutput()
-        if (!output) throw new Error("MaskGenerationSolver did not produce output")
+        if (!output)
+          throw new Error("MaskGenerationSolver did not produce output")
         return [
           {
             ...output,
@@ -63,7 +65,8 @@ export class NodeMergeSolver extends BasePipelineSolver<NodeMergeSolverInput> {
       ObstacleInjectionSolver,
       (pipeline: NodeMergeSolver) => {
         const output = pipeline.coverageMergeSolver?.getOutput()
-        if (!output) throw new Error("CoverageMergeSolver did not produce output")
+        if (!output)
+          throw new Error("CoverageMergeSolver did not produce output")
         return [
           {
             coverageRects: output.coverageRects,

@@ -59,7 +59,10 @@ export class CoverageMergeSolver extends BaseSolver {
 
       const xStart = x
       x += 1
-      while (x < this.input.xs.length - 1 && this.input.layerMasks[y]![x] === mask) {
+      while (
+        x < this.input.xs.length - 1 &&
+        this.input.layerMasks[y]![x] === mask
+      ) {
         x += 1
       }
 
@@ -156,7 +159,8 @@ export class CoverageMergeSolver extends BaseSolver {
       const step = width / parts
       return Array.from({ length: parts }, (_, index) => {
         const minX = rect.minX + index * step
-        const maxX = index === parts - 1 ? rect.maxX : rect.minX + (index + 1) * step
+        const maxX =
+          index === parts - 1 ? rect.maxX : rect.minX + (index + 1) * step
         return {
           ...rect,
           minX,
@@ -172,7 +176,8 @@ export class CoverageMergeSolver extends BaseSolver {
     const step = height / parts
     return Array.from({ length: parts }, (_, index) => {
       const minY = rect.minY + index * step
-      const maxY = index === parts - 1 ? rect.maxY : rect.minY + (index + 1) * step
+      const maxY =
+        index === parts - 1 ? rect.maxY : rect.minY + (index + 1) * step
       return {
         ...rect,
         minY,

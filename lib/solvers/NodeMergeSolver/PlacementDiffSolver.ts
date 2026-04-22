@@ -106,7 +106,10 @@ export class PlacementDiffSolver extends BaseSolver {
       texts,
       this.xs,
       this.ys,
-      [`phase: placements`, `placements: ${this.placementIndex}/${this.input.placed.length}`].join("\n"),
+      [
+        `phase: placements`,
+        `placements: ${this.placementIndex}/${this.input.placed.length}`,
+      ].join("\n"),
     )
 
     return {

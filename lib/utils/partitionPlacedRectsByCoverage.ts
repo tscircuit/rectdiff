@@ -64,8 +64,9 @@ export function partitionPlacedRectsByCoverage(placed: Placed3D[]): Rect3d[] {
     }
   }
 
-  const layerMasks = Array.from({ length: ys.length - 1 }, () =>
-    new Uint32Array(xs.length - 1),
+  const layerMasks = Array.from(
+    { length: ys.length - 1 },
+    () => new Uint32Array(xs.length - 1),
   )
 
   for (let z = 0; z < layerCount; z++) {
@@ -119,8 +120,10 @@ export function partitionPlacedRectsByCoverage(placed: Placed3D[]): Rect3d[] {
             minY: existing.minY,
             maxX: existing.maxX,
             maxY: existing.maxY,
-            zLayers: Array.from({ length: layerCount }, (_, zIndex) => zIndex)
-              .filter((zIndex) => (existing.mask & (1 << zIndex)) !== 0),
+            zLayers: Array.from(
+              { length: layerCount },
+              (_, zIndex) => zIndex,
+            ).filter((zIndex) => (existing.mask & (1 << zIndex)) !== 0),
           })
         }
         activeRects.set(key, {
@@ -141,8 +144,10 @@ export function partitionPlacedRectsByCoverage(placed: Placed3D[]): Rect3d[] {
           minY: rect.minY,
           maxX: rect.maxX,
           maxY: rect.maxY,
-          zLayers: Array.from({ length: layerCount }, (_, zIndex) => zIndex)
-            .filter((zIndex) => (rect.mask & (1 << zIndex)) !== 0),
+          zLayers: Array.from(
+            { length: layerCount },
+            (_, zIndex) => zIndex,
+          ).filter((zIndex) => (rect.mask & (1 << zIndex)) !== 0),
         })
         activeRects.delete(key)
       }

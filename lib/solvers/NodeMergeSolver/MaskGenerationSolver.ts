@@ -32,7 +32,8 @@ export class MaskGenerationSolver extends BaseSolver {
   override _setup() {
     this.layerMasks = Array.from(
       { length: Math.max(0, this.input.ys.length - 1) },
-      () => Array.from({ length: Math.max(0, this.input.xs.length - 1) }, () => 0),
+      () =>
+        Array.from({ length: Math.max(0, this.input.xs.length - 1) }, () => 0),
     )
     this.stats = { maskLayerIndex: 0, maskRowIndex: 0 }
   }

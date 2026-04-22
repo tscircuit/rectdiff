@@ -17,7 +17,10 @@ import type { GraphicsObject } from "graphics-debug"
 import RBush from "rbush"
 import { buildObstacleIndexesByLayer } from "./buildObstacleIndexes"
 import type { Bounds } from "@tscircuit/math-utils"
-import { buildMergedObstacles, type ObstacleEntry } from "../NodeMergeSolver/shared"
+import {
+  buildMergedObstacles,
+  type ObstacleEntry,
+} from "../NodeMergeSolver/shared"
 
 export type RectDiffGridSolverPipelineInput = {
   bounds: Bounds
