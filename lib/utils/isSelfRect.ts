@@ -1,4 +1,4 @@
-import type { XYRect } from "lib/rectdiff-types"
+import type { XYRect } from "../rectdiff-types"
 
 const EPS = 1e-9
 
