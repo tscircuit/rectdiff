@@ -3,11 +3,11 @@ import {
   definePipelineStep,
   type PipelineStep,
 } from "@tscircuit/solver-utils"
-import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
+import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { FindSegmentsWithAdjacentEmptySpaceSolver } from "./FindSegmentsWithAdjacentEmptySpaceSolver"
 import { ExpandEdgesToEmptySpaceSolver } from "./ExpandEdgesToEmptySpaceSolver"
-import type { XYRect } from "lib/rectdiff-types"
+import type { XYRect } from "../../rectdiff-types"
 
 type GapFillSolverInput = {
   meshNodes: CapacityMeshNode[]

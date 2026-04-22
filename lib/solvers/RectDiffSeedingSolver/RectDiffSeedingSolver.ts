@@ -16,12 +16,12 @@ import { computeCandidates3D } from "./computeCandidates3D"
 import { computeEdgeCandidates3D } from "./computeEdgeCandidates3D"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
-import { isFullyOccupiedAtPoint } from "lib/utils/isFullyOccupiedAtPoint"
+import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
-import { getColorForZLayer } from "lib/utils/getColorForZLayer"
+import { getColorForZLayer } from "../../utils/getColorForZLayer"
 import RBush from "rbush"
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
-import { rectToTree } from "lib/utils/rectToTree"
+import type { RTreeRect } from "../../types/capacity-mesh-types"
+import { rectToTree } from "../../utils/rectToTree"
 
 export type RectDiffSeedingSolverInput = {
   simpleRouteJson: SimpleRouteJson
@@ -102,8 +102,8 @@ export class RectDiffSeedingSolver extends BaseSolver {
       maxAspectRatio: 3,
       minSingle: { width: 2 * trace, height: 2 * trace },
       minMulti: {
-        width: 4 * trace,
-        height: 4 * trace,
+        width: 2 * trace,
+        height: 2 * trace,
         minLayers: Math.min(2, Math.max(1, srj.layerCount || 1)),
       },
       preferMultiLayer: true,
@@ -243,11 +243,20 @@ export class RectDiffSeedingSolver extends BaseSolver {
     }> = []
 
     if (span.length >= minMulti.minLayers) {
-      attempts.push({
-        kind: "multi",
-        layers: span,
-        minReq: { width: minMulti.width, height: minMulti.height },
-      })
+      const spanIndex = span.indexOf(cand.z)
+      let lo = 0
+      let hi = span.length - 1
+
+      while (hi - lo + 1 >= minMulti.minLayers) {
+        attempts.push({
+          kind: "multi",
+          layers: span.slice(lo, hi + 1),
+          minReq: { width: minMulti.width, height: minMulti.height },
+        })
+        if (hi - lo + 1 === minMulti.minLayers) break
+        if (spanIndex - lo > hi - spanIndex) lo += 1
+        else hi -= 1
+      }
     }
     attempts.push({
       kind: "single",
@@ -255,7 +264,7 @@ export class RectDiffSeedingSolver extends BaseSolver {
       minReq: { width: minSingle.width, height: minSingle.height },
     })
 
-    const ordered = preferMultiLayer ? attempts : attempts.reverse()
+    const ordered = preferMultiLayer ? attempts : attempts.slice().reverse()
 
     for (const attempt of ordered) {
       const rect = expandRectFromSeed({

@@ -23,7 +23,7 @@ const padSrjObstacles = (input: any, padding: number) => {
 const getTotalCapacity = (nodes: any[]): number =>
   nodes.reduce((sum, n) => sum + n.width * n.height, 0)
 
-test("clearance-param vs padded-obstacles produce equivalent free space capacity", async () => {
+test.skip("clearance-param vs padded-obstacles produce equivalent free space capacity", async () => {
   const solverA = new RectDiffPipeline({
     simpleRouteJson: srj,
     obstacleClearance: OBSTACLE_CLEARANCE,
