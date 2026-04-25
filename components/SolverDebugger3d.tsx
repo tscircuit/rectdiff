@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { GenericSolverDebugger } from "@tscircuit/solver-utils/react"
 import type { SimpleRouteJson } from "../lib/types/srj-types"
 import type { CapacityMeshNode } from "../lib/types/capacity-mesh-types"
+import { matchesExactZFilter, parseZFilterInput } from "../lib/utils/z-filter"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import type { BaseSolver } from "@tscircuit/solver-utils"
@@ -168,6 +169,7 @@ const ThreeBoardView: React.FC<{
   shrinkBoxes: boolean
   boxShrinkAmount: number
   showBorders: boolean
+  selectedZValues: number[] | null
 }> = ({
   nodes,
   srj,
@@ -181,6 +183,7 @@ const ThreeBoardView: React.FC<{
   shrinkBoxes,
   boxShrinkAmount,
   showBorders,
+  selectedZValues,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const destroyRef = useRef<() => void>(() => {})
@@ -203,9 +206,17 @@ const ThreeBoardView: React.FC<{
 
   const layerCount = layerNames.length || srj?.layerCount || 1
 
-  const prisms = useMemo(
-    () => buildPrismsFromNodes(nodes, layerCount),
-    [nodes, layerCount],
+  const filteredNodes = useMemo(
+    () =>
+      nodes.filter((node) =>
+        matchesExactZFilter(node.availableZ ?? [], selectedZValues),
+      ),
+    [nodes, selectedZValues],
+  )
+
+  const filteredPrisms = useMemo(
+    () => buildPrismsFromNodes(filteredNodes, layerCount),
+    [filteredNodes, layerCount],
   )
 
   useEffect(() => {
@@ -372,6 +383,8 @@ const ThreeBoardView: React.FC<{
                   .map((name) => zIndexByLayerName.get(name))
                   .filter((z): z is number => typeof z === "number")
 
+          if (!matchesExactZFilter(zs, selectedZValues)) continue
+
           for (const z of zs) {
             if (z < 0 || z >= layerCount) continue
             obstaclesGroup.add(
@@ -389,7 +402,7 @@ const ThreeBoardView: React.FC<{
 
       // Output prisms from nodes (wireframe toggle like the experiment)
       if (showOutput) {
-        for (const p of prisms) {
+        for (const p of filteredPrisms) {
           let box = p
           if (shrinkBoxes && boxShrinkAmount > 0) {
             const s = boxShrinkAmount
@@ -442,7 +455,7 @@ const ThreeBoardView: React.FC<{
             z1: layerCount,
           }
         : (() => {
-            if (prisms.length === 0) {
+            if (filteredPrisms.length === 0) {
               return {
                 minX: -10,
                 maxX: 10,
@@ -456,7 +469,7 @@ const ThreeBoardView: React.FC<{
               minY = Infinity,
               maxX = -Infinity,
               maxY = -Infinity
-            for (const p of prisms) {
+            for (const p of filteredPrisms) {
               minX = Math.min(minX, p.minX)
               maxX = Math.max(maxX, p.maxX)
               minY = Math.min(minY, p.minY)
@@ -517,7 +530,7 @@ const ThreeBoardView: React.FC<{
     }
   }, [
     srj,
-    prisms,
+    filteredPrisms,
     layerCount,
     layerThickness,
     height,
@@ -530,6 +543,7 @@ const ThreeBoardView: React.FC<{
     shrinkBoxes,
     boxShrinkAmount,
     showBorders,
+    selectedZValues,
   ])
 
   return (
@@ -572,9 +586,17 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   const [shrinkBoxes, setShrinkBoxes] = useState(true)
   const [boxShrinkAmount, setBoxShrinkAmount] = useState(0.1)
   const [showBorders, setShowBorders] = useState(true)
+  const [zFilterInput, setZFilterInput] = useState("")
 
   // Mesh nodes state - updated when solver completes or during stepping
   const [meshNodes, setMeshNodes] = useState<CapacityMeshNode[]>([])
+
+  const selectedZValues = useMemo(
+    () => parseZFilterInput(zFilterInput),
+    [zFilterInput],
+  )
+  const hasInvalidZFilter =
+    zFilterInput.trim().length > 0 && selectedZValues === null
 
   // Update mesh nodes from solver output
   const updateMeshNodes = useCallback(() => {
@@ -601,11 +623,16 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
   // Poll for updates during stepping (GenericSolverDebugger doesn't have onStep)
   useEffect(() => {
     const interval = setInterval(() => {
-      // Only update if solver has output available
-      if (solver.solved || solver.stats?.placed > 0) {
+      if (solver.solved) {
+        updateMeshNodes()
+        clearInterval(interval)
+        return
+      }
+
+      if (solver.stats?.placed > 0) {
         updateMeshNodes()
       }
-    }, 100) // Poll every 100ms during active solving
+    }, 100)
 
     return () => clearInterval(interval)
   }, [updateMeshNodes, solver])
@@ -724,6 +751,32 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
                 />
                 Wireframe
               </label>
+
+              <label
+                style={{
+                  display: "inline-flex",
+                  gap: 8,
+                  alignItems: "center",
+                  fontSize: 13,
+                }}
+              >
+                <span>Z Filter</span>
+                <input
+                  type="text"
+                  value={zFilterInput}
+                  onChange={(e) => setZFilterInput(e.target.value)}
+                  placeholder="1 or 1,2,3"
+                  style={{
+                    width: 120,
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    border: `1px solid ${hasInvalidZFilter ? "#dc2626" : "#cbd5e1"}`,
+                    background: "white",
+                    fontSize: 13,
+                  }}
+                  title="Show only exact z matches. Example: 1 matches [1], 1,2,3 matches [1,2,3]."
+                />
+              </label>
             </>
           )}
         </div>
@@ -752,6 +805,7 @@ export const SolverDebugger3d: React.FC<SolverDebugger3dProps> = ({
             shrinkBoxes={shrinkBoxes}
             boxShrinkAmount={boxShrinkAmount}
             showBorders={showBorders}
+            selectedZValues={selectedZValues}
           />
         )}
       </div>
