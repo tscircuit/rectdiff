@@ -1,14 +1,14 @@
-import type { SimpleRouteJson } from "lib/types/srj-types"
+import type { SimpleRouteJson } from "../../types/srj-types"
 import RBush from "rbush"
-import { computeInverseRects } from "lib/solvers/RectDiffSeedingSolver/computeInverseRects"
+import { computeInverseRects } from "../RectDiffSeedingSolver/computeInverseRects"
 import {
   buildZIndexMap,
   obstacleToXYRect,
   obstacleZs,
-} from "lib/solvers/RectDiffSeedingSolver/layers"
-import type { XYRect } from "lib/rectdiff-types"
-import type { RTreeRect } from "lib/types/capacity-mesh-types"
-import { padRect } from "lib/utils/padRect"
+} from "../RectDiffSeedingSolver/layers"
+import type { XYRect } from "../../rectdiff-types"
+import type { RTreeRect } from "../../types/capacity-mesh-types"
+import { padRect } from "../../utils/padRect"
 
 export const buildObstacleIndexesByLayer = (params: {
   srj: SimpleRouteJson

@@ -1,12 +1,15 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
-import type { CapacityMeshNode, RTreeRect } from "lib/types/capacity-mesh-types"
+import type {
+  CapacityMeshNode,
+  RTreeRect,
+} from "../../types/capacity-mesh-types"
 import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
 import { finalizeRects } from "../../utils/finalizeRects"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { rectsToMeshNodes } from "./rectsToMeshNodes"
 import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
-import type { Obstacle } from "lib/types/srj-types"
+import type { Obstacle } from "../../types/srj-types"
 import RBush from "rbush"
 import { rectToTree } from "../../utils/rectToTree"
 import { sameTreeRect } from "../../utils/sameTreeRect"
