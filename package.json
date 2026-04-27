@@ -19,7 +19,7 @@
     "@biomejs/biome": "^2.3.5",
     "@react-hook/resize-observer": "^2.0.2",
     "@tscircuit/math-utils": "^0.0.29",
-    "@tscircuit/solver-utils": "^0.0.9",
+    "@tscircuit/solver-utils": "^0.0.16",
     "@types/bun": "latest",
     "@types/rbush": "^4.0.0",
     "@types/react": "^18",
