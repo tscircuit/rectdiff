@@ -1,24 +1,25 @@
+import type { Bounds } from "@tscircuit/math-utils"
 import {
   BasePipelineSolver,
   definePipelineStep,
   type PipelineStep,
 } from "@tscircuit/solver-utils"
-import type {
-  Obstacle,
-  SimpleRouteConnection,
-  SimpleRouteJson,
-} from "../../types/srj-types"
+import type { GraphicsObject } from "graphics-debug"
+import type RBush from "rbush"
 import type { GridFill3DOptions, XYRect } from "../../rectdiff-types"
 import type {
   CapacityMeshNode,
   RTreeRect,
 } from "../../types/capacity-mesh-types"
-import { RectDiffSeedingSolver } from "../RectDiffSeedingSolver/RectDiffSeedingSolver"
+import type {
+  Obstacle,
+  SimpleRouteConnection,
+  SimpleRouteJson,
+} from "../../types/srj-types"
+import { MergeToMaximizeLargeMultiLayerNodesPipelineSolver } from "../MergeToMaximizeLargeMultiLayerNodes/MergeToMaximizeLargeMultiLayerNodesPipelineSolver"
 import { RectDiffExpansionSolver } from "../RectDiffExpansionSolver/RectDiffExpansionSolver"
-import type { GraphicsObject } from "graphics-debug"
-import RBush from "rbush"
+import { RectDiffSeedingSolver } from "../RectDiffSeedingSolver/RectDiffSeedingSolver"
 import { buildObstacleIndexesByLayer } from "./buildObstacleIndexes"
-import type { Bounds } from "@tscircuit/math-utils"
 
 export type RectDiffGridSolverPipelineInput = {
   bounds: Bounds
@@ -37,6 +38,7 @@ export type RectDiffGridSolverPipelineInput = {
 export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridSolverPipelineInput> {
   rectDiffSeedingSolver?: RectDiffSeedingSolver
   rectDiffExpansionSolver?: RectDiffExpansionSolver
+  mergeToMaximizeLargeMultiLayerNodes?: MergeToMaximizeLargeMultiLayerNodesPipelineSolver
   private obstacleIndexByLayer: Array<RBush<RTreeRect>>
   private layerNames: string[]
   private zIndexByName: Map<string, number>
@@ -115,6 +117,25 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
         ]
       },
     ),
+    definePipelineStep(
+      "mergeToMaximizeLargeMultiLayerNodes",
+      MergeToMaximizeLargeMultiLayerNodesPipelineSolver,
+      (pipeline: RectDiffGridSolverPipeline) => {
+        const output = pipeline.rectDiffExpansionSolver?.getOutput()
+        if (!output) {
+          throw new Error("RectDiffExpansionSolver did not produce output")
+        }
+        return [
+          {
+            placed: output.placed,
+            obstacles: pipeline.inputProblem.obstacles,
+            layerCount: pipeline.inputProblem.layerCount,
+            zIndexByName: pipeline.zIndexByName,
+            obstacleClearance: pipeline.inputProblem.obstacleClearance,
+          },
+        ]
+      },
+    ),
   ]
 
   override getConstructorParams() {
@@ -122,8 +143,11 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
   }
 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
+    if (this.mergeToMaximizeLargeMultiLayerNodes) {
+      return this.mergeToMaximizeLargeMultiLayerNodes.getOutput()
+    }
     if (this.rectDiffExpansionSolver) {
-      return this.rectDiffExpansionSolver.getOutput()
+      return { meshNodes: this.rectDiffExpansionSolver.getOutput().meshNodes }
     }
     if (this.rectDiffSeedingSolver) {
       const snapshot = this.rectDiffSeedingSolver.getOutput()
@@ -146,6 +170,9 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
   }
 
   override visualize(): GraphicsObject {
+    if (this.mergeToMaximizeLargeMultiLayerNodes) {
+      return this.mergeToMaximizeLargeMultiLayerNodes.visualize()
+    }
     if (this.rectDiffExpansionSolver) {
       return this.rectDiffExpansionSolver.visualize()
     }

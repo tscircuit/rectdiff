@@ -1,18 +1,18 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
+import RBush from "rbush"
+import type { Candidate3D, Placed3D, XYRect } from "../../rectdiff-types"
 import type {
   CapacityMeshNode,
   RTreeRect,
 } from "../../types/capacity-mesh-types"
-import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
-import { finalizeRects } from "../../utils/finalizeRects"
-import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
-import { rectsToMeshNodes } from "./rectsToMeshNodes"
-import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
 import type { Obstacle } from "../../types/srj-types"
-import RBush from "rbush"
+import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
+import { overlaps } from "../../utils/rectdiff-geometry"
 import { rectToTree } from "../../utils/rectToTree"
+import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { sameTreeRect } from "../../utils/sameTreeRect"
+import { rectsToMeshNodes } from "./rectsToMeshNodes"
 
 export type RectDiffExpansionSolverInput = {
   layerNames: string[]
@@ -45,7 +45,6 @@ export type RectDiffExpansionSolverInput = {
  */
 export class RectDiffExpansionSolver extends BaseSolver {
   placedIndexByLayer: Array<RBush<RTreeRect>> = []
-  _meshNodes: CapacityMeshNode[] = []
   constructor(private input: RectDiffExpansionSolverInput) {
     super()
   }
@@ -79,7 +78,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
     this.stats.placed = this.input.placed.length
 
     if (this.input.expansionIndex >= this.input.placed.length) {
-      this.finalizeIfNeeded()
+      this.solved = true
     }
   }
 
@@ -107,6 +106,7 @@ export class RectDiffExpansionSolver extends BaseSolver {
       zLayers: p.zLayers,
     })
 
+    const rectToUse = expanded ?? oldRect
     if (expanded) {
       // Update placement + per-layer index (replace old rect object)
       this.input.placed[idx] = { rect: expanded, zLayers: p.zLayers }
@@ -130,21 +130,85 @@ export class RectDiffExpansionSolver extends BaseSolver {
       )
     }
 
+    this.expandPlacementLayers(idx, rectToUse)
+
     this.input.expansionIndex += 1
   }
 
-  private finalizeIfNeeded() {
-    if (this.solved) return
+  private expandPlacementLayers(idx: number, rect: XYRect) {
+    const placement = this.input.placed[idx]
+    if (!placement) return
 
-    const rects = finalizeRects({
-      placed: this.input.placed,
-      obstacles: this.input.obstacles,
-      zIndexByName: this.input.zIndexByName,
-      boardVoidRects: this.input.boardVoidRects,
-      obstacleClearance: this.input.obstacleClearance,
-    })
-    this._meshNodes = rectsToMeshNodes(rects)
-    this.solved = true
+    const currentLayers = placement.zLayers.slice().sort((a, b) => a - b)
+    if (currentLayers.length === 0) return
+
+    const query = {
+      minX: rect.x,
+      minY: rect.y,
+      maxX: rect.x + rect.width,
+      maxY: rect.y + rect.height,
+    }
+
+    const isLayerFree = (layer: number) => {
+      const placedIndex = this.placedIndexByLayer[layer]
+      if (placedIndex) {
+        const hits = placedIndex.search(query)
+        for (const hit of hits) {
+          if (!overlaps(rect, hit)) continue
+          if (hit.zLayers.length >= this.input.layerCount) return false
+        }
+      }
+
+      return true
+    }
+
+    const minLayer = currentLayers[0]!
+    const maxLayer = currentLayers[currentLayers.length - 1]!
+    let nextMin = minLayer
+    let nextMax = maxLayer
+
+    while (nextMin - 1 >= 0 && isLayerFree(nextMin - 1)) {
+      nextMin -= 1
+    }
+
+    while (nextMax + 1 < this.input.layerCount && isLayerFree(nextMax + 1)) {
+      nextMax += 1
+    }
+
+    if (nextMin === minLayer && nextMax === maxLayer) return
+
+    const nextLayers: number[] = []
+    for (let z = nextMin; z <= nextMax; z += 1) {
+      nextLayers.push(z)
+    }
+
+    for (const z of currentLayers) {
+      const tree = this.placedIndexByLayer[z]
+      if (tree) {
+        tree.remove(rectToTree(rect, { zLayers: currentLayers }), sameTreeRect)
+        tree.insert(rectToTree(rect, { zLayers: nextLayers }))
+      }
+    }
+
+    for (const z of nextLayers) {
+      if (currentLayers.includes(z)) continue
+      const tree = this.placedIndexByLayer[z]
+      if (tree) {
+        tree.insert(rectToTree(rect, { zLayers: nextLayers }))
+      }
+    }
+
+    this.input.placed[idx] = { rect, zLayers: nextLayers }
+
+    resizeSoftOverlaps(
+      {
+        layerCount: this.input.layerCount,
+        placed: this.input.placed,
+        options: this.input.options,
+        placedIndexByLayer: this.placedIndexByLayer,
+      },
+      idx,
+    )
   }
 
   computeProgress(): number {
@@ -156,25 +220,25 @@ export class RectDiffExpansionSolver extends BaseSolver {
     return Math.min(0.999, base + frac * (1 / (grids + 1)))
   }
 
-  override getOutput(): { meshNodes: CapacityMeshNode[] } {
-    if (this.solved) return { meshNodes: this._meshNodes }
-
-    // Provide a live preview of the placements before finalization so debuggers
-    // can inspect intermediary states without forcing the solver to finish.
-    const previewNodes: CapacityMeshNode[] = this.input.placed.map(
-      (placement, idx) => ({
-        capacityMeshNodeId: `expand-preview-${idx}`,
-        center: {
-          x: placement.rect.x + placement.rect.width / 2,
-          y: placement.rect.y + placement.rect.height / 2,
-        },
-        width: placement.rect.width,
-        height: placement.rect.height,
-        availableZ: placement.zLayers.slice(),
-        layer: `z${placement.zLayers.join(",")}`,
-      }),
+  override getOutput(): {
+    placed: Placed3D[]
+    meshNodes: CapacityMeshNode[]
+  } {
+    // Expose placements for a downstream finalization/merge solver step.
+    // Also return a preview mesh as single-layer nodes for debuggers/UI.
+    const previewRects = this.input.placed.flatMap((p) =>
+      p.zLayers.map((z) => ({
+        minX: p.rect.x,
+        minY: p.rect.y,
+        maxX: p.rect.x + p.rect.width,
+        maxY: p.rect.y + p.rect.height,
+        zLayers: [z],
+      })),
     )
-    return { meshNodes: previewNodes }
+    return {
+      placed: this.input.placed,
+      meshNodes: rectsToMeshNodes(previewRects),
+    }
   }
 
   /** Simple visualization of expanded placements. */

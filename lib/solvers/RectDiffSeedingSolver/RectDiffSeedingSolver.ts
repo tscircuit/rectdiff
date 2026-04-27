@@ -1,27 +1,25 @@
 import { BaseSolver } from "@tscircuit/solver-utils"
-import type { SimpleRouteJson } from "../../types/srj-types"
 import type { GraphicsObject } from "graphics-debug"
+import RBush from "rbush"
 import type {
-  GridFill3DOptions,
   Candidate3D,
+  GridFill3DOptions,
   Placed3D,
   XYRect,
 } from "../../rectdiff-types"
-import { computeInverseRects } from "./computeInverseRects"
-import { buildZIndexMap, obstacleToXYRect, obstacleZs } from "./layers"
-import { overlaps } from "../../utils/rectdiff-geometry"
-import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
-import { computeDefaultGridSizes } from "./computeDefaultGridSizes"
-import { computeCandidates3D } from "./computeCandidates3D"
-import { computeEdgeCandidates3D } from "./computeEdgeCandidates3D"
-import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
-import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
-import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
-import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
-import { getColorForZLayer } from "../../utils/getColorForZLayer"
-import RBush from "rbush"
 import type { RTreeRect } from "../../types/capacity-mesh-types"
+import type { SimpleRouteJson } from "../../types/srj-types"
+import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
+import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
+import { getColorForZLayer } from "../../utils/getColorForZLayer"
+import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
+import { overlaps } from "../../utils/rectdiff-geometry"
 import { rectToTree } from "../../utils/rectToTree"
+import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
+import { computeCandidates3D } from "./computeCandidates3D"
+import { computeDefaultGridSizes } from "./computeDefaultGridSizes"
+import { computeEdgeCandidates3D } from "./computeEdgeCandidates3D"
+import { buildZIndexMap } from "./layers"
 
 export type RectDiffSeedingSolverInput = {
   simpleRouteJson: SimpleRouteJson
@@ -72,10 +70,9 @@ export class RectDiffSeedingSolver extends BaseSolver {
     const opts = this.input.gridOptions ?? {}
 
     const precomputed = this.input.layerNames && this.input.zIndexByName
-    const { layerNames, zIndexByName } = precomputed
+    const { layerNames } = precomputed
       ? {
           layerNames: this.input.layerNames!,
-          zIndexByName: this.input.zIndexByName!,
         }
       : buildZIndexMap({
           obstacles: srj.obstacles,
@@ -102,8 +99,8 @@ export class RectDiffSeedingSolver extends BaseSolver {
       maxAspectRatio: 3,
       minSingle: { width: 2 * trace, height: 2 * trace },
       minMulti: {
-        width: 4 * trace,
-        height: 4 * trace,
+        width: 2 * trace,
+        height: 2 * trace,
         minLayers: Math.min(2, Math.max(1, srj.layerCount || 1)),
       },
       preferMultiLayer: true,
@@ -155,15 +152,8 @@ export class RectDiffSeedingSolver extends BaseSolver {
    * One micro-step during the GRID phase: handle exactly one candidate.
    */
   private _stepGrid(): void {
-    const {
-      gridSizes,
-      initialCellRatio,
-      maxAspectRatio,
-      minSingle,
-      minMulti,
-      preferMultiLayer,
-      maxMultiLayerSpan,
-    } = this.options
+    const { gridSizes, initialCellRatio, maxAspectRatio, minSingle } =
+      this.options
     const grid = gridSizes[this.gridIndex]!
 
     // Ensure candidates exist for this grid
@@ -224,58 +214,25 @@ export class RectDiffSeedingSolver extends BaseSolver {
       return
     }
 
-    // Evaluate attempts — multi-layer span first (computed ignoring soft nodes)
-    const span = longestFreeSpanAroundZ({
-      x: cand.x,
-      y: cand.y,
-      z: cand.z,
-      layerCount: this.layerCount,
-      minSpan: minMulti.minLayers,
-      maxSpan: maxMultiLayerSpan,
-      obstacleIndexByLayer: this.input.obstacleIndexByLayer,
-      additionalBlockersByLayer: this.hardPlacedByLayer,
-    })
-
-    const attempts: Array<{
-      kind: "multi" | "single"
-      layers: number[]
-      minReq: { width: number; height: number }
-    }> = []
-
-    if (span.length >= minMulti.minLayers) {
-      attempts.push({
-        kind: "multi",
-        layers: span,
-        minReq: { width: minMulti.width, height: minMulti.height },
-      })
-    }
-    attempts.push({
-      kind: "single",
-      layers: [cand.z],
+    // Default behavior: only place single-layer nodes during seeding.
+    // Multi-layer grouping is handled in later pipeline stages.
+    const rect = expandRectFromSeed({
+      startX: cand.x,
+      startY: cand.y,
+      gridSize: grid,
+      bounds: this.bounds,
+      obsticalIndexByLayer: this.input.obstacleIndexByLayer,
+      placedIndexByLayer: this.placedIndexByLayer,
+      initialCellRatio,
+      maxAspectRatio,
       minReq: { width: minSingle.width, height: minSingle.height },
+      zLayers: [cand.z],
     })
-
-    const ordered = preferMultiLayer ? attempts : attempts.reverse()
-
-    for (const attempt of ordered) {
-      const rect = expandRectFromSeed({
-        startX: cand.x,
-        startY: cand.y,
-        gridSize: grid,
-        bounds: this.bounds,
-        obsticalIndexByLayer: this.input.obstacleIndexByLayer,
-        placedIndexByLayer: this.placedIndexByLayer,
-        initialCellRatio,
-        maxAspectRatio,
-        minReq: attempt.minReq,
-        zLayers: attempt.layers,
-      })
-      if (!rect) continue
-
+    if (rect) {
       // Place the new node
-      const placed: Placed3D = { rect, zLayers: [...attempt.layers] }
+      const placed: Placed3D = { rect, zLayers: [cand.z] }
       const newIndex = this.placed.push(placed) - 1
-      for (const z of attempt.layers) {
+      for (const z of placed.zLayers) {
         const idx = this.placedIndexByLayer[z]
         if (idx) {
           idx.insert(rectToTree(rect, { zLayers: placed.zLayers }))
