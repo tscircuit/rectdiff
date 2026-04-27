@@ -73,7 +73,6 @@ export class RectDiffSeedingSolver extends BaseSolver {
     const { layerNames } = precomputed
       ? {
           layerNames: this.input.layerNames!,
-          zIndexByName: this.input.zIndexByName!,
         }
       : buildZIndexMap({
           obstacles: srj.obstacles,
