@@ -3,19 +3,19 @@ import {
   definePipelineStep,
   type PipelineStep,
 } from "@tscircuit/solver-utils"
-import type { SimpleRouteJson } from "./types/srj-types"
-import type { GridFill3DOptions, XYRect } from "./rectdiff-types"
-import type { CapacityMeshNode } from "./types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
+import { mergeGraphics } from "graphics-debug"
+import { buildFinalRectDiffVisualization } from "./buildFinalRectDiffVisualization"
+import type { GridFill3DOptions, XYRect } from "./rectdiff-types"
+import { createBaseVisualization } from "./rectdiff-visualization"
 import { GapFillSolverPipeline } from "./solvers/GapFillSolver/GapFillSolverPipeline"
 import { OuterLayerContainmentMergeSolver } from "./solvers/OuterLayerContainmentMergeSolver/OuterLayerContainmentMergeSolver"
 import { RectDiffGridSolverPipeline } from "./solvers/RectDiffGridSolverPipeline/RectDiffGridSolverPipeline"
-import { createBaseVisualization } from "./rectdiff-visualization"
-import { buildFinalRectDiffVisualization } from "./buildFinalRectDiffVisualization"
 import { computeInverseRects } from "./solvers/RectDiffSeedingSolver/computeInverseRects"
 import { buildZIndexMap } from "./solvers/RectDiffSeedingSolver/layers"
+import type { CapacityMeshNode } from "./types/capacity-mesh-types"
+import type { SimpleRouteJson } from "./types/srj-types"
 import { buildObstacleClearanceGraphics } from "./utils/renderObstacleClearance"
-import { mergeGraphics } from "graphics-debug"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson

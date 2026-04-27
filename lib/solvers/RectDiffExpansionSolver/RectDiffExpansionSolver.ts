@@ -225,14 +225,16 @@ export class RectDiffExpansionSolver extends BaseSolver {
     meshNodes: CapacityMeshNode[]
   } {
     // Expose placements for a downstream finalization/merge solver step.
-    // Also return a preview mesh (directly from placements) for debuggers.
-    const previewRects = this.input.placed.map((p) => ({
-      minX: p.rect.x,
-      minY: p.rect.y,
-      maxX: p.rect.x + p.rect.width,
-      maxY: p.rect.y + p.rect.height,
-      zLayers: p.zLayers.slice(),
-    }))
+    // Also return a preview mesh as single-layer nodes for debuggers/UI.
+    const previewRects = this.input.placed.flatMap((p) =>
+      p.zLayers.map((z) => ({
+        minX: p.rect.x,
+        minY: p.rect.y,
+        maxX: p.rect.x + p.rect.width,
+        maxY: p.rect.y + p.rect.height,
+        zLayers: [z],
+      })),
+    )
     return {
       placed: this.input.placed,
       meshNodes: rectsToMeshNodes(previewRects),
