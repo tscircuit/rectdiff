@@ -1,5 +1,6 @@
 import type { Obstacle } from "../types/srj-types"
 import type { Placed3D, Rect3d, XYRect } from "../rectdiff-types"
+import { subtractRect2D } from "./rectdiff-geometry"
 import {
   obstacleToXYRect,
   obstacleZs,
@@ -12,14 +13,8 @@ export function finalizeRects(params: {
   zIndexByName: Map<string, number>
   obstacleClearance?: number
 }): Rect3d[] {
-  // Convert all placed (free space) nodes to output format
-  const out: Rect3d[] = params.placed.map((p) => ({
-    minX: p.rect.x,
-    minY: p.rect.y,
-    maxX: p.rect.x + p.rect.width,
-    maxY: p.rect.y + p.rect.height,
-    zLayers: [...p.zLayers].sort((a, b) => a - b),
-  }))
+  const out: Rect3d[] = []
+  const obstacleRectsByLayer = new Map<number, XYRect[]>()
 
   const layersByKey = new Map<string, { rect: XYRect; layers: Set<number> }>()
 
@@ -38,6 +33,11 @@ export function finalizeRects(params: {
       obstacle.zLayers?.length && obstacle.zLayers.length > 0
         ? obstacle.zLayers
         : obstacleZs(obstacle, params.zIndexByName)
+    for (const layer of zLayers) {
+      const list = obstacleRectsByLayer.get(layer)
+      if (list) list.push(rect)
+      else obstacleRectsByLayer.set(layer, [rect])
+    }
     const key = `${rect.x}:${rect.y}:${rect.width}:${rect.height}`
     let entry = layersByKey.get(key)
     if (!entry) {
@@ -45,6 +45,48 @@ export function finalizeRects(params: {
       layersByKey.set(key, entry)
     }
     zLayers.forEach((layer: number) => entry!.layers.add(layer))
+  }
+
+  const freeRectsByKey = new Map<
+    string,
+    { rect: XYRect; layers: Set<number> }
+  >()
+
+  for (const placed of params.placed) {
+    for (const layer of placed.zLayers) {
+      let parts: XYRect[] = [placed.rect]
+      const blockers = obstacleRectsByLayer.get(layer) ?? []
+      for (const blocker of blockers) {
+        const nextParts: XYRect[] = []
+        for (const part of parts) {
+          nextParts.push(...subtractRect2D(part, blocker))
+        }
+        parts = nextParts
+        if (parts.length === 0) break
+      }
+
+      for (const part of parts) {
+        const key = `${part.x}:${part.y}:${part.width}:${part.height}`
+        let entry = freeRectsByKey.get(key)
+        if (!entry) {
+          entry = { rect: part, layers: new Set() }
+          freeRectsByKey.set(key, entry)
+        }
+        entry.layers.add(layer)
+      }
+    }
+  }
+
+  for (const { rect, layers } of freeRectsByKey.values()) {
+    const layerList = Array.from(layers).sort((a, b) => a - b)
+    if (layerList.length === 0) continue
+    out.push({
+      minX: rect.x,
+      minY: rect.y,
+      maxX: rect.x + rect.width,
+      maxY: rect.y + rect.height,
+      zLayers: layerList,
+    })
   }
 
   for (const { rect, layers } of layersByKey.values()) {
