@@ -74,6 +74,8 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
       points: [],
       lines: [],
       circles: [],
+      infiniteLines: [],
+      polygons: [],
       arrows: [],
       texts: [],
     }
@@ -104,6 +106,8 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
       points: [],
       lines: [],
       circles: [],
+      infiniteLines: [],
+      polygons: [],
       arrows: [],
       texts: [],
     }

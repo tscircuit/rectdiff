@@ -140,6 +140,8 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
       points: [],
       lines: [],
       circles: [],
+      infiniteLines: [],
+      polygons: [],
       arrows: [],
       texts: [],
     }

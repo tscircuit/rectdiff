@@ -213,6 +213,8 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
       points: [],
       lines: [],
       circles: [],
+      infiniteLines: [],
+      polygons: [],
       arrows: [],
       texts: [],
     }
