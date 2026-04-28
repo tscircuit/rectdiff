@@ -129,6 +129,37 @@ const hasContiguousZSpan = (zValues: number[]) => {
   return true
 }
 
+const rectContainsRect = (outer: XYRect, inner: XYRect) =>
+  inner.x + EPS >= outer.x &&
+  inner.y + EPS >= outer.y &&
+  inner.x + inner.width <= outer.x + outer.width + EPS &&
+  inner.y + inner.height <= outer.y + outer.height + EPS
+
+const rectsTouchOrOverlap = (a: XYRect, b: XYRect) =>
+  a.x <= b.x + b.width + EPS &&
+  b.x <= a.x + a.width + EPS &&
+  a.y <= b.y + b.height + EPS &&
+  b.y <= a.y + a.height + EPS
+
+const subtractRects = (target: XYRect, cutters: XYRect[]) => {
+  let remaining: XYRect[] = [target]
+
+  for (const cutter of cutters) {
+    if (remaining.length === 0) return remaining
+    remaining = remaining.flatMap((piece) => subtractRect2D(piece, cutter))
+  }
+
+  return remaining
+}
+
+const SPARSE_PROMOTION_TARGET_SHARE = 0.86
+
+type CoalesceCandidate = {
+  rect: XYRect
+  absorbedNodeIds: string[]
+  score: number
+}
+
 export class SparseMultilayerPromotionSolver extends BaseSolver {
   private outputNodes: CapacityMeshNode[] = []
   private promotedNodeIds = new Set<string>()
@@ -150,11 +181,11 @@ export class SparseMultilayerPromotionSolver extends BaseSolver {
   }
 
   private promoteSparseMultilayerCoverage() {
-    const minRectSize = Math.max(
+    const baseMinRectSize = Math.max(
       this.input.simpleRouteJson.minViaDiameter ?? 0,
       this.input.simpleRouteJson.minTraceWidth ?? 0,
     )
-    const threshold = 0.9
+    const threshold = SPARSE_PROMOTION_TARGET_SHARE
     let nodes = this.input.meshNodes.map(cloneNode)
 
     if (getUsableMultilayerVolumeShare(nodes) >= threshold) {
@@ -169,7 +200,7 @@ export class SparseMultilayerPromotionSolver extends BaseSolver {
       getUsableMultilayerVolumeShare(nodes) < threshold &&
       iterations < 1000
     ) {
-      const mergeCandidate = this.findBestMergeCandidate(nodes, minRectSize)
+      const mergeCandidate = this.findBestMergeCandidate(nodes, baseMinRectSize)
       if (!mergeCandidate) break
 
       const sourceNode = nodes.find(
@@ -233,7 +264,7 @@ export class SparseMultilayerPromotionSolver extends BaseSolver {
     if (getUsableMultilayerVolumeShare(nodes) < threshold) {
       nodes = this.removeSingleLayerCoverageAlreadyContainedInMultilayerNodes(
         nodes,
-        minRectSize,
+        baseMinRectSize,
       )
     }
 
@@ -307,44 +338,93 @@ export class SparseMultilayerPromotionSolver extends BaseSolver {
 
   private coalesceCompatibleNodes(nodes: CapacityMeshNode[]) {
     const out = [...nodes]
-    let merged = true
     let nextMergedId = 0
 
-    while (merged) {
-      merged = false
+    while (true) {
+      const bestCandidate = this.findBestCoalesceCandidate(out)
+      if (!bestCandidate) break
 
-      for (let i = 0; i < out.length; i++) {
-        const a = out[i]!
-        if (!isFreeNode(a)) continue
+      const survivingNodes = out.filter(
+        (node) =>
+          !bestCandidate.absorbedNodeIds.includes(node.capacityMeshNodeId),
+      )
+      const templateNode = out.find(
+        (node) => node.capacityMeshNodeId === bestCandidate.absorbedNodeIds[0],
+      )
+      if (!templateNode) break
 
-        for (let j = i + 1; j < out.length; j++) {
-          const b = out[j]!
-          if (!isFreeNode(b)) continue
-          if (a.availableZ.join(",") !== b.availableZ.join(",")) continue
-
-          const rectA = nodeToRect(a)
-          const rectB = nodeToRect(b)
-          if (!areRectsAlignedForMerge(rectA, rectB)) continue
-
-          const mergedRect = mergeRects(rectA, rectB)
-          const mergedNode = cloneNodeWithRect(
-            a,
-            mergedRect,
-            `sparse-coalesced-${nextMergedId++}`,
-          )
-
-          out.splice(j, 1)
-          out.splice(i, 1, mergedNode)
-          this.promotedNodeIds.add(mergedNode.capacityMeshNodeId)
-          merged = true
-          break
-        }
-
-        if (merged) break
-      }
+      const mergedNode = cloneNodeWithRect(
+        templateNode,
+        bestCandidate.rect,
+        `sparse-coalesced-${nextMergedId++}`,
+      )
+      this.promotedNodeIds.add(mergedNode.capacityMeshNodeId)
+      out.splice(0, out.length, ...survivingNodes, mergedNode)
     }
 
     return out
+  }
+
+  private findBestCoalesceCandidate(
+    nodes: CapacityMeshNode[],
+  ): CoalesceCandidate | null {
+    const nodesBySpan = new Map<string, CapacityMeshNode[]>()
+
+    for (const node of nodes) {
+      if (!isFreeNode(node) || node.availableZ.length <= 1) continue
+      const spanKey = node.availableZ.join(",")
+      const group = nodesBySpan.get(spanKey) ?? []
+      group.push(node)
+      nodesBySpan.set(spanKey, group)
+    }
+
+    let best: CoalesceCandidate | null = null
+
+    for (const [spanKey, spanNodes] of nodesBySpan) {
+      for (let i = 0; i < spanNodes.length; i++) {
+        const a = spanNodes[i]!
+        const rectA = nodeToRect(a)
+
+        for (let j = i + 1; j < spanNodes.length; j++) {
+          const b = spanNodes[j]!
+          const rectB = nodeToRect(b)
+
+          if (
+            !areRectsAlignedForMerge(rectA, rectB) &&
+            !rectsTouchOrOverlap(rectA, rectB)
+          ) {
+            continue
+          }
+
+          const mergedRect = mergeRects(rectA, rectB)
+          const absorbedNodes = spanNodes.filter((node) =>
+            rectContainsRect(mergedRect, nodeToRect(node)),
+          )
+          if (absorbedNodes.length < 2) continue
+
+          const uncovered = subtractRects(
+            mergedRect,
+            absorbedNodes.map(nodeToRect),
+          )
+          if (uncovered.length > 0) continue
+
+          const mergedArea = rectArea(mergedRect)
+          const score = mergedArea * absorbedNodes.length
+
+          if (!best || score > best.score) {
+            best = {
+              rect: mergedRect,
+              absorbedNodeIds: absorbedNodes.map(
+                (node) => node.capacityMeshNodeId,
+              ),
+              score,
+            }
+          }
+        }
+      }
+    }
+
+    return best
   }
 
   private findBestMergeCandidate(
