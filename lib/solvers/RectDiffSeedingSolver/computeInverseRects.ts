@@ -43,7 +43,7 @@ export function computeInverseRects(
 
   // Simplify polygon if it has too many points to avoid O(n^2) performance issues
   // A polygon with 350+ points (like rounded corners) creates too many grid cells
-  const MAX_POLYGON_POINTS = 150
+  const MAX_POLYGON_POINTS = 120
   const workingPolygon =
     polygon.length > MAX_POLYGON_POINTS
       ? simplifyPolygon(
