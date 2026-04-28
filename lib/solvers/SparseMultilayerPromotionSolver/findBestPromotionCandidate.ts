@@ -9,8 +9,8 @@ import { nodeToRect } from "./nodeToRect"
 import type { PromotionCandidate } from "./types"
 
 /**
- * Find the best overlap that upgrades a single-layer node into a larger span.
- * The score is overlap area, which preserves the current promotion behavior.
+ * Find a good overlap to turn into shared space.
+ * Larger overlaps are preferred.
  */
 export const findBestPromotionCandidate = ({
   minRectSize,

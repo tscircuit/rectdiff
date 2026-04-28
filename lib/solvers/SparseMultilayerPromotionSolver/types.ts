@@ -4,6 +4,7 @@ import type { SimpleRouteJson } from "../../types/srj-types"
 
 export type SparseMultilayerPromotionInput = {
   meshNodes: CapacityMeshNode[]
+  promotionTargetShare: number
   simpleRouteJson: SimpleRouteJson
 }
 

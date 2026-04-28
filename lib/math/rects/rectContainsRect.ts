@@ -2,8 +2,8 @@ import type { XYRect } from "../../rectdiff-types"
 import { EPS } from "../../utils/rectdiff-geometry"
 
 /**
- * Test whether one rectangle fully contains another under EPS tolerance.
- * This is used to collect every tile absorbed by a coalesced region.
+ * Check whether one rectangle fully contains another.
+ * A small tolerance is used for edge cases.
  */
 export const rectContainsRect = ({
   inner,

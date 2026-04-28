@@ -2,8 +2,8 @@ import { EPS } from "../../utils/rectdiff-geometry"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 
 /**
- * Measure the usable multilayer volume share of the current mesh.
- * Obstacle volume is removed from the denominator to match existing rectdiff semantics.
+ * Measure how much usable space is shared across multiple layers.
+ * Obstacle-only space is not counted.
  */
 export const getUsableMultilayerVolumeShare = ({
   nodes,

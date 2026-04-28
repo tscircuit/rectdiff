@@ -1,6 +1,6 @@
 /**
- * Format a z-span as the layer label used by mesh nodes and debug graphics.
- * This keeps layer-name string building in one place instead of inlined templates.
+ * Build the display name for a layer span.
+ * This keeps layer labels consistent.
  */
 export const getZLayerName = ({ availableZ }: { availableZ: number[] }) =>
   `z${availableZ.join(",")}`

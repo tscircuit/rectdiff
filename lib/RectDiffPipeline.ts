@@ -22,6 +22,7 @@ export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
   obstacleClearance?: number
+  sparseMultilayerPromotionTargetShare?: number
 }
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
@@ -101,6 +102,9 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
             rectDiffPipeline.rectDiffGridSolverPipeline?.getOutput()
               .meshNodes ??
             [],
+          promotionTargetShare:
+            rectDiffPipeline.inputProblem
+              .sparseMultilayerPromotionTargetShare ?? 0.86,
           simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
         },
       ],

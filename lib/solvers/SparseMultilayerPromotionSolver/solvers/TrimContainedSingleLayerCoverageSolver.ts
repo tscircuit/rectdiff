@@ -6,7 +6,6 @@ import type {
 } from "../../../types/capacity-mesh-types"
 import { getZLayerName } from "../../../math/layers/getZLayerName"
 import { EPS } from "../../../utils/rectdiff-geometry"
-import { SPARSE_PROMOTION_TARGET_SHARE } from "../constants"
 import { cloneNode } from "../cloneNode"
 import { cloneNodeWithRect } from "../cloneNodeWithRect"
 import { getUsableMultilayerVolumeShare } from "../getUsableMultilayerVolumeShare"
@@ -18,11 +17,12 @@ import { subtractRects } from "../../../math/rects/subtractRects"
 type TrimContainedSingleLayerCoverageSolverInput = {
   meshNodes: CapacityMeshNode[]
   minRectSize: number
+  promotionTargetShare: number
 }
 
 /**
- * Trim single-layer space that is already represented by multilayer nodes.
- * This stage runs once and only activates when promotion still undershoots target share.
+ * Remove single-layer pieces that are already covered by shared space.
+ * This keeps the result smaller and simpler.
  */
 export class TrimContainedSingleLayerCoverageSolver extends BaseSolver {
   private nextResidualId = 0
@@ -42,7 +42,7 @@ export class TrimContainedSingleLayerCoverageSolver extends BaseSolver {
   override _step() {
     if (
       getUsableMultilayerVolumeShare({ nodes: this.outputNodes }) >=
-      SPARSE_PROMOTION_TARGET_SHARE
+      this.input.promotionTargetShare
     ) {
       this.solved = true
       return

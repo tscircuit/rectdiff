@@ -1,8 +1,8 @@
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 
 /**
- * Check whether a node is routable free space.
- * Sparse promotion only merges free nodes and never touches targets/obstacles.
+ * Check whether a node is plain free space.
+ * Obstacles and targets are excluded.
  */
 export const isFreeNode = ({ node }: { node: CapacityMeshNode }) =>
   !node._containsObstacle && !node._containsTarget

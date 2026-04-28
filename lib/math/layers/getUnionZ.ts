@@ -1,6 +1,6 @@
 /**
- * Return a sorted unique union of two z-layer spans.
- * This keeps promotion logic focused on span shape instead of array cleanup.
+ * Combine two layer lists into one ordered list.
+ * Duplicate layers are removed.
  */
 export const getUnionZ = ({ a, b }: { a: number[]; b: number[] }) =>
   [...new Set([...a, ...b])].sort((x, y) => x - y)

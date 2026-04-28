@@ -2,8 +2,8 @@ import type { XYRect } from "../../rectdiff-types"
 import { subtractRect2D } from "../../utils/rectdiff-geometry"
 
 /**
- * Subtract many cutter rectangles from a target rectangle.
- * The remaining pieces are used to verify full box coverage and residual space.
+ * Remove several rectangles from one rectangle.
+ * The result is the list of remaining pieces.
  */
 export const subtractRects = ({
   cutters,

@@ -1,7 +1,7 @@
 import type { XYRect } from "../../rectdiff-types"
 
 /**
- * Compute the 2D area of a rectangle.
- * The sparse multilayer solvers use this as their primary merge score.
+ * Return the area of a rectangle.
+ * Width and height are multiplied directly.
  */
 export const rectArea = ({ rect }: { rect: XYRect }) => rect.width * rect.height

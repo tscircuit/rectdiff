@@ -1,6 +1,6 @@
 /**
- * Check whether a z-layer span is contiguous.
- * Sparse promotion only creates shared nodes when the joined span has no gaps.
+ * Check whether the layers form one continuous range.
+ * Gapped layer spans return false.
  */
 export const hasContiguousZSpan = ({ zValues }: { zValues: number[] }) => {
   for (let i = 1; i < zValues.length; i++) {

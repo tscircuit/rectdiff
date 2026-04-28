@@ -3,8 +3,8 @@ import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import { getZLayerName } from "../../math/layers/getZLayerName"
 
 /**
- * Clone a node while replacing its rectangle and optional z-span.
- * This is the common constructor for promoted, residual, and coalesced nodes.
+ * Copy a node and replace its shape.
+ * The layer span can also be replaced when needed.
  */
 export const cloneNodeWithRect = ({
   rect,

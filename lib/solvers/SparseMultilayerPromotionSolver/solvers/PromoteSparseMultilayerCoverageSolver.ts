@@ -6,7 +6,6 @@ import type {
 } from "../../../types/capacity-mesh-types"
 import { getZLayerName } from "../../../math/layers/getZLayerName"
 import { getColorForZLayer } from "../../../utils/getColorForZLayer"
-import { SPARSE_PROMOTION_TARGET_SHARE } from "../constants"
 import { cloneNode } from "../cloneNode"
 import { cloneNodeWithRect } from "../cloneNodeWithRect"
 import { createResidualNodes } from "../createResidualNodes"
@@ -16,11 +15,12 @@ import { getUsableMultilayerVolumeShare } from "../getUsableMultilayerVolumeShar
 type PromoteSparseMultilayerCoverageSolverInput = {
   meshNodes: CapacityMeshNode[]
   minRectSize: number
+  promotionTargetShare: number
 }
 
 /**
- * Promote sparse single-layer overlaps into shared multilayer regions.
- * This solver advances one promotion per step until the target share is reached.
+ * Turn overlapping single-layer space into shared space.
+ * It runs until the configured shared-space threshold is reached.
  */
 export class PromoteSparseMultilayerCoverageSolver extends BaseSolver {
   private nextMergedId = 0
@@ -46,7 +46,7 @@ export class PromoteSparseMultilayerCoverageSolver extends BaseSolver {
   override _step() {
     if (
       getUsableMultilayerVolumeShare({ nodes: this.workingNodes }) >=
-      SPARSE_PROMOTION_TARGET_SHARE
+      this.input.promotionTargetShare
     ) {
       this.outputNodes = [...this.workingNodes]
       this.solved = true

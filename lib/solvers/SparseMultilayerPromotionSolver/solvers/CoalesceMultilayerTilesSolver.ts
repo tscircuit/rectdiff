@@ -15,8 +15,8 @@ type CoalesceMultilayerTilesSolverInput = {
 }
 
 /**
- * Collapse tiled shared nodes into larger boxes one step at a time.
- * The solver stops when there are no fully covered merge boxes left.
+ * Merge small shared tiles into larger regions.
+ * It runs until no useful merge remains.
  */
 export class CoalesceMultilayerTilesSolver extends BaseSolver {
   private nextMergedId = 0

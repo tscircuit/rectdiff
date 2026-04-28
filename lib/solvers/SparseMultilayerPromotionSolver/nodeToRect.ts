@@ -2,8 +2,8 @@ import type { XYRect } from "../../rectdiff-types"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 
 /**
- * Convert a capacity node into its rectangle form.
- * This keeps all sparse promotion geometry working on a common shape type.
+ * Convert a node into a rectangle.
+ * This keeps geometry code simple.
  */
 export const nodeToRect = ({ node }: { node: CapacityMeshNode }): XYRect => ({
   x: node.center.x - node.width / 2,

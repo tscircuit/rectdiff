@@ -2,8 +2,8 @@ import type { XYRect } from "../../rectdiff-types"
 import { EPS } from "../../utils/rectdiff-geometry"
 
 /**
- * Return the overlapping rectangle shared by two rectangles.
- * Null means there is no usable overlap after EPS tolerance.
+ * Return the shared area between two rectangles.
+ * Returns null when they do not overlap.
  */
 export const intersectRects = ({
   a,

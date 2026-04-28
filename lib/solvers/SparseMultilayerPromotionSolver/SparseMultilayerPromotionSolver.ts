@@ -16,9 +16,8 @@ import { TrimContainedSingleLayerCoverageSolver } from "./solvers/TrimContainedS
 import type { SparseMultilayerPromotionInput } from "./types"
 
 /**
- * Sparse multilayer promotion is a small pipeline:
- * promote sparse overlaps, trim redundant single-layer leftovers, then coalesce
- * the remaining shared tiles into larger reusable regions.
+ * This pipeline makes shared multilayer regions easier to use.
+ * It grows shared space, removes redundant leftovers, and combines small tiles.
  */
 export class SparseMultilayerPromotionSolver extends BasePipelineSolver<SparseMultilayerPromotionInput> {
   coalesceMultilayerTilesSolver?: CoalesceMultilayerTilesSolver
@@ -36,6 +35,7 @@ export class SparseMultilayerPromotionSolver extends BasePipelineSolver<SparseMu
             solver.inputProblem.simpleRouteJson.minViaDiameter ?? 0,
             solver.inputProblem.simpleRouteJson.minTraceWidth ?? 0,
           ),
+          promotionTargetShare: solver.inputProblem.promotionTargetShare,
         },
       ],
     ),
@@ -51,6 +51,7 @@ export class SparseMultilayerPromotionSolver extends BasePipelineSolver<SparseMu
             solver.inputProblem.simpleRouteJson.minViaDiameter ?? 0,
             solver.inputProblem.simpleRouteJson.minTraceWidth ?? 0,
           ),
+          promotionTargetShare: solver.inputProblem.promotionTargetShare,
         },
       ],
     ),

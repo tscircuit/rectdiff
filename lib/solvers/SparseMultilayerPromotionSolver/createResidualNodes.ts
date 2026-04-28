@@ -7,8 +7,8 @@ import type { XYRect } from "../../rectdiff-types"
 import { cloneNodeWithRect } from "./cloneNodeWithRect"
 
 /**
- * Split a node around a promoted rectangle and build residual nodes.
- * Residual ids stay centralized so every stage can create stable node names.
+ * Cut one rectangle out of a node and return the remaining pieces.
+ * Each remaining piece is turned back into a node.
  */
 export const createResidualNodes = ({
   cutRect,

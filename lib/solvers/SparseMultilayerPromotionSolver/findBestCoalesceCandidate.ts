@@ -32,8 +32,8 @@ const areRectsAlignedForMerge = ({
 }
 
 /**
- * Find one fully covered bounding box that collapses many shared tiles at once.
- * The score prefers larger boxes that absorb more nodes.
+ * Find a good merge for nearby shared tiles.
+ * Larger, more useful merges are preferred.
  */
 export const findBestCoalesceCandidate = ({
   nodes,
