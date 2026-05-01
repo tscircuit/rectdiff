@@ -29,22 +29,6 @@ const nodeToRect = (node: CapacityMeshNode): XYRect => ({
 
 const rectArea = (rect: XYRect) => rect.width * rect.height
 
-const intersectRects = (a: XYRect, b: XYRect): XYRect | null => {
-  const x0 = Math.max(a.x, b.x)
-  const y0 = Math.max(a.y, b.y)
-  const x1 = Math.min(a.x + a.width, b.x + b.width)
-  const y1 = Math.min(a.y + a.height, b.y + b.height)
-
-  if (x1 <= x0 + EPS || y1 <= y0 + EPS) return null
-
-  return {
-    x: x0,
-    y: y0,
-    width: x1 - x0,
-    height: y1 - y0,
-  }
-}
-
 const cloneNode = (node: CapacityMeshNode): CapacityMeshNode => ({
   ...node,
   center: { ...node.center },
@@ -103,7 +87,6 @@ const isFullyCoveredByRects = (target: XYRect, coveringRects: XYRect[]) => {
 export class OuterLayerContainmentMergeSolver extends BaseSolver {
   private outputNodes: CapacityMeshNode[] = []
   private promotedNodeIds = new Set<string>()
-  private fullyPromotedNodeIds = new Set<string>()
   private residualNodeIds = new Set<string>()
 
   constructor(private input: OuterLayerContainmentMergeSolverInput) {
@@ -113,7 +96,6 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
   override _setup() {
     this.outputNodes = this.input.meshNodes.map(cloneNode)
     this.promotedNodeIds.clear()
-    this.fullyPromotedNodeIds.clear()
     this.residualNodeIds.clear()
   }
 
@@ -134,8 +116,6 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
     const viaMinSize = Math.max(srj.minViaDiameter ?? 0, srj.minTraceWidth || 0)
     const originalNodes = this.input.meshNodes.map(cloneNode)
     const obstaclesByLayer = this.buildObstaclesByLayer(layerCount)
-    const shouldAllowPartialPromotion =
-      this.getUsableMultilayerVolumeShare(originalNodes) < 0.5
     const mutableOuterNodes = originalNodes.filter(
       (node) =>
         isFreeNode(node) &&
@@ -186,51 +166,23 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
         continue
       }
       if (!isFullyCoveredByRects(candidateRect, oppositeSupportRects)) {
-        if (!shouldAllowPartialPromotion) {
-          continue
-        }
-
-        const partialPromotionRects = this.getSupportedPromotionRects({
-          candidateRect,
-          supportRects: oppositeSupportRects,
-          minRectSize: viaMinSize,
-        })
-
-        if (partialPromotionRects.length === 0) {
-          continue
-        }
-
-        for (const partialRect of partialPromotionRects) {
-          const promotedNode = cloneNodeWithRect(
-            candidate,
-            partialRect,
-            `${candidate.capacityMeshNodeId}-outer-partial-${promotedNodes.length}`,
-          )
-          promotedNode.availableZ = [topZ, bottomZ]
-          promotedNode.layer = `z${topZ},${bottomZ}`
-          promotedNodes.push(promotedNode)
-          promotedRects.push(partialRect)
-          this.promotedNodeIds.add(promotedNode.capacityMeshNodeId)
-        }
         continue
       }
 
-      const promotedNode = {
+      promotedNodes.push({
         ...candidate,
         availableZ: [topZ, bottomZ],
         layer: `z${topZ},${bottomZ}`,
-      }
-      promotedNodes.push(promotedNode)
+      })
       promotedRects.push(candidateRect)
-      this.promotedNodeIds.add(promotedNode.capacityMeshNodeId)
-      this.fullyPromotedNodeIds.add(candidate.capacityMeshNodeId)
+      this.promotedNodeIds.add(candidate.capacityMeshNodeId)
     }
 
     let nextResidualId = 0
     const residualNodes: CapacityMeshNode[] = []
 
     for (const node of mutableOuterNodes) {
-      if (this.fullyPromotedNodeIds.has(node.capacityMeshNodeId)) {
+      if (this.promotedNodeIds.has(node.capacityMeshNodeId)) {
         continue
       }
 
@@ -257,62 +209,6 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
     }
 
     return [...immutableNodes, ...promotedNodes, ...residualNodes]
-  }
-
-  private getUsableMultilayerVolumeShare(nodes: CapacityMeshNode[]) {
-    let totalVolume = 0
-    let obstacleVolume = 0
-    let multilayerVolume = 0
-
-    for (const node of nodes) {
-      const volume = node.width * node.height * node.availableZ.length
-      totalVolume += volume
-      if (node._containsObstacle) {
-        obstacleVolume += volume
-        continue
-      }
-      if (node.availableZ.length > 1) {
-        multilayerVolume += volume
-      }
-    }
-
-    const usableVolume = totalVolume - obstacleVolume
-    if (usableVolume <= EPS) return 0
-    return multilayerVolume / usableVolume
-  }
-
-  private getSupportedPromotionRects(params: {
-    candidateRect: XYRect
-    supportRects: XYRect[]
-    minRectSize: number
-  }) {
-    const { candidateRect, supportRects, minRectSize } = params
-    const promotedPieces: XYRect[] = []
-
-    for (const supportRect of supportRects) {
-      const overlapRect = intersectRects(candidateRect, supportRect)
-      if (!overlapRect) continue
-
-      let remainingPieces = [overlapRect]
-      for (const existingPiece of promotedPieces) {
-        remainingPieces = remainingPieces.flatMap((piece) =>
-          subtractRect2D(piece, existingPiece),
-        )
-        if (remainingPieces.length === 0) break
-      }
-
-      for (const piece of remainingPieces) {
-        if (
-          piece.width + EPS < minRectSize ||
-          piece.height + EPS < minRectSize
-        ) {
-          continue
-        }
-        promotedPieces.push(piece)
-      }
-    }
-
-    return promotedPieces
   }
 
   private buildObstaclesByLayer(layerCount: number): ObstacleWithRect[][] {

@@ -16,20 +16,17 @@ import { computeInverseRects } from "./solvers/RectDiffSeedingSolver/computeInve
 import { buildZIndexMap } from "./solvers/RectDiffSeedingSolver/layers"
 import { buildObstacleClearanceGraphics } from "./utils/renderObstacleClearance"
 import { mergeGraphics } from "graphics-debug"
-import { SparseMultilayerPromotionSolver } from "./solvers/SparseMultilayerPromotionSolver/SparseMultilayerPromotionSolver"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
   obstacleClearance?: number
-  sparseMultilayerPromotionTargetShare?: number
 }
 
 export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> {
   rectDiffGridSolverPipeline?: RectDiffGridSolverPipeline
   gapFillSolver?: GapFillSolverPipeline
   outerLayerContainmentMergeSolver?: OuterLayerContainmentMergeSolver
-  sparseMultilayerPromotionSolver?: SparseMultilayerPromotionSolver
   boardVoidRects: XYRect[] | undefined
   zIndexByName?: Map<string, number>
   layerNames?: string[]
@@ -90,25 +87,6 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
         },
       ],
     ),
-    definePipelineStep(
-      "sparseMultilayerPromotionSolver",
-      SparseMultilayerPromotionSolver,
-      (rectDiffPipeline: RectDiffPipeline) => [
-        {
-          meshNodes:
-            rectDiffPipeline.outerLayerContainmentMergeSolver?.getOutput()
-              .outputNodes ??
-            rectDiffPipeline.gapFillSolver?.getOutput().outputNodes ??
-            rectDiffPipeline.rectDiffGridSolverPipeline?.getOutput()
-              .meshNodes ??
-            [],
-          promotionTargetShare:
-            rectDiffPipeline.inputProblem
-              .sparseMultilayerPromotionTargetShare ?? 0.86,
-          simpleRouteJson: rectDiffPipeline.inputProblem.simpleRouteJson,
-        },
-      ],
-    ),
   ]
 
   override _setup(): void {
@@ -142,11 +120,6 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
   override getOutput(): { meshNodes: CapacityMeshNode[] } {
     const outerLayerMergeOutput =
       this.outerLayerContainmentMergeSolver?.getOutput()
-    const sparseMultilayerOutput =
-      this.sparseMultilayerPromotionSolver?.getOutput()
-    if (sparseMultilayerOutput) {
-      return { meshNodes: sparseMultilayerOutput.outputNodes }
-    }
     if (outerLayerMergeOutput) {
       return { meshNodes: outerLayerMergeOutput.outputNodes }
     }
