@@ -10,6 +10,7 @@ import type { Pipeline4Constructor } from "./types"
  */
 export const createSolver = async (
   scenario: WorkerTaskMessage["task"]["scenario"],
+  RectDiffPipelineClass: typeof RectDiffPipeline = RectDiffPipeline,
 ) => {
   // Import Pipeline 4 directly from the installed package source so we avoid
   // the package root's unrelated re-exports while still using the local
@@ -27,7 +28,7 @@ export const createSolver = async (
 
   return new AutoroutingPipelineSolver4(scenario, {
     overrides: {
-      RectDiffPipelineClass: RectDiffPipeline,
+      RectDiffPipelineClass,
     },
   })
 }

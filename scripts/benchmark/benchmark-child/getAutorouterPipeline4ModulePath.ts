@@ -1,9 +1,7 @@
 /**
- * Resolves the installed Pipeline 4 source module for benchmarking.
- * The worker imports this file directly instead of going through package exports.
+ * Resolves the published capacity-autorouter dist entry for benchmarking.
+ * The benchmark relies on the bundled runtime export instead of package-
+ * internal source paths.
  */
 export const getAutorouterPipeline4ModulePath = () =>
-  new URL(
-    "../autorouter-pipelines/AutoroutingPipeline4_TinyHypergraph/AutoroutingPipelineSolver4_TinyHypergraph.ts",
-    import.meta.resolve("@tscircuit/capacity-autorouter"),
-  ).href
+  import.meta.resolve("@tscircuit/capacity-autorouter")
