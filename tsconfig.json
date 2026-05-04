@@ -8,6 +8,7 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "paths": {
+      "@tscircuit/rectdiff": ["./lib/index.ts"],
       "lib/*": ["./lib/*"],
       "components/*": ["./components/*"],
       "tests/*": ["./tests/*"],

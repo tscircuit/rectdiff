@@ -14,18 +14,21 @@ const importRuntimeModule = (modulePath: string) =>
     modulePath,
   ) as Promise<unknown>
 
+const getAutorouterPipeline4ModulePath = () =>
+  new URL(
+    "./autorouter-pipelines/AutoroutingPipeline4_TinyHypergraph/AutoroutingPipelineSolver4_TinyHypergraph.ts",
+    import.meta.resolve("@tscircuit/capacity-autorouter"),
+  ).href
+
 const createSolver = async (
   scenario: WorkerTaskMessage["task"]["scenario"],
 ) => {
-  // TODO: Replace this runtime-only import with a normal package import once
-  // `@tscircuit/capacity-autorouter` exposes a stable, typed entry for
-  // Pipeline 4 benchmark use. We currently hide the import from TypeScript
-  // because a static import causes `rectdiff`'s `tsc --noEmit` run to crawl
-  // the autorouter source tree and fail on upstream type/setup issues that are
-  // outside this repo.
+  // Import Pipeline 4 directly from the installed package source so we avoid
+  // the package root's unrelated re-exports while still using the local
+  // RectDiffPipeline override for benchmarking.
   const [{ RectDiffPipeline }, solverModule] = await Promise.all([
     import("../../lib/RectDiffPipeline"),
-    importRuntimeModule("@tscircuit/capacity-autorouter/lib/index.ts"),
+    importRuntimeModule(getAutorouterPipeline4ModulePath()),
   ])
 
   // TODO: Replace this cast once capacity-autorouter exposes a typed
