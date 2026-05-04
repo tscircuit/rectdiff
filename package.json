@@ -1,6 +1,6 @@
 {
   "name": "@tscircuit/rectdiff",
-  "version": "0.0.39",
+  "version": "0.0.41",
   "type": "module",
   "main": "lib/index.ts",
   "types": "lib/index.ts",
