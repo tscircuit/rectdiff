@@ -5,16 +5,16 @@ import { importRuntimeModule } from "./importRuntimeModule"
 import type { Pipeline4Constructor } from "./types"
 
 /**
- * Creates the benchmark solver with the local RectDiff pipeline override.
- * This keeps benchmark runs aligned with the repo's current implementation.
+ * Creates the benchmark solver with the repo-local RectDiff pipeline override.
+ * The benchmark imports Pipeline 4 from the published autorouter bundle while
+ * forcing it to instantiate this repo's RectDiff implementation by default.
  */
 export const createSolver = async (
   scenario: WorkerTaskMessage["task"]["scenario"],
   RectDiffPipelineClass: typeof RectDiffPipeline = RectDiffPipeline,
 ) => {
-  // Import Pipeline 4 directly from the installed package source so we avoid
-  // the package root's unrelated re-exports while still using the local
-  // RectDiffPipeline override for benchmarking.
+  // Load Pipeline 4 from the installed capacity-autorouter dist bundle, then
+  // inject the RectDiff class explicitly through its runtime override hook.
   const solverModule = await importRuntimeModule(
     getAutorouterPipeline4ModulePath(),
   )

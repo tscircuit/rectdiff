@@ -1,6 +1,6 @@
 /**
  * Imports a runtime-resolved module path.
- * This bypasses Bun's static analyzer for package-internal source paths.
+ * This keeps the benchmark loader on a runtime-only import path.
  */
 export const importRuntimeModule = (modulePath: string) =>
   new Function("modulePath", "return import(modulePath)")(
