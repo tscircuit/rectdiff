@@ -19,7 +19,9 @@ export const createSolver = async (
   )
 
   // TODO: Replace this cast once capacity-autorouter exposes a typed
-  // Pipeline 4 override interface suitable for partial benchmark runs.
+  // Pipeline 4 override interface. As of this repo state, the installed
+  // Pipeline 4 constructor only exposes CapacityMeshSolverOptions and does
+  // not type the benchmark's overrides.RectDiffPipelineClass injection.
   const AutoroutingPipelineSolver4 = (solverModule as any)
     .AutoroutingPipelineSolver4 as Pipeline4Constructor
 
