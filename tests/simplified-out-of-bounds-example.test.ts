@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import simpleRouteJson from "../test-assets/simplified-out-of-bounds-example.json"
 import { RectDiffPipeline } from "../lib/RectDiffPipeline"
 
-test("simplified out-of-bounds fixture currently creates a generated node outside the board bounds", () => {
+test("simplified out-of-bounds fixture does not create a generated node outside the board bounds", () => {
   const solver = new RectDiffPipeline({ simpleRouteJson })
 
   solver.solve()
@@ -26,8 +26,5 @@ test("simplified out-of-bounds fixture currently creates a generated node outsid
 
   expect(solver.solved).toBe(true)
   expect(meshNodes.length).toBeGreaterThan(0)
-  expect(outsideGeneratedNodes.length).toBeGreaterThan(0)
-  expect(outsideGeneratedNodes[0]!.capacityMeshNodeId.startsWith("new-")).toBe(
-    true,
-  )
+  expect(outsideGeneratedNodes).toHaveLength(0)
 })
