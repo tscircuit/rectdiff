@@ -139,6 +139,12 @@ export class RectDiffExpansionSolver extends BaseSolver {
     const rects = finalizeRects({
       placed: this.input.placed,
       obstacles: this.input.obstacles,
+      bounds: {
+        minX: this.input.bounds.x,
+        maxX: this.input.bounds.x + this.input.bounds.width,
+        minY: this.input.bounds.y,
+        maxY: this.input.bounds.y + this.input.bounds.height,
+      },
       zIndexByName: this.input.zIndexByName,
       boardVoidRects: this.input.boardVoidRects,
       obstacleClearance: this.input.obstacleClearance,

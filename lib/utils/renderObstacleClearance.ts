@@ -1,5 +1,7 @@
 import type { SimpleRouteJson } from "../types/srj-types"
 import type { GraphicsObject } from "graphics-debug"
+import { obstacleIntersectsBounds } from "./obstacleIntersectsBounds"
+import { clipXYRectToBounds } from "./clipXYRectToBounds"
 
 /**
  * Pure helper that returns clearance rect graphics; does not mutate inputs.
@@ -21,13 +23,18 @@ export const buildObstacleClearanceGraphics = (params: {
   const rects: NonNullable<GraphicsObject["rects"]> = []
 
   for (const obstacle of srj.obstacles ?? []) {
+    if (!obstacleIntersectsBounds(obstacle, srj.bounds)) continue
     if (obstacle.type !== "rect" && obstacle.type !== "oval") continue
-    const expanded = {
-      x: obstacle.center.x - obstacle.width / 2 - c,
-      y: obstacle.center.y - obstacle.height / 2 - c,
-      width: obstacle.width + 2 * c,
-      height: obstacle.height + 2 * c,
-    }
+    const expanded = clipXYRectToBounds(
+      {
+        x: obstacle.center.x - obstacle.width / 2 - c,
+        y: obstacle.center.y - obstacle.height / 2 - c,
+        width: obstacle.width + 2 * c,
+        height: obstacle.height + 2 * c,
+      },
+      srj.bounds,
+    )
+    if (!expanded) continue
     rects.push({
       center: {
         x: expanded.x + expanded.width / 2,
