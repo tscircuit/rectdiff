@@ -9,6 +9,8 @@ import {
 import type { XYRect } from "../../rectdiff-types"
 import type { RTreeRect } from "../../types/capacity-mesh-types"
 import { padRect } from "../../utils/padRect"
+import { obstacleIntersectsBounds } from "../../utils/obstacleIntersectsBounds"
+import { clipXYRectToBounds } from "../../utils/clipXYRectToBounds"
 
 export const buildObstacleIndexesByLayer = (params: {
   srj: SimpleRouteJson
@@ -55,9 +57,13 @@ export const buildObstacleIndexesByLayer = (params: {
   }
 
   for (const obstacle of srj.obstacles ?? []) {
+    if (!obstacleIntersectsBounds(obstacle, srj.bounds)) continue
+
     const rectBase = obstacleToXYRect(obstacle)
     if (!rectBase) continue
-    const rect = padRect(rectBase, obstacleClearance ?? 0)
+    const paddedRect = padRect(rectBase, obstacleClearance ?? 0)
+    const rect = clipXYRectToBounds(paddedRect, srj.bounds)
+    if (!rect) continue
     const zLayers = obstacleZs(obstacle, zIndexByName)
     const invalidZs = zLayers.filter((z) => z < 0 || z >= layerCount)
     if (invalidZs.length) {

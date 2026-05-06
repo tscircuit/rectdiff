@@ -28,3 +28,28 @@ test("arduino out-of-bounds fixture does not create a generated node outside the
   expect(meshNodes.length).toBeGreaterThan(0)
   expect(outsideGeneratedNodes).toHaveLength(0)
 })
+
+test("arduino out-of-bounds fixture clips obstacle nodes to board bounds", () => {
+  const solver = new RectDiffPipeline({ simpleRouteJson })
+
+  solver.solve()
+
+  const { meshNodes } = solver.getOutput()
+  const outsideObstacleNodes = meshNodes.filter((node) => {
+    if (!node._containsObstacle) return false
+
+    const minX = node.center.x - node.width / 2
+    const maxX = node.center.x + node.width / 2
+    const minY = node.center.y - node.height / 2
+    const maxY = node.center.y + node.height / 2
+
+    return (
+      minX < simpleRouteJson.bounds.minX ||
+      maxX > simpleRouteJson.bounds.maxX ||
+      minY < simpleRouteJson.bounds.minY ||
+      maxY > simpleRouteJson.bounds.maxY
+    )
+  })
+
+  expect(outsideObstacleNodes).toHaveLength(0)
+})

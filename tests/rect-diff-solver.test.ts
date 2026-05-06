@@ -141,3 +141,39 @@ test("multi-layer mesh generation", () => {
   const multiLayerNodes = mesh.filter((n) => (n.availableZ?.length ?? 0) >= 2)
   expect(multiLayerNodes.length).toBeGreaterThan(0)
 })
+
+test("RectDiffSolver ignores obstacles that are fully outside board bounds", () => {
+  const baseSrj: SimpleRouteJson = {
+    bounds: { minX: 0, maxX: 10, minY: 0, maxY: 10 },
+    obstacles: [],
+    connections: [],
+    layerCount: 1,
+    minTraceWidth: 0.1,
+  }
+
+  const withOutOfBoundsObstacle: SimpleRouteJson = {
+    ...baseSrj,
+    obstacles: [
+      {
+        type: "rect",
+        layers: ["top"],
+        center: { x: 20, y: 20 },
+        width: 2,
+        height: 2,
+        connectedTo: [],
+      },
+    ],
+  }
+
+  const baseSolver = new RectDiffPipeline({
+    simpleRouteJson: baseSrj,
+  })
+  const outOfBoundsObstacleSolver = new RectDiffPipeline({
+    simpleRouteJson: withOutOfBoundsObstacle,
+  })
+
+  baseSolver.solve()
+  outOfBoundsObstacleSolver.solve()
+
+  expect(outOfBoundsObstacleSolver.getOutput()).toEqual(baseSolver.getOutput())
+})

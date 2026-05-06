@@ -7,6 +7,8 @@ import { obstacleToXYRect, obstacleZs } from "../RectDiffSeedingSolver/layers"
 import { getColorForZLayer } from "../../utils/getColorForZLayer"
 import { subtractRect2D, overlaps, EPS } from "../../utils/rectdiff-geometry"
 import { padRect } from "../../utils/padRect"
+import { obstacleIntersectsBounds } from "../../utils/obstacleIntersectsBounds"
+import { clipXYRectToBounds } from "../../utils/clipXYRectToBounds"
 
 type OuterLayerContainmentMergeSolverInput = {
   meshNodes: CapacityMeshNode[]
@@ -218,9 +220,18 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
     )
 
     for (const obstacle of this.input.simpleRouteJson.obstacles ?? []) {
+      if (!obstacleIntersectsBounds(obstacle, this.input.simpleRouteJson.bounds)) {
+        continue
+      }
+
       const baseRect = obstacleToXYRect(obstacle)
       if (!baseRect) continue
-      const rect = padRect(baseRect, this.input.obstacleClearance ?? 0)
+      const paddedRect = padRect(baseRect, this.input.obstacleClearance ?? 0)
+      const rect = clipXYRectToBounds(
+        paddedRect,
+        this.input.simpleRouteJson.bounds,
+      )
+      if (!rect) continue
       const zLayers = obstacleZs(obstacle, this.input.zIndexByName)
 
       for (const z of zLayers) {

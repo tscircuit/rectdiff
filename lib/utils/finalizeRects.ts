@@ -4,11 +4,15 @@ import {
   obstacleToXYRect,
   obstacleZs,
 } from "../solvers/RectDiffSeedingSolver/layers"
+import { obstacleIntersectsBounds } from "./obstacleIntersectsBounds"
+import type { Bounds } from "@tscircuit/math-utils"
+import { clipXYRectToBounds } from "./clipXYRectToBounds"
 
 export function finalizeRects(params: {
   placed: Placed3D[]
   obstacles: Obstacle[]
   boardVoidRects: XYRect[]
+  bounds: Bounds
   zIndexByName: Map<string, number>
   obstacleClearance?: number
 }): Rect3d[] {
@@ -24,9 +28,11 @@ export function finalizeRects(params: {
   const layersByKey = new Map<string, { rect: XYRect; layers: Set<number> }>()
 
   for (const obstacle of params.obstacles ?? []) {
+    if (!obstacleIntersectsBounds(obstacle, params.bounds)) continue
+
     const baseRect = obstacleToXYRect(obstacle)
     if (!baseRect) continue
-    const rect = params.obstacleClearance
+    const paddedRect = params.obstacleClearance
       ? {
           x: baseRect.x - params.obstacleClearance,
           y: baseRect.y - params.obstacleClearance,
@@ -34,6 +40,8 @@ export function finalizeRects(params: {
           height: baseRect.height + 2 * params.obstacleClearance,
         }
       : baseRect
+    const rect = clipXYRectToBounds(paddedRect, params.bounds)
+    if (!rect) continue
     const zLayers =
       obstacle.zLayers?.length && obstacle.zLayers.length > 0
         ? obstacle.zLayers
