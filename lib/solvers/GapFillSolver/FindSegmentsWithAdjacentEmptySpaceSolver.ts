@@ -6,7 +6,8 @@ import { projectToUncoveredSegments } from "./projectToUncoveredSegments"
 import { EDGES } from "./edge-constants"
 import { visuallyOffsetLine } from "./visuallyOffsetLine"
 import type { Bounds } from "@tscircuit/math-utils"
-import { getBoundFromCenteredRect } from "@tscircuit/math-utils"
+import { clipNodeToBounds } from "./clipNodeToBounds"
+import { isBoundaryFacingEdge } from "./isBoundaryFacingEdge"
 
 export interface SegmentWithAdjacentEmptySpace {
   parent: CapacityMeshNode
@@ -17,70 +18,6 @@ export interface SegmentWithAdjacentEmptySpace {
 }
 
 const EPS = 1e-4
-
-const clipNodeToBounds = (
-  node: CapacityMeshNode,
-  bounds?: Bounds,
-): {
-  center: { x: number; y: number }
-  width: number
-  height: number
-  minX: number
-  maxX: number
-  minY: number
-  maxY: number
-} | null => {
-  const nodeBounds = getBoundFromCenteredRect(node)
-  if (!bounds) {
-    return {
-      ...nodeBounds,
-      center: node.center,
-      width: node.width,
-      height: node.height,
-    }
-  }
-
-  const minX = Math.max(nodeBounds.minX, bounds.minX)
-  const maxX = Math.min(nodeBounds.maxX, bounds.maxX)
-  const minY = Math.max(nodeBounds.minY, bounds.minY)
-  const maxY = Math.min(nodeBounds.maxY, bounds.maxY)
-  const width = maxX - minX
-  const height = maxY - minY
-
-  if (width <= EPS || height <= EPS) return null
-
-  return {
-    minX,
-    maxX,
-    minY,
-    maxY,
-    width,
-    height,
-    center: {
-      x: (minX + maxX) / 2,
-      y: (minY + maxY) / 2,
-    },
-  }
-}
-
-const isBoundaryFacingEdge = (
-  edgeDirection: SegmentWithAdjacentEmptySpace["facingDirection"],
-  rectBounds: { minX: number; maxX: number; minY: number; maxY: number },
-  bounds?: Bounds,
-) => {
-  if (!bounds) return false
-
-  switch (edgeDirection) {
-    case "x-":
-      return Math.abs(rectBounds.minX - bounds.minX) < EPS
-    case "x+":
-      return Math.abs(rectBounds.maxX - bounds.maxX) < EPS
-    case "y-":
-      return Math.abs(rectBounds.minY - bounds.minY) < EPS
-    case "y+":
-      return Math.abs(rectBounds.maxY - bounds.maxY) < EPS
-  }
-}
 
 /**
  * Find edges with adjacent empty space in the mesh
