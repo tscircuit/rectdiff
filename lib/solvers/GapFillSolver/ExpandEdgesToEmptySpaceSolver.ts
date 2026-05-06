@@ -216,6 +216,12 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     })
   }
 
+  /**
+   * Measures how far this segment can grow before it hits the board edge.
+   *
+   * In general terms, this is the maximum legal expansion distance in the
+   * direction the segment is facing.
+   */
   private getDistanceToBoundary(segment: SegmentWithAdjacentEmptySpace) {
     if (!this.input.bounds) return Infinity
 
@@ -231,6 +237,13 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     }
   }
 
+  /**
+   * Nudges boundary-clamped rectangles slightly inward to avoid floating-point
+   * overshoot when later code recomputes min/max from center and size.
+   *
+   * In general terms, this keeps "exactly on the edge" rectangles from looking
+   * like they spill microscopically outside the board.
+   */
   private makeBoundsNumericallySafe(
     clippedBounds: ReturnType<typeof clipNodeToBounds>,
   ) {
