@@ -5,7 +5,8 @@ import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import { projectToUncoveredSegments } from "./projectToUncoveredSegments"
 import { EDGES } from "./edge-constants"
 import { visuallyOffsetLine } from "./visuallyOffsetLine"
-import { midpoint } from "@tscircuit/math-utils"
+import type { Bounds } from "@tscircuit/math-utils"
+import { getBoundFromCenteredRect } from "@tscircuit/math-utils"
 
 export interface SegmentWithAdjacentEmptySpace {
   parent: CapacityMeshNode
@@ -16,6 +17,70 @@ export interface SegmentWithAdjacentEmptySpace {
 }
 
 const EPS = 1e-4
+
+const clipNodeToBounds = (
+  node: CapacityMeshNode,
+  bounds?: Bounds,
+): {
+  center: { x: number; y: number }
+  width: number
+  height: number
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+} | null => {
+  const nodeBounds = getBoundFromCenteredRect(node)
+  if (!bounds) {
+    return {
+      ...nodeBounds,
+      center: node.center,
+      width: node.width,
+      height: node.height,
+    }
+  }
+
+  const minX = Math.max(nodeBounds.minX, bounds.minX)
+  const maxX = Math.min(nodeBounds.maxX, bounds.maxX)
+  const minY = Math.max(nodeBounds.minY, bounds.minY)
+  const maxY = Math.min(nodeBounds.maxY, bounds.maxY)
+  const width = maxX - minX
+  const height = maxY - minY
+
+  if (width <= EPS || height <= EPS) return null
+
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    width,
+    height,
+    center: {
+      x: (minX + maxX) / 2,
+      y: (minY + maxY) / 2,
+    },
+  }
+}
+
+const isBoundaryFacingEdge = (
+  edgeDirection: SegmentWithAdjacentEmptySpace["facingDirection"],
+  rectBounds: { minX: number; maxX: number; minY: number; maxY: number },
+  bounds?: Bounds,
+) => {
+  if (!bounds) return false
+
+  switch (edgeDirection) {
+    case "x-":
+      return Math.abs(rectBounds.minX - bounds.minX) < EPS
+    case "x+":
+      return Math.abs(rectBounds.maxX - bounds.maxX) < EPS
+    case "y-":
+      return Math.abs(rectBounds.minY - bounds.minY) < EPS
+    case "y+":
+      return Math.abs(rectBounds.maxY - bounds.maxY) < EPS
+  }
+}
 
 /**
  * Find edges with adjacent empty space in the mesh
@@ -44,18 +109,32 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
   constructor(
     private input: {
       meshNodes: CapacityMeshNode[]
+      bounds?: Bounds
     },
   ) {
     super()
     for (const node of this.input.meshNodes) {
+      const effectiveNode = clipNodeToBounds(node, this.input.bounds)
+      if (!effectiveNode) continue
+
       for (const edge of EDGES) {
+        if (
+          isBoundaryFacingEdge(
+            edge.facingDirection,
+            effectiveNode,
+            this.input.bounds,
+          )
+        ) {
+          continue
+        }
+
         let start = {
-          x: node.center.x + node.width * edge.startX,
-          y: node.center.y + node.height * edge.startY,
+          x: effectiveNode.center.x + effectiveNode.width * edge.startX,
+          y: effectiveNode.center.y + effectiveNode.height * edge.startY,
         }
         let end = {
-          x: node.center.x + node.width * edge.endX,
-          y: node.center.y + node.height * edge.endY,
+          x: effectiveNode.center.x + effectiveNode.width * edge.endX,
+          y: effectiveNode.center.y + effectiveNode.height * edge.endY,
         }
 
         // Ensure start.x < end.x and if x is the same, ensure start.y < end.y
