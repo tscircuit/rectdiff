@@ -48,6 +48,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
           segmentsWithAdjacentEmptySpace:
             gapFillPipeline.findSegmentsWithAdjacentEmptySpaceSolver!.getOutput()
               .segmentsWithAdjacentEmptySpace,
+          bounds: gapFillPipeline.inputProblem.bounds,
           boardVoid: gapFillPipeline.inputProblem.boardVoid,
         },
       ],
