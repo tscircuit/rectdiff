@@ -1,0 +1,24 @@
+{
+  "bounds": {
+    "minX": -5.5,
+    "maxX": 5.5,
+    "minY": -6,
+    "maxY": 6
+  },
+  "obstacles": [
+    {
+      "type": "rect",
+      "layers": ["top"],
+      "center": {
+        "x": -5.856893060790263,
+        "y": -8.275436101920713
+      },
+      "width": 0.6000000000000001,
+      "height": 0.16500000000000004,
+      "connectedTo": []
+    }
+  ],
+  "connections": [],
+  "layerCount": 2,
+  "minTraceWidth": 0.15
+}
