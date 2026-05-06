@@ -20,7 +20,7 @@
     "@react-hook/resize-observer": "^2.0.2",
     "@tscircuit/autorouting-dataset-01": "^1.0.32",
     "@tscircuit/capacity-autorouter": "https://npm-releases.tscircuit.com/npm-tarballs/25314012755-1/tscircuit-capacity-autorouter-0.0.489.tgz",
-    "@tscircuit/math-utils": "^0.0.29",
+    "@tscircuit/math-utils": "^0.0.36",
     "@tscircuit/solver-utils": "^0.0.16",
     "@types/bun": "latest",
     "@types/rbush": "^4.0.0",
