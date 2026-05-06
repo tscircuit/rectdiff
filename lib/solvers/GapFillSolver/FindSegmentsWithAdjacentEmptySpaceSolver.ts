@@ -100,7 +100,7 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
 
   segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace> = []
 
-  edgeSpatialIndex: Flatbush
+  edgeSpatialIndex: Flatbush | null = null
 
   lastCandidateEdge: SegmentWithAdjacentEmptySpace | null = null
   lastOverlappingEdges: Array<SegmentWithAdjacentEmptySpace> | null = null
@@ -158,16 +158,18 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
     }
     this.allEdges = [...this.unprocessedEdges]
 
-    this.edgeSpatialIndex = new Flatbush(this.allEdges.length)
-    for (const edge of this.allEdges) {
-      this.edgeSpatialIndex.add(
-        edge.start.x,
-        edge.start.y,
-        edge.end.x,
-        edge.end.y,
-      )
+    if (this.allEdges.length > 0) {
+      this.edgeSpatialIndex = new Flatbush(this.allEdges.length)
+      for (const edge of this.allEdges) {
+        this.edgeSpatialIndex.add(
+          edge.start.x,
+          edge.start.y,
+          edge.end.x,
+          edge.end.y,
+        )
+      }
+      this.edgeSpatialIndex.finish()
     }
-    this.edgeSpatialIndex.finish()
   }
 
   override _step() {
@@ -183,12 +185,14 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
     this.lastCandidateEdge = candidateEdge
 
     // Find all edges that are nearby
-    const nearbyEdges = this.edgeSpatialIndex.search(
-      candidateEdge.start.x - EPS,
-      candidateEdge.start.y - EPS,
-      candidateEdge.end.x + EPS,
-      candidateEdge.end.y + EPS,
-    )
+    const nearbyEdges = this.edgeSpatialIndex
+      ? this.edgeSpatialIndex.search(
+          candidateEdge.start.x - EPS,
+          candidateEdge.start.y - EPS,
+          candidateEdge.end.x + EPS,
+          candidateEdge.end.y + EPS,
+        )
+      : []
 
     const overlappingEdges = nearbyEdges
       .map((i) => this.allEdges[i]!)
