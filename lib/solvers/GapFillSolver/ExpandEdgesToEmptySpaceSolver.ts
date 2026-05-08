@@ -8,12 +8,15 @@ import { getBoundsFromCorners } from "./getBoundsFromCorners"
 import type { Bounds } from "@tscircuit/math-utils"
 import { midpoint, segmentToBoxMinDistance } from "@tscircuit/math-utils"
 import type { XYRect } from "../../rectdiff-types"
+import { clipNodeToBounds } from "./clipNodeToBounds"
 
 const EPS = 1e-4
+const NUMERIC_SAFETY_EPS = 1e-9
 
 export type ExpandEdgesToEmptySpaceSolverInput = {
   inputMeshNodes: CapacityMeshNode[]
   segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace>
+  bounds?: Bounds
   boardVoid?: {
     boardVoidRects: XYRect[]
     layerCount: number
@@ -112,20 +115,26 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     }
     this.lastSearchCorner1 = searchCorner1
     this.lastSearchCorner2 = searchCorner2
+    const boundaryDistance = this.getDistanceToBoundary(segment)
+
+    if (boundaryDistance <= EPS) {
+      return
+    }
+
     while (
       (!collidingNodes || collidingNodes.length === 0) &&
-      searchDistance < 1000
+      searchDistance < boundaryDistance + EPS
     ) {
       const searchBounds = getBoundsFromCorners([
         searchCorner1,
         searchCorner2,
         {
-          x: searchCorner1.x + dx * searchDistance,
-          y: searchCorner1.y + dy * searchDistance,
+          x: searchCorner1.x + dx * Math.min(searchDistance, boundaryDistance),
+          y: searchCorner1.y + dy * Math.min(searchDistance, boundaryDistance),
         },
         {
-          x: searchCorner2.x + dx * searchDistance,
-          y: searchCorner2.y + dy * searchDistance,
+          x: searchCorner2.x + dx * Math.min(searchDistance, boundaryDistance),
+          y: searchCorner2.y + dy * Math.min(searchDistance, boundaryDistance),
         },
       ])
       this.lastSearchBounds = searchBounds
@@ -140,13 +149,12 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     }
 
     if (!collidingNodes || collidingNodes.length === 0) {
-      // TODO, this means we need to expand the node to the boundary
-      return
+      collidingNodes = []
     }
     this.lastCollidingNodes = collidingNodes
 
     // Determine the expand distance from the colliding nodes
-    let smallestDistance = Infinity
+    let smallestDistance = boundaryDistance
     for (const node of collidingNodes) {
       const distance = segmentToBoxMinDistance(segment.start, segment.end, node)
       if (distance < smallestDistance) {
@@ -185,18 +193,93 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
         layer: segment.parent.layer,
       },
     }
-    this.lastExpandedSegment = expandedSegment
-
-    if (nodeWidth < EPS || nodeHeight < EPS) {
+    const clippedBounds = this.makeBoundsNumericallySafe(
+      clipNodeToBounds(expandedSegment.newNode, this.input.bounds),
+    )
+    if (!clippedBounds || clippedBounds.width < EPS || clippedBounds.height < EPS) {
       // Node is too small, skipping
       return
     }
 
+    expandedSegment.newNode = {
+      ...expandedSegment.newNode,
+      center: clippedBounds.center,
+      width: clippedBounds.width,
+      height: clippedBounds.height,
+    }
+    this.lastExpandedSegment = expandedSegment
+
     this.expandedSegments.push(expandedSegment)
     this.rectSpatialIndex.insert({
       ...expandedSegment.newNode,
-      ...nodeBounds,
+      ...clippedBounds,
     })
+  }
+
+  /**
+   * Measures how far this segment can grow before it hits the board edge.
+   *
+   * In general terms, this is the maximum legal expansion distance in the
+   * direction the segment is facing.
+   */
+  private getDistanceToBoundary(segment: SegmentWithAdjacentEmptySpace) {
+    if (!this.input.bounds) return Infinity
+
+    switch (segment.facingDirection) {
+      case "x+":
+        return this.input.bounds.maxX - Math.max(segment.start.x, segment.end.x)
+      case "x-":
+        return Math.min(segment.start.x, segment.end.x) - this.input.bounds.minX
+      case "y+":
+        return this.input.bounds.maxY - Math.max(segment.start.y, segment.end.y)
+      case "y-":
+        return Math.min(segment.start.y, segment.end.y) - this.input.bounds.minY
+    }
+  }
+
+  /**
+   * Nudges boundary-clamped rectangles slightly inward to avoid floating-point
+   * overshoot when later code recomputes min/max from center and size.
+   *
+   * In general terms, this keeps "exactly on the edge" rectangles from looking
+   * like they spill microscopically outside the board.
+   */
+  private makeBoundsNumericallySafe(
+    clippedBounds: ReturnType<typeof clipNodeToBounds>,
+  ) {
+    if (!clippedBounds || !this.input.bounds) return clippedBounds
+
+    let { minX, maxX, minY, maxY } = clippedBounds
+
+    if (Math.abs(minX - this.input.bounds.minX) < EPS) {
+      minX = this.input.bounds.minX + NUMERIC_SAFETY_EPS
+    }
+    if (Math.abs(maxX - this.input.bounds.maxX) < EPS) {
+      maxX = this.input.bounds.maxX - NUMERIC_SAFETY_EPS
+    }
+    if (Math.abs(minY - this.input.bounds.minY) < EPS) {
+      minY = this.input.bounds.minY + NUMERIC_SAFETY_EPS
+    }
+    if (Math.abs(maxY - this.input.bounds.maxY) < EPS) {
+      maxY = this.input.bounds.maxY - NUMERIC_SAFETY_EPS
+    }
+
+    const width = maxX - minX
+    const height = maxY - minY
+    if (width <= EPS || height <= EPS) return null
+
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      width,
+      height,
+      center: {
+        x: (minX + maxX) / 2,
+        y: (minY + maxY) / 2,
+      },
+    }
   }
 
   override getOutput() {
