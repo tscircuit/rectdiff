@@ -8,9 +8,11 @@ import type { GraphicsObject } from "graphics-debug"
 import { FindSegmentsWithAdjacentEmptySpaceSolver } from "./FindSegmentsWithAdjacentEmptySpaceSolver"
 import { ExpandEdgesToEmptySpaceSolver } from "./ExpandEdgesToEmptySpaceSolver"
 import type { XYRect } from "../../rectdiff-types"
+import type { Bounds } from "@tscircuit/math-utils"
 
 type GapFillSolverInput = {
   meshNodes: CapacityMeshNode[]
+  bounds?: Bounds
   boardVoid?: {
     boardVoidRects: XYRect[]
     layerCount: number
@@ -28,6 +30,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
       (gapFillPipeline) => [
         {
           meshNodes: gapFillPipeline.inputProblem.meshNodes,
+          bounds: gapFillPipeline.inputProblem.bounds,
         },
       ],
       {

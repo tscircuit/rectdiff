@@ -5,7 +5,9 @@ import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import { projectToUncoveredSegments } from "./projectToUncoveredSegments"
 import { EDGES } from "./edge-constants"
 import { visuallyOffsetLine } from "./visuallyOffsetLine"
-import { midpoint } from "@tscircuit/math-utils"
+import type { Bounds } from "@tscircuit/math-utils"
+import { clipNodeToBounds } from "./clipNodeToBounds"
+import { isBoundaryFacingEdge } from "./isBoundaryFacingEdge"
 
 export interface SegmentWithAdjacentEmptySpace {
   parent: CapacityMeshNode
@@ -35,7 +37,7 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
 
   segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace> = []
 
-  edgeSpatialIndex: Flatbush
+  edgeSpatialIndex: Flatbush | null = null
 
   lastCandidateEdge: SegmentWithAdjacentEmptySpace | null = null
   lastOverlappingEdges: Array<SegmentWithAdjacentEmptySpace> | null = null
@@ -44,18 +46,32 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
   constructor(
     private input: {
       meshNodes: CapacityMeshNode[]
+      bounds?: Bounds
     },
   ) {
     super()
     for (const node of this.input.meshNodes) {
+      const effectiveNode = clipNodeToBounds(node, this.input.bounds)
+      if (!effectiveNode) continue
+
       for (const edge of EDGES) {
+        if (
+          isBoundaryFacingEdge(
+            edge.facingDirection,
+            effectiveNode,
+            this.input.bounds,
+          )
+        ) {
+          continue
+        }
+
         let start = {
-          x: node.center.x + node.width * edge.startX,
-          y: node.center.y + node.height * edge.startY,
+          x: effectiveNode.center.x + effectiveNode.width * edge.startX,
+          y: effectiveNode.center.y + effectiveNode.height * edge.startY,
         }
         let end = {
-          x: node.center.x + node.width * edge.endX,
-          y: node.center.y + node.height * edge.endY,
+          x: effectiveNode.center.x + effectiveNode.width * edge.endX,
+          y: effectiveNode.center.y + effectiveNode.height * edge.endY,
         }
 
         // Ensure start.x < end.x and if x is the same, ensure start.y < end.y
@@ -79,16 +95,18 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
     }
     this.allEdges = [...this.unprocessedEdges]
 
-    this.edgeSpatialIndex = new Flatbush(this.allEdges.length)
-    for (const edge of this.allEdges) {
-      this.edgeSpatialIndex.add(
-        edge.start.x,
-        edge.start.y,
-        edge.end.x,
-        edge.end.y,
-      )
+    if (this.allEdges.length > 0) {
+      this.edgeSpatialIndex = new Flatbush(this.allEdges.length)
+      for (const edge of this.allEdges) {
+        this.edgeSpatialIndex.add(
+          edge.start.x,
+          edge.start.y,
+          edge.end.x,
+          edge.end.y,
+        )
+      }
+      this.edgeSpatialIndex.finish()
     }
-    this.edgeSpatialIndex.finish()
   }
 
   override _step() {
@@ -104,12 +122,14 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
     this.lastCandidateEdge = candidateEdge
 
     // Find all edges that are nearby
-    const nearbyEdges = this.edgeSpatialIndex.search(
-      candidateEdge.start.x - EPS,
-      candidateEdge.start.y - EPS,
-      candidateEdge.end.x + EPS,
-      candidateEdge.end.y + EPS,
-    )
+    const nearbyEdges = this.edgeSpatialIndex
+      ? this.edgeSpatialIndex.search(
+          candidateEdge.start.x - EPS,
+          candidateEdge.start.y - EPS,
+          candidateEdge.end.x + EPS,
+          candidateEdge.end.y + EPS,
+        )
+      : []
 
     const overlappingEdges = nearbyEdges
       .map((i) => this.allEdges[i]!)
