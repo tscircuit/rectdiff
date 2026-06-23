@@ -6,7 +6,10 @@ import {
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { FindSegmentsWithAdjacentEmptySpaceSolver } from "./FindSegmentsWithAdjacentEmptySpaceSolver"
-import { ExpandEdgesToEmptySpaceSolver } from "./ExpandEdgesToEmptySpaceSolver"
+import {
+  ExpandEdgesToEmptySpaceSolver,
+  type ExpandedSegment,
+} from "./ExpandEdgesToEmptySpaceSolver"
 import type { XYRect } from "../../rectdiff-types"
 
 type GapFillSolverInput = {
@@ -17,17 +20,31 @@ type GapFillSolverInput = {
   }
 }
 
+type GapFillOutput = {
+  outputNodes: CapacityMeshNode[]
+}
+
+type GapFillPipelineStep = PipelineStep<
+  FindSegmentsWithAdjacentEmptySpaceSolver | ExpandEdgesToEmptySpaceSolver
+>
+
 export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput> {
   findSegmentsWithAdjacentEmptySpaceSolver?: FindSegmentsWithAdjacentEmptySpaceSolver
   expandEdgesToEmptySpaceSolver?: ExpandEdgesToEmptySpaceSolver
+  outputNodes: CapacityMeshNode[] = []
+  passExpandedCounts: number[] = []
+  private currentPassNodes: CapacityMeshNode[] = []
+  private currentPassIndex: number = 0
+  private readonly expandedNodeIds: Set<string> = new Set()
+  private readonly maxGapFillPasses: number = 4
 
-  override pipelineDef: PipelineStep<any>[] = [
+  override pipelineDef: GapFillPipelineStep[] = [
     definePipelineStep(
       "findSegmentsWithAdjacentEmptySpaceSolver",
       FindSegmentsWithAdjacentEmptySpaceSolver,
-      (gapFillPipeline) => [
+      (gapFillPipeline: GapFillSolverPipeline) => [
         {
-          meshNodes: gapFillPipeline.inputProblem.meshNodes,
+          meshNodes: gapFillPipeline.currentPassNodes,
         },
       ],
       {
@@ -41,7 +58,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
       ExpandEdgesToEmptySpaceSolver,
       (gapFillPipeline: GapFillSolverPipeline) => [
         {
-          inputMeshNodes: gapFillPipeline.inputProblem.meshNodes,
+          inputMeshNodes: gapFillPipeline.currentPassNodes,
           segmentsWithAdjacentEmptySpace:
             gapFillPipeline.findSegmentsWithAdjacentEmptySpaceSolver!.getOutput()
               .segmentsWithAdjacentEmptySpace,
@@ -49,20 +66,51 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
         },
       ],
       {
-        onSolved: () => {
-          // Gap fill solver completed
+        onSolved: (gapFillPipeline: GapFillSolverPipeline): void => {
+          gapFillPipeline.completePass()
         },
       },
     ),
   ] as const
 
-  override getOutput(): { outputNodes: CapacityMeshNode[] } {
-    const expandedSegments =
-      this.expandEdgesToEmptySpaceSolver?.getOutput().expandedSegments ?? []
-    const expandedNodes = expandedSegments.map((es) => es.newNode)
+  override _setup(): void {
+    this.outputNodes = [...this.inputProblem.meshNodes]
+    this.currentPassNodes = [...this.inputProblem.meshNodes]
+    this.passExpandedCounts = []
+    this.currentPassIndex = 0
+    this.expandedNodeIds.clear()
+  }
 
+  private completePass(): void {
+    const expandedSegments: ExpandedSegment[] =
+      this.expandEdgesToEmptySpaceSolver?.getOutput().expandedSegments ?? []
+    const expandedNodes: CapacityMeshNode[] = expandedSegments.map(
+      (es: ExpandedSegment): CapacityMeshNode => es.newNode,
+    )
+    for (const node of expandedNodes) {
+      this.expandedNodeIds.add(node.capacityMeshNodeId)
+    }
+
+    this.passExpandedCounts.push(expandedNodes.length)
+    this.currentPassNodes = [...this.currentPassNodes, ...expandedNodes]
+    this.outputNodes = this.currentPassNodes
+
+    if (
+      expandedNodes.length === 0 ||
+      this.currentPassIndex + 1 >= this.maxGapFillPasses
+    ) {
+      return
+    }
+
+    this.currentPassIndex += 1
+    this.currentPipelineStageIndex = -1
+  }
+
+  override getOutput(): GapFillOutput {
     return {
-      outputNodes: [...this.inputProblem.meshNodes, ...expandedNodes],
+      outputNodes: this.outputNodes.length
+        ? this.outputNodes
+        : this.inputProblem.meshNodes,
     }
   }
 
@@ -113,14 +161,9 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
     }
 
     const { outputNodes } = this.getOutput()
-    const expandedSegments =
-      this.expandEdgesToEmptySpaceSolver?.getOutput().expandedSegments ?? []
-    const expandedNodeIds = new Set(
-      expandedSegments.map((es) => es.newNode.capacityMeshNodeId),
-    )
 
     for (const node of outputNodes) {
-      const isExpanded = expandedNodeIds.has(node.capacityMeshNodeId)
+      const isExpanded = this.expandedNodeIds.has(node.capacityMeshNodeId)
       graphics.rects.push({
         center: node.center,
         width: node.width,
