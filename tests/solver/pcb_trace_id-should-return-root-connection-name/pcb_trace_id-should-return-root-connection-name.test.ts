@@ -15,6 +15,7 @@ import { makeSimpleRouteOutlineGraphics } from "tests/fixtures/makeSimpleRouteOu
 test("pcb_trace_id-should-return-root-connection-name", async () => {
   const solver = new RectDiffPipeline({
     simpleRouteJson: srj,
+    maxGapFillPasses: 1,
   })
 
   const outline = makeSimpleRouteOutlineGraphics(srj)

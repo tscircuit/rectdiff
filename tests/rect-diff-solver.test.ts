@@ -27,6 +27,7 @@ test("RectDiffSolver creates mesh nodes with grid-based approach", () => {
 
   const solver = new RectDiffPipeline({
     simpleRouteJson,
+    maxGapFillPasses: 1,
   })
 
   solver.solve()
@@ -61,6 +62,7 @@ test("RectDiffSolver handles multi-layer spans", () => {
 
   const solver = new RectDiffPipeline({
     simpleRouteJson,
+    maxGapFillPasses: 1,
     gridOptions: {
       minSingle: { width: 0.4, height: 0.4 },
       minMulti: { width: 1.0, height: 1.0, minLayers: 2 },
@@ -103,6 +105,7 @@ test("RectDiffSolver respects single-layer minimums", () => {
 
   const solver = new RectDiffPipeline({
     simpleRouteJson,
+    maxGapFillPasses: 1,
     gridOptions: {
       minSingle: { width: minWidth, height: minHeight },
       minMulti: { width: 1.0, height: 1.0, minLayers: 2 },
@@ -128,7 +131,10 @@ test("multi-layer mesh generation", () => {
     layerCount: 3,
     minTraceWidth: 0.2,
   }
-  const pipeline = new RectDiffPipeline({ simpleRouteJson: srj })
+  const pipeline = new RectDiffPipeline({
+    simpleRouteJson: srj,
+    maxGapFillPasses: 1,
+  })
 
   // Run to completion
   pipeline.solve()

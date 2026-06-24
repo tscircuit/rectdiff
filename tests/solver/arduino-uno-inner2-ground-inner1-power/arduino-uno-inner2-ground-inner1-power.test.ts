@@ -15,6 +15,7 @@ import { makeSimpleRouteOutlineGraphics } from "tests/fixtures/makeSimpleRouteOu
 test("arduino-uno-inner2-ground-inner1-power", async () => {
   const solver = new RectDiffPipeline({
     simpleRouteJson,
+    maxGapFillPasses: 1,
   })
 
   const outline = makeSimpleRouteOutlineGraphics(simpleRouteJson)

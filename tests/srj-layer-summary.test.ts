@@ -43,7 +43,10 @@ test("solve srj files and print multi-layer node summary", async () => {
   const rows: Array<Record<string, string | number>> = []
 
   for (const { filePath, srj } of largestFiles) {
-    const solver = new RectDiffPipeline({ simpleRouteJson: srj })
+    const solver = new RectDiffPipeline({
+      simpleRouteJson: srj,
+      maxGapFillPasses: 1,
+    })
     solver.solve()
 
     const allMeshNodes = solver.getOutput().meshNodes

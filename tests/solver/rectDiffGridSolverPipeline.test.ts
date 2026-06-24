@@ -15,6 +15,7 @@ import { makeSimpleRouteOutlineGraphics } from "tests/fixtures/makeSimpleRouteOu
 test("RectDiffPipeline mesh layer snapshots", async () => {
   const solver = new RectDiffPipeline({
     simpleRouteJson: srj.simple_route_json,
+    maxGapFillPasses: 1,
   })
 
   const outline = makeSimpleRouteOutlineGraphics(srj.simple_route_json)
