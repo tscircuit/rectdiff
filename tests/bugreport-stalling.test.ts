@@ -18,7 +18,10 @@ import type { SimpleRouteJson } from "../lib/types/srj-types"
 test("Bug #518: RectDiff solver completes without stalling on mixed-precision coordinates", () => {
   const simpleRouteJson = stallingBugReport as SimpleRouteJson
 
-  const pipeline = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
+  const pipeline = new RectDiffPipeline({
+    simpleRouteJson,
+    maxGapFillPasses: 1,
+  })
 
   // Setup initializes state
   pipeline.setup()
@@ -90,7 +93,10 @@ test("Bug #518: expandRectFromSeed iteration guard prevents infinite loops", () 
     minTraceWidth: 0.15,
   }
 
-  const pipeline = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
+  const pipeline = new RectDiffPipeline({
+    simpleRouteJson,
+    maxGapFillPasses: 1,
+  })
 
   // Should complete without hanging
   pipeline.solve()

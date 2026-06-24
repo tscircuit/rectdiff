@@ -29,7 +29,10 @@ test("RectDiffSolver clamps extra layer names to available z indices", () => {
     ],
   }
 
-  const pipeline = new RectDiffPipeline({ simpleRouteJson: srj, maxGapFillPasses: 1 })
+  const pipeline = new RectDiffPipeline({
+    simpleRouteJson: srj,
+    maxGapFillPasses: 1,
+  })
 
   // Solve completely
   pipeline.solve()

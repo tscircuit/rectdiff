@@ -3,7 +3,7 @@ import simpleRouteJson from "../test-assets/simplified-out-of-bounds-example.jso
 import { RectDiffPipeline } from "../lib/RectDiffPipeline"
 
 test("simplified out-of-bounds fixture currently creates a generated node outside the board bounds", () => {
-  const solver = new RectDiffPipeline({ simpleRouteJson })
+  const solver = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
 
   solver.solve()
 

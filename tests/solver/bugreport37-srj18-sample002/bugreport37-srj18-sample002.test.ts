@@ -5,5 +5,7 @@ import simpleRouteJson from "./bugreport37-srj18-sample002.json"
 test("bugreport37-srj18-sample002", async () => {
   const solver = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 4 })
   solver.solve()
-  await expect(getSvgFromGraphicsObject(solver.visualize(), { backgroundColor: "white" })).toMatchSvgSnapshot(import.meta.path)
+  await expect(
+    getSvgFromGraphicsObject(solver.visualize(), { backgroundColor: "white" }),
+  ).toMatchSvgSnapshot(import.meta.path)
 })

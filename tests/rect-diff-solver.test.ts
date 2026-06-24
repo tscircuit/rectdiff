@@ -131,7 +131,10 @@ test("multi-layer mesh generation", () => {
     layerCount: 3,
     minTraceWidth: 0.2,
   }
-  const pipeline = new RectDiffPipeline({ simpleRouteJson: srj, maxGapFillPasses: 1 })
+  const pipeline = new RectDiffPipeline({
+    simpleRouteJson: srj,
+    maxGapFillPasses: 1,
+  })
 
   // Run to completion
   pipeline.solve()

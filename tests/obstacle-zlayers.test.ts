@@ -29,7 +29,10 @@ test("RectDiffSolver maps obstacle layers to numeric zLayers", () => {
     ],
   }
 
-  const pipeline = new RectDiffPipeline({ simpleRouteJson: srj, maxGapFillPasses: 1 })
+  const pipeline = new RectDiffPipeline({
+    simpleRouteJson: srj,
+    maxGapFillPasses: 1,
+  })
 
   // Solve completely
   pipeline.solve()

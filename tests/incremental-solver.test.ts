@@ -20,7 +20,10 @@ test("RectDiffSolver supports incremental stepping", () => {
     minTraceWidth: 0.15,
   }
 
-  const pipeline = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
+  const pipeline = new RectDiffPipeline({
+    simpleRouteJson,
+    maxGapFillPasses: 1,
+  })
 
   // Setup initializes state
   pipeline.setup()
