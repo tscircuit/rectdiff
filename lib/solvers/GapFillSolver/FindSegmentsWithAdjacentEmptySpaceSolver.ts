@@ -19,15 +19,15 @@ const EPS = 1e-4
 
 type FindSegmentsWithAdjacentEmptySpaceSolverInput = {
   /**
-   * Full mesh used as edge coverage context. These nodes are all indexed so
-   * candidate edges can still be recognized as covered by older regions.
+   * Complete mesh used as context. These nodes are all indexed so target node
+   * edges can still be recognized as covered by older regions.
    */
-  meshNodes: CapacityMeshNode[]
+  allMeshNodes: CapacityMeshNode[]
   /**
    * Nodes whose edges should be checked for adjacent empty space. When omitted,
    * every mesh node is treated as a candidate.
    */
-  candidateMeshNodes?: CapacityMeshNode[]
+  targetMeshNodes?: CapacityMeshNode[]
 }
 
 function getEdgesForMeshNodes(
@@ -95,16 +95,16 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
 
   constructor(private input: FindSegmentsWithAdjacentEmptySpaceSolverInput) {
     super()
-    const candidateMeshNodes =
-      this.input.candidateMeshNodes ?? this.input.meshNodes
-    const candidateMeshNodeIds = new Set(
-      candidateMeshNodes.map((node) => node.capacityMeshNodeId),
+    const targetMeshNodes =
+      this.input.targetMeshNodes ?? this.input.allMeshNodes
+    const targetMeshNodeIds = new Set(
+      targetMeshNodes.map((node) => node.capacityMeshNodeId),
     )
-    const contextMeshNodes = this.input.meshNodes.filter(
-      (node) => !candidateMeshNodeIds.has(node.capacityMeshNodeId),
+    const contextMeshNodes = this.input.allMeshNodes.filter(
+      (node) => !targetMeshNodeIds.has(node.capacityMeshNodeId),
     )
 
-    this.unprocessedEdges = getEdgesForMeshNodes(candidateMeshNodes)
+    this.unprocessedEdges = getEdgesForMeshNodes(targetMeshNodes)
     this.allEdges = [
       ...this.unprocessedEdges,
       ...getEdgesForMeshNodes(contextMeshNodes),
@@ -178,7 +178,7 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
     }
 
     // Draw the capacity mesh nodes with gray, faded rects
-    for (const node of this.input.meshNodes) {
+    for (const node of this.input.allMeshNodes) {
       graphics.rects.push({
         center: node.center,
         width: node.width,

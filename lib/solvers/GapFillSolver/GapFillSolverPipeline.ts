@@ -41,7 +41,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
   outputNodes: CapacityMeshNode[] = []
   passExpandedCounts: number[] = []
   private currentPassNodes: CapacityMeshNode[] = []
-  private currentCandidateNodes: CapacityMeshNode[] = []
+  private currentTargetNodes: CapacityMeshNode[] = []
   private currentPassIndex: number = 0
   private readonly expandedNodeIds: Set<string> = new Set()
   private maxGapFillPasses: number = 1
@@ -52,8 +52,8 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
       FindSegmentsWithAdjacentEmptySpaceSolver,
       (gapFillPipeline: GapFillSolverPipeline) => [
         {
-          meshNodes: gapFillPipeline.currentPassNodes,
-          candidateMeshNodes: gapFillPipeline.currentCandidateNodes,
+          allMeshNodes: gapFillPipeline.currentPassNodes,
+          targetMeshNodes: gapFillPipeline.currentTargetNodes,
         },
       ],
       {
@@ -85,7 +85,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
   override _setup(): void {
     this.outputNodes = [...this.inputProblem.meshNodes]
     this.currentPassNodes = [...this.inputProblem.meshNodes]
-    this.currentCandidateNodes = [...this.inputProblem.meshNodes]
+    this.currentTargetNodes = [...this.inputProblem.meshNodes]
     this.passExpandedCounts = []
     this.currentPassIndex = 0
     this.expandedNodeIds.clear()
@@ -107,7 +107,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
 
     this.passExpandedCounts.push(expandedNodes.length)
     this.currentPassNodes = [...this.currentPassNodes, ...expandedNodes]
-    this.currentCandidateNodes = expandedNodes
+    this.currentTargetNodes = expandedNodes
     this.outputNodes = this.currentPassNodes
 
     if (
