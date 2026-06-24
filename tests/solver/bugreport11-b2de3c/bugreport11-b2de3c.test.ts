@@ -17,6 +17,7 @@ const srj = srj_json.simple_route_json ?? srj_json.simpleRouteJson ?? srj_json
 test("bugreport11-b2de3c", async () => {
   const solver = new RectDiffPipeline({
     simpleRouteJson: srj,
+    maxGapFillPasses: 1,
   })
 
   const outline = makeSimpleRouteOutlineGraphics(srj)

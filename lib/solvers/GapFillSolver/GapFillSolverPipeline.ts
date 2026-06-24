@@ -18,6 +18,13 @@ type GapFillSolverInput = {
     boardVoidRects: XYRect[]
     layerCount: number
   }
+  /**
+   * Maximum number of expansion passes to run. A pass finds exposed mesh edges,
+   * expands them into adjacent empty board space, and appends those nodes before
+   * the next pass starts. Higher values allow recursive gap filling from newly
+   * expanded nodes; values below 1 are clamped to 1.
+   */
+  maxGapFillPasses: number
 }
 
 type GapFillOutput = {
@@ -34,9 +41,10 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
   outputNodes: CapacityMeshNode[] = []
   passExpandedCounts: number[] = []
   private currentPassNodes: CapacityMeshNode[] = []
+  private currentCandidateNodes: CapacityMeshNode[] = []
   private currentPassIndex: number = 0
   private readonly expandedNodeIds: Set<string> = new Set()
-  private readonly maxGapFillPasses: number = 4
+  private maxGapFillPasses: number = 1
 
   override pipelineDef: GapFillPipelineStep[] = [
     definePipelineStep(
@@ -45,6 +53,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
       (gapFillPipeline: GapFillSolverPipeline) => [
         {
           meshNodes: gapFillPipeline.currentPassNodes,
+          candidateMeshNodes: gapFillPipeline.currentCandidateNodes,
         },
       ],
       {
@@ -76,9 +85,14 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
   override _setup(): void {
     this.outputNodes = [...this.inputProblem.meshNodes]
     this.currentPassNodes = [...this.inputProblem.meshNodes]
+    this.currentCandidateNodes = [...this.inputProblem.meshNodes]
     this.passExpandedCounts = []
     this.currentPassIndex = 0
     this.expandedNodeIds.clear()
+    const maxGapFillPasses = this.inputProblem.maxGapFillPasses
+    this.maxGapFillPasses = Number.isFinite(maxGapFillPasses)
+      ? Math.max(1, Math.floor(maxGapFillPasses))
+      : 1
   }
 
   private completePass(): void {
@@ -93,6 +107,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
 
     this.passExpandedCounts.push(expandedNodes.length)
     this.currentPassNodes = [...this.currentPassNodes, ...expandedNodes]
+    this.currentCandidateNodes = expandedNodes
     this.outputNodes = this.currentPassNodes
 
     if (

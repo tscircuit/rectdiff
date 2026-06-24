@@ -17,6 +17,58 @@ export interface SegmentWithAdjacentEmptySpace {
 
 const EPS = 1e-4
 
+type FindSegmentsWithAdjacentEmptySpaceSolverInput = {
+  /**
+   * Full mesh used as edge coverage context. These nodes are all indexed so
+   * candidate edges can still be recognized as covered by older regions.
+   */
+  meshNodes: CapacityMeshNode[]
+  /**
+   * Nodes whose edges should be checked for adjacent empty space. When omitted,
+   * every mesh node is treated as a candidate.
+   */
+  candidateMeshNodes?: CapacityMeshNode[]
+}
+
+function getEdgesForMeshNodes(
+  meshNodes: CapacityMeshNode[],
+): Array<SegmentWithAdjacentEmptySpace> {
+  const edgesForMeshNodes: Array<SegmentWithAdjacentEmptySpace> = []
+
+  for (const node of meshNodes) {
+    for (const edge of EDGES) {
+      let start = {
+        x: node.center.x + node.width * edge.startX,
+        y: node.center.y + node.height * edge.startY,
+      }
+      let end = {
+        x: node.center.x + node.width * edge.endX,
+        y: node.center.y + node.height * edge.endY,
+      }
+
+      // Ensure start.x < end.x and if x is the same, ensure start.y < end.y
+      if (start.x > end.x) {
+        ;[start, end] = [end, start]
+      }
+      if (Math.abs(start.x - end.x) < EPS && start.y > end.y) {
+        ;[start, end] = [end, start]
+      }
+
+      for (const z of node.availableZ) {
+        edgesForMeshNodes.push({
+          parent: node,
+          start,
+          end,
+          facingDirection: edge.facingDirection,
+          z,
+        })
+      }
+    }
+  }
+
+  return edgesForMeshNodes
+}
+
 /**
  * Find edges with adjacent empty space in the mesh
  *
@@ -41,43 +93,22 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
   lastOverlappingEdges: Array<SegmentWithAdjacentEmptySpace> | null = null
   lastUncoveredSegments: Array<SegmentWithAdjacentEmptySpace> | null = null
 
-  constructor(
-    private input: {
-      meshNodes: CapacityMeshNode[]
-    },
-  ) {
+  constructor(private input: FindSegmentsWithAdjacentEmptySpaceSolverInput) {
     super()
-    for (const node of this.input.meshNodes) {
-      for (const edge of EDGES) {
-        let start = {
-          x: node.center.x + node.width * edge.startX,
-          y: node.center.y + node.height * edge.startY,
-        }
-        let end = {
-          x: node.center.x + node.width * edge.endX,
-          y: node.center.y + node.height * edge.endY,
-        }
+    const candidateMeshNodes =
+      this.input.candidateMeshNodes ?? this.input.meshNodes
+    const candidateMeshNodeIds = new Set(
+      candidateMeshNodes.map((node) => node.capacityMeshNodeId),
+    )
+    const contextMeshNodes = this.input.meshNodes.filter(
+      (node) => !candidateMeshNodeIds.has(node.capacityMeshNodeId),
+    )
 
-        // Ensure start.x < end.x and if x is the same, ensure start.y < end.y
-        if (start.x > end.x) {
-          ;[start, end] = [end, start]
-        }
-        if (Math.abs(start.x - end.x) < EPS && start.y > end.y) {
-          ;[start, end] = [end, start]
-        }
-
-        for (const z of node.availableZ) {
-          this.unprocessedEdges.push({
-            parent: node,
-            start,
-            end,
-            facingDirection: edge.facingDirection,
-            z,
-          })
-        }
-      }
-    }
-    this.allEdges = [...this.unprocessedEdges]
+    this.unprocessedEdges = getEdgesForMeshNodes(candidateMeshNodes)
+    this.allEdges = [
+      ...this.unprocessedEdges,
+      ...getEdgesForMeshNodes(contextMeshNodes),
+    ]
 
     this.edgeSpatialIndex = new Flatbush(this.allEdges.length)
     for (const edge of this.allEdges) {

@@ -20,7 +20,7 @@ test("RectDiffSolver supports incremental stepping", () => {
     minTraceWidth: 0.15,
   }
 
-  const pipeline = new RectDiffPipeline({ simpleRouteJson })
+  const pipeline = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
 
   // Setup initializes state
   pipeline.setup()
@@ -52,7 +52,7 @@ test("RectDiffSolver.solve() still works (backward compatibility)", () => {
     minTraceWidth: 0.1,
   }
 
-  const solver = new RectDiffPipeline({ simpleRouteJson })
+  const solver = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
 
   // Old-style: just call solve()
   solver.solve()
@@ -71,7 +71,7 @@ test("RectDiffSolver exposes progress during solve", () => {
     minTraceWidth: 0.2,
   }
 
-  const solver = new RectDiffPipeline({ simpleRouteJson })
+  const solver = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
   solver.setup()
 
   const progressValues: number[] = []

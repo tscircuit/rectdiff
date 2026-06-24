@@ -15,6 +15,7 @@ import { makeSimpleRouteOutlineGraphics } from "tests/fixtures/makeSimpleRouteOu
 test("bugreport23-LGA15x4", async () => {
   const solver = new RectDiffPipeline({
     simpleRouteJson: srj,
+    maxGapFillPasses: 1,
   })
 
   const outline = makeSimpleRouteOutlineGraphics(srj)

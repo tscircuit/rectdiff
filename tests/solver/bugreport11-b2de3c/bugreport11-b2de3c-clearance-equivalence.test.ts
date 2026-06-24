@@ -26,6 +26,7 @@ const getTotalCapacity = (nodes: any[]): number =>
 test("clearance-param vs padded-obstacles produce equivalent free space capacity", async () => {
   const solverA = new RectDiffPipeline({
     simpleRouteJson: srj,
+    maxGapFillPasses: 1,
     obstacleClearance: OBSTACLE_CLEARANCE,
   })
   solverA.solve()
@@ -34,6 +35,7 @@ test("clearance-param vs padded-obstacles produce equivalent free space capacity
   const paddedSrj = padSrjObstacles(srj, OBSTACLE_CLEARANCE)
   const solverB = new RectDiffPipeline({
     simpleRouteJson: paddedSrj,
+    maxGapFillPasses: 1,
     obstacleClearance: 0,
   })
   solverB.solve()

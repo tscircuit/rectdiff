@@ -39,7 +39,7 @@ const runs: Array<{
 }> = []
 
 for (let i = 0; i < repeatCount; i++) {
-  const solver = new RectDiffPipeline(input)
+  const solver = new RectDiffPipeline({ ...input, maxGapFillPasses: 1 })
   const t0 = performance.now()
   solver.solve()
   const t1 = performance.now()

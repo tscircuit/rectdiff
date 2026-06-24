@@ -14,7 +14,7 @@ import { makeSimpleRouteOutlineGraphics } from "tests/fixtures/makeSimpleRouteOu
 
 test("node-solver input repro snapshot", async () => {
   const problem = inputProblems[0]!
-  const solver = new RectDiffPipeline(problem)
+  const solver = new RectDiffPipeline({ ...problem, maxGapFillPasses: 1 })
   const outline = makeSimpleRouteOutlineGraphics(problem.simpleRouteJson)
 
   solver.solve()

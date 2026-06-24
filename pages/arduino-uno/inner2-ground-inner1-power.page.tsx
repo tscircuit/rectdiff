@@ -8,6 +8,7 @@ export default () => {
     () =>
       new RectDiffPipeline({
         simpleRouteJson,
+        maxGapFillPasses: 1,
       }),
     [],
   )

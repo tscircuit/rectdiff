@@ -9,7 +9,7 @@ import {
 } from "lib/solvers/RectDiffSeedingSolver/layers"
 
 test.skip("example01", () => {
-  const solver = new RectDiffPipeline({ simpleRouteJson })
+  const solver = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
 
   solver.solve()
 
