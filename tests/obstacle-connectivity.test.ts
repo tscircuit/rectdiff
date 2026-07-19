@@ -13,7 +13,7 @@ const getObstacleNodesAt = (
       node._containsObstacle && node.center.x === x && node.center.y === y,
   )
 
-test("preserves obstacle connectivity without merging different nets across layers", () => {
+test("preserves obstacle connectivity without conflating nets across layers", () => {
   const srj: SimpleRouteJson = {
     bounds: { minX: -5, maxX: 5, minY: -5, maxY: 5 },
     connections: [],
@@ -54,20 +54,21 @@ test("preserves obstacle connectivity without merging different nets across laye
   pipeline.solve()
 
   const meshNodes = pipeline.getOutput().meshNodes
-  const layerSpecificNodes = getObstacleNodesAt(meshNodes, 0, 0)
-    .map((node) => ({
-      availableZ: node.availableZ,
-      connectedTo: node._connectedTo,
-    }))
-    .sort((a, b) => a.availableZ[0]! - b.availableZ[0]!)
-
-  expect(layerSpecificNodes).toEqual([
-    { availableZ: [0], connectedTo: ["net-top"] },
-    { availableZ: [1], connectedTo: ["net-bottom"] },
-  ])
+  const layerSpecificNode = getObstacleNodesAt(meshNodes, 0, 0)
+  expect(layerSpecificNode).toHaveLength(1)
+  expect(layerSpecificNode[0]?.availableZ).toEqual([0, 1])
+  expect(layerSpecificNode[0]?._connectedTo).toBeUndefined()
+  expect(layerSpecificNode[0]?._connectedToByZ).toEqual({
+    0: ["net-top"],
+    1: ["net-bottom"],
+  })
 
   const sharedNode = getObstacleNodesAt(meshNodes, 2, 0)
   expect(sharedNode).toHaveLength(1)
   expect(sharedNode[0]?.availableZ).toEqual([0, 1])
   expect(sharedNode[0]?._connectedTo).toEqual(["net-shared", "pad-shared"])
+  expect(sharedNode[0]?._connectedToByZ).toEqual({
+    0: ["net-shared", "pad-shared"],
+    1: ["net-shared", "pad-shared"],
+  })
 })
