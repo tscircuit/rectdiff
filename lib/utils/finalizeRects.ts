@@ -21,7 +21,10 @@ export function finalizeRects(params: {
     zLayers: [...p.zLayers].sort((a, b) => a - b),
   }))
 
-  const layersByKey = new Map<string, { rect: XYRect; layers: Set<number> }>()
+  const obstacleRectsByKey = new Map<
+    string,
+    { rect: XYRect; layers: Set<number>; connectedTo: string[] }
+  >()
 
   for (const obstacle of params.obstacles ?? []) {
     const baseRect = obstacleToXYRect(obstacle)
@@ -38,16 +41,23 @@ export function finalizeRects(params: {
       obstacle.zLayers?.length && obstacle.zLayers.length > 0
         ? obstacle.zLayers
         : obstacleZs(obstacle, params.zIndexByName)
-    const key = `${rect.x}:${rect.y}:${rect.width}:${rect.height}`
-    let entry = layersByKey.get(key)
+    const connectedTo = [...new Set(obstacle.connectedTo)].sort()
+    const key = JSON.stringify([
+      rect.x,
+      rect.y,
+      rect.width,
+      rect.height,
+      connectedTo,
+    ])
+    let entry = obstacleRectsByKey.get(key)
     if (!entry) {
-      entry = { rect, layers: new Set() }
-      layersByKey.set(key, entry)
+      entry = { rect, layers: new Set(), connectedTo }
+      obstacleRectsByKey.set(key, entry)
     }
-    zLayers.forEach((layer: number) => entry!.layers.add(layer))
+    zLayers.forEach((layer: number) => entry.layers.add(layer))
   }
 
-  for (const { rect, layers } of layersByKey.values()) {
+  for (const { rect, layers, connectedTo } of obstacleRectsByKey.values()) {
     out.push({
       minX: rect.x,
       minY: rect.y,
@@ -55,6 +65,7 @@ export function finalizeRects(params: {
       maxY: rect.y + rect.height,
       zLayers: Array.from(layers).sort((a, b) => a - b),
       isObstacle: true,
+      connectedTo,
     })
   }
 
