@@ -11,9 +11,8 @@ type ObstacleRectGroup = {
   connectedToByZ: Map<number, Set<string>>
 }
 
-const getSortedConnectionNames = (
-  connectedTo: Iterable<string>,
-): string[] => [...new Set(connectedTo)].sort()
+const getSortedConnectionNames = (connectedTo: Iterable<string>): string[] =>
+  [...new Set(connectedTo)].sort()
 
 const getSharedConnectionNames = (
   zLayers: number[],
@@ -22,9 +21,7 @@ const getSharedConnectionNames = (
   const firstZ = zLayers[0]
   if (firstZ === undefined) return []
 
-  const sharedNames = getSortedConnectionNames(
-    connectedToByZ.get(firstZ) ?? [],
-  )
+  const sharedNames = getSortedConnectionNames(connectedToByZ.get(firstZ) ?? [])
   const allLayersMatch = zLayers.slice(1).every((z) => {
     const layerNames = getSortedConnectionNames(connectedToByZ.get(z) ?? [])
     return (
