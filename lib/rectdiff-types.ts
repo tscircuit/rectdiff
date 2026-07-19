@@ -9,6 +9,7 @@ export type Rect3d = {
   zLayers: number[] // sorted contiguous integers
   isObstacle?: boolean
   connectedTo?: string[]
+  connectedToByZ?: Record<number, string[]>
 }
 
 export type GridFill3DOptions = {
