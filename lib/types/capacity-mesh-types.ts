@@ -20,10 +20,8 @@ export interface CapacityMeshNode {
   _completelyInsideObstacle?: boolean
   _containsObstacle?: boolean
   _containsTarget?: boolean
-  /** Connection names shared by every available layer of an obstacle node. */
+  /** Connection names copied from the source obstacle. */
   _connectedTo?: string[]
-  /** Exact obstacle connection names for each available z-layer. */
-  _connectedToByZ?: Record<number, string[]>
   _targetConnectionName?: string
   _strawNode?: boolean
   _strawParentCapacityMeshNodeId?: CapacityMeshNodeId

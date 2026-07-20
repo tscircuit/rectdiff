@@ -13,7 +13,7 @@ const getObstacleNodesAt = (
       node._containsObstacle && node.center.x === x && node.center.y === y,
   )
 
-test("preserves obstacle connectivity without conflating nets across layers", () => {
+test("creates one obstacle node per SRJ obstacle with its connectivity", () => {
   const srj: SimpleRouteJson = {
     bounds: { minX: -5, maxX: 5, minY: -5, maxY: 5 },
     connections: [],
@@ -42,7 +42,7 @@ test("preserves obstacle connectivity without conflating nets across layers", ()
         width: 1,
         height: 1,
         layers: ["top", "bottom"],
-        connectedTo: ["pad-shared", "net-shared", "net-shared"],
+        connectedTo: ["pad-shared", "net-shared"],
       },
     ],
   }
@@ -54,21 +54,23 @@ test("preserves obstacle connectivity without conflating nets across layers", ()
   pipeline.solve()
 
   const meshNodes = pipeline.getOutput().meshNodes
-  const layerSpecificNode = getObstacleNodesAt(meshNodes, 0, 0)
-  expect(layerSpecificNode).toHaveLength(1)
-  expect(layerSpecificNode[0]?.availableZ).toEqual([0, 1])
-  expect(layerSpecificNode[0]?._connectedTo).toBeUndefined()
-  expect(layerSpecificNode[0]?._connectedToByZ).toEqual({
-    0: ["net-top"],
-    1: ["net-bottom"],
-  })
+  const layerSpecificNodes = getObstacleNodesAt(meshNodes, 0, 0)
+  expect(layerSpecificNodes).toHaveLength(2)
+  expect(layerSpecificNodes).toContainEqual(
+    expect.objectContaining({
+      availableZ: [0],
+      _connectedTo: ["net-top"],
+    }),
+  )
+  expect(layerSpecificNodes).toContainEqual(
+    expect.objectContaining({
+      availableZ: [1],
+      _connectedTo: ["net-bottom"],
+    }),
+  )
 
   const sharedNode = getObstacleNodesAt(meshNodes, 2, 0)
   expect(sharedNode).toHaveLength(1)
   expect(sharedNode[0]?.availableZ).toEqual([0, 1])
-  expect(sharedNode[0]?._connectedTo).toEqual(["net-shared", "pad-shared"])
-  expect(sharedNode[0]?._connectedToByZ).toEqual({
-    0: ["net-shared", "pad-shared"],
-    1: ["net-shared", "pad-shared"],
-  })
+  expect(sharedNode[0]?._connectedTo).toEqual(["pad-shared", "net-shared"])
 })
