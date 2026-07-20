@@ -1,5 +1,5 @@
-import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 import type { Rect3d } from "../../rectdiff-types"
+import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
 
 export function rectsToMeshNodes(rects: Rect3d[]): CapacityMeshNode[] {
   let id = 0
@@ -8,6 +8,7 @@ export function rectsToMeshNodes(rects: Rect3d[]): CapacityMeshNode[] {
     const w = Math.max(0, r.maxX - r.minX)
     const h = Math.max(0, r.maxY - r.minY)
     if (w <= 0 || h <= 0 || r.zLayers.length === 0) continue
+
     out.push({
       capacityMeshNodeId: `cmn_${id++}`,
       center: { x: (r.minX + r.maxX) / 2, y: (r.minY + r.maxY) / 2 },
@@ -17,6 +18,7 @@ export function rectsToMeshNodes(rects: Rect3d[]): CapacityMeshNode[] {
       availableZ: r.zLayers.slice(),
       _containsObstacle: r.isObstacle,
       _containsTarget: r.isObstacle,
+      ...(r.connectedTo?.length ? { _connectedTo: [...r.connectedTo] } : {}),
     })
   }
 

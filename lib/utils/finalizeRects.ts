@@ -21,8 +21,9 @@ export function finalizeRects(params: {
     zLayers: [...p.zLayers].sort((a, b) => a - b),
   }))
 
-  const layersByKey = new Map<string, { rect: XYRect; layers: Set<number> }>()
-
+  // NOTE: Obstacle nodes are emitted one-for-one from SRJ. Do not group them
+  // only by geometry: distinct obstacles can share XY bounds while belonging
+  // to different layers or nets.
   for (const obstacle of params.obstacles ?? []) {
     const baseRect = obstacleToXYRect(obstacle)
     if (!baseRect) continue
@@ -38,23 +39,15 @@ export function finalizeRects(params: {
       obstacle.zLayers?.length && obstacle.zLayers.length > 0
         ? obstacle.zLayers
         : obstacleZs(obstacle, params.zIndexByName)
-    const key = `${rect.x}:${rect.y}:${rect.width}:${rect.height}`
-    let entry = layersByKey.get(key)
-    if (!entry) {
-      entry = { rect, layers: new Set() }
-      layersByKey.set(key, entry)
-    }
-    zLayers.forEach((layer: number) => entry!.layers.add(layer))
-  }
 
-  for (const { rect, layers } of layersByKey.values()) {
     out.push({
       minX: rect.x,
       minY: rect.y,
       maxX: rect.x + rect.width,
       maxY: rect.y + rect.height,
-      zLayers: Array.from(layers).sort((a, b) => a - b),
+      zLayers: [...new Set(zLayers)].sort((a, b) => a - b),
       isObstacle: true,
+      connectedTo: [...obstacle.connectedTo],
     })
   }
 

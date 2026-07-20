@@ -8,6 +8,7 @@ export type Rect3d = {
   maxY: number
   zLayers: number[] // sorted contiguous integers
   isObstacle?: boolean
+  connectedTo?: string[]
 }
 
 export type GridFill3DOptions = {
