@@ -1,10 +1,12 @@
 import type { XYRect } from "../../rectdiff-types"
-import {
-  containsPoint,
-  subtractRect2D,
-  EPS,
-} from "../../utils/rectdiff-geometry"
+import { EPS } from "../../utils/rectdiff-geometry"
 import { isPointInPolygon } from "./isPointInPolygon"
+
+const MAX_DIAGONAL_SUBDIVISIONS = 256
+
+type ComputeInverseRectsOptions = {
+  minGridSize?: number
+}
 
 /**
  * Simplify a polygon by reducing coordinate precision to avoid excessive grid cells.
@@ -31,6 +33,90 @@ function simplifyPolygon(
   return result
 }
 
+function isPointOnPolygonBoundary(
+  point: { x: number; y: number },
+  polygon: Array<{ x: number; y: number }>,
+): boolean {
+  for (let index = 0; index < polygon.length; index++) {
+    const start = polygon[index]!
+    const end = polygon[(index + 1) % polygon.length]!
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+    const cross = (point.x - start.x) * dy - (point.y - start.y) * dx
+    const crossTolerance = EPS * Math.max(1, Math.abs(dx), Math.abs(dy))
+
+    if (Math.abs(cross) > crossTolerance) continue
+    if (
+      point.x >= Math.min(start.x, end.x) - EPS &&
+      point.x <= Math.max(start.x, end.x) + EPS &&
+      point.y >= Math.min(start.y, end.y) - EPS &&
+      point.y <= Math.max(start.y, end.y) + EPS
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function isPointInOrOnPolygon(
+  point: { x: number; y: number },
+  polygon: Array<{ x: number; y: number }>,
+): boolean {
+  return (
+    isPointOnPolygonBoundary(point, polygon) || isPointInPolygon(point, polygon)
+  )
+}
+
+function addDiagonalEdgeCoordinates({
+  polygon,
+  xs,
+  ys,
+  minGridSize,
+}: {
+  polygon: Array<{ x: number; y: number }>
+  xs: Set<number>
+  ys: Set<number>
+  minGridSize: number
+}) {
+  const diagonalEdges: Array<{
+    start: { x: number; y: number }
+    end: { x: number; y: number }
+    span: number
+  }> = []
+  let totalDiagonalSpan = 0
+
+  for (let index = 0; index < polygon.length; index++) {
+    const start = polygon[index]!
+    const end = polygon[(index + 1) % polygon.length]!
+    const dx = Math.abs(end.x - start.x)
+    const dy = Math.abs(end.y - start.y)
+
+    if (dx <= EPS || dy <= EPS) continue
+
+    const span = Math.max(dx, dy)
+    diagonalEdges.push({ start, end, span })
+    totalDiagonalSpan += span
+  }
+
+  if (diagonalEdges.length === 0) return
+
+  const subdivisionSize = Math.max(
+    minGridSize,
+    totalDiagonalSpan / MAX_DIAGONAL_SUBDIVISIONS,
+  )
+
+  for (const { start, end, span } of diagonalEdges) {
+    const subdivisionCount = Math.max(1, Math.ceil(span / subdivisionSize))
+
+    for (let step = 1; step < subdivisionCount; step++) {
+      const progress = step / subdivisionCount
+      xs.add(start.x + (end.x - start.x) * progress)
+      ys.add(start.y + (end.y - start.y) * progress)
+    }
+  }
+}
+
 /**
  * Decompose the empty space inside 'bounds' but outside 'polygon' into rectangles.
  * This uses a coordinate grid approach, ideal for rectilinear polygons.
@@ -38,6 +124,7 @@ function simplifyPolygon(
 export function computeInverseRects(
   bounds: XYRect,
   polygon: Array<{ x: number; y: number }>,
+  options: ComputeInverseRectsOptions = {},
 ): XYRect[] {
   if (!polygon || polygon.length < 3) return []
 
@@ -59,6 +146,16 @@ export function computeInverseRects(
     xs.add(p.x)
     ys.add(p.y)
   }
+  addDiagonalEdgeCoordinates({
+    polygon: workingPolygon,
+    xs,
+    ys,
+    minGridSize: Math.max(
+      EPS,
+      options.minGridSize ??
+        Math.max(bounds.width, bounds.height) / MAX_DIAGONAL_SUBDIVISIONS,
+    ),
+  })
   const xSorted = Array.from(xs).sort((a, b) => a - b)
   const ySorted = Array.from(ys).sort((a, b) => a - b)
 
@@ -71,7 +168,6 @@ export function computeInverseRects(
       const y0 = ySorted[j]!
       const y1 = ySorted[j + 1]!
 
-      // Check center point
       const cx = (x0 + x1) / 2
       const cy = (y0 + y1) / 2
 
@@ -82,7 +178,17 @@ export function computeInverseRects(
         cy >= bounds.y &&
         cy <= bounds.y + bounds.height
       ) {
-        if (!isPointInPolygon({ x: cx, y: cy }, polygon)) {
+        const pointsToCheck = [
+          { x: cx, y: cy },
+          { x: x0, y: y0 },
+          { x: x1, y: y0 },
+          { x: x0, y: y1 },
+          { x: x1, y: y1 },
+        ]
+
+        if (
+          !pointsToCheck.every((point) => isPointInOrOnPolygon(point, polygon))
+        ) {
           rawRects.push({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
         }
       }
