@@ -116,6 +116,9 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
             this.inputProblem.simpleRouteJson.bounds.minY,
         },
         this.inputProblem.simpleRouteJson.outline ?? [],
+        {
+          minGridSize: this.inputProblem.simpleRouteJson.minTraceWidth,
+        },
       )
     }
   }
