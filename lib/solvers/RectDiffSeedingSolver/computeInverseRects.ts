@@ -1,6 +1,6 @@
+import { isPointInsidePolygon } from "@tscircuit/math-utils"
 import type { XYRect } from "../../rectdiff-types"
 import { EPS } from "../../utils/rectdiff-geometry"
-import { isPointInPolygon } from "./isPointInPolygon"
 
 const MAX_DIAGONAL_SUBDIVISIONS = 256
 
@@ -31,41 +31,6 @@ function simplifyPolygon(
   }
 
   return result
-}
-
-function isPointOnPolygonBoundary(
-  point: { x: number; y: number },
-  polygon: Array<{ x: number; y: number }>,
-): boolean {
-  for (let index = 0; index < polygon.length; index++) {
-    const start = polygon[index]!
-    const end = polygon[(index + 1) % polygon.length]!
-    const dx = end.x - start.x
-    const dy = end.y - start.y
-    const cross = (point.x - start.x) * dy - (point.y - start.y) * dx
-    const crossTolerance = EPS * Math.max(1, Math.abs(dx), Math.abs(dy))
-
-    if (Math.abs(cross) > crossTolerance) continue
-    if (
-      point.x >= Math.min(start.x, end.x) - EPS &&
-      point.x <= Math.max(start.x, end.x) + EPS &&
-      point.y >= Math.min(start.y, end.y) - EPS &&
-      point.y <= Math.max(start.y, end.y) + EPS
-    ) {
-      return true
-    }
-  }
-
-  return false
-}
-
-function isPointInOrOnPolygon(
-  point: { x: number; y: number },
-  polygon: Array<{ x: number; y: number }>,
-): boolean {
-  return (
-    isPointOnPolygonBoundary(point, polygon) || isPointInPolygon(point, polygon)
-  )
 }
 
 function addDiagonalEdgeCoordinates({
@@ -192,7 +157,7 @@ export function computeInverseRects(
             ]
 
         if (
-          !pointsToCheck.every((point) => isPointInOrOnPolygon(point, polygon))
+          !pointsToCheck.every((point) => isPointInsidePolygon(point, polygon))
         ) {
           rawRects.push({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
         }
