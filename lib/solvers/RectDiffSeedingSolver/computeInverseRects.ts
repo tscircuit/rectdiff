@@ -131,13 +131,13 @@ export function computeInverseRects(
   // Simplify polygon if it has too many points to avoid O(n^2) performance issues
   // A polygon with 350+ points (like rounded corners) creates too many grid cells
   const MAX_POLYGON_POINTS = 120
-  const workingPolygon =
-    polygon.length > MAX_POLYGON_POINTS
-      ? simplifyPolygon(
-          polygon,
-          Math.max(bounds.width, bounds.height) / MAX_POLYGON_POINTS,
-        )
-      : polygon
+  const polygonWasSimplified = polygon.length > MAX_POLYGON_POINTS
+  const workingPolygon = polygonWasSimplified
+    ? simplifyPolygon(
+        polygon,
+        Math.max(bounds.width, bounds.height) / MAX_POLYGON_POINTS,
+      )
+    : polygon
 
   // 1. Collect unique sorted X and Y coordinates
   const xs = new Set<number>([bounds.x, bounds.x + bounds.width])
@@ -178,13 +178,18 @@ export function computeInverseRects(
         cy >= bounds.y &&
         cy <= bounds.y + bounds.height
       ) {
-        const pointsToCheck = [
-          { x: cx, y: cy },
-          { x: x0, y: y0 },
-          { x: x1, y: y0 },
-          { x: x0, y: y1 },
-          { x: x1, y: y1 },
-        ]
+        // Requiring every corner to remain inside an already simplified outline
+        // erodes narrow interior regions and can disconnect ports near rounded edges.
+        // Diagonal subdivision keeps these center-classified boundary cells small.
+        const pointsToCheck = polygonWasSimplified
+          ? [{ x: cx, y: cy }]
+          : [
+              { x: cx, y: cy },
+              { x: x0, y: y0 },
+              { x: x1, y: y0 },
+              { x: x0, y: y1 },
+              { x: x1, y: y1 },
+            ]
 
         if (
           !pointsToCheck.every((point) => isPointInOrOnPolygon(point, polygon))

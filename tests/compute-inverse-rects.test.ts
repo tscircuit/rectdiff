@@ -24,3 +24,23 @@ test("covers the exterior along a diagonal concave outline", () => {
   expect(isCoveredByBoardVoid({ x: 28.5, y: -23.5 })).toBe(false)
   expect(isCoveredByBoardVoid({ x: 20, y: -27 })).toBe(false)
 })
+
+test("preserves the interior portion of a simplified diagonal boundary cell", () => {
+  const bounds = { x: 0, y: 0, width: 10, height: 10 }
+  const outline = [
+    ...Array.from({ length: 121 }, (_, index) => ({
+      x: (index * 10) / 120,
+      y: 0,
+    })),
+    { x: 0, y: 10 },
+  ]
+
+  const boardVoidRects = computeInverseRects(bounds, outline, {
+    minGridSize: 2,
+  })
+  const isCoveredByBoardVoid = (point: { x: number; y: number }) =>
+    boardVoidRects.some((rect) => containsPoint(rect, point))
+
+  expect(isCoveredByBoardVoid({ x: 4.9, y: 5 })).toBe(false)
+  expect(isCoveredByBoardVoid({ x: 7, y: 5 })).toBe(true)
+})
