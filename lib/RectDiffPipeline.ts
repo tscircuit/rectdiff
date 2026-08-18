@@ -16,6 +16,7 @@ import { computeInverseRects } from "./solvers/RectDiffSeedingSolver/computeInve
 import { buildZIndexMap } from "./solvers/RectDiffSeedingSolver/layers"
 import { buildObstacleClearanceGraphics } from "./utils/renderObstacleClearance"
 import { mergeGraphics } from "graphics-debug"
+import { padRect } from "./utils/padRect"
 
 export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
@@ -104,22 +105,28 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
     this.zIndexByName = zIndexByName
     this.layerNames = layerNames
     if (this.inputProblem.simpleRouteJson.outline) {
+      const boardEdgeClearance = Math.max(
+        0,
+        this.inputProblem.simpleRouteJson.minBoardEdgeClearance ?? 0,
+      )
       this.boardVoidRects = computeInverseRects(
         {
-          x: this.inputProblem.simpleRouteJson.bounds.minX,
-          y: this.inputProblem.simpleRouteJson.bounds.minY,
+          x: this.inputProblem.simpleRouteJson.bounds.minX - boardEdgeClearance,
+          y: this.inputProblem.simpleRouteJson.bounds.minY - boardEdgeClearance,
           width:
             this.inputProblem.simpleRouteJson.bounds.maxX -
-            this.inputProblem.simpleRouteJson.bounds.minX,
+            this.inputProblem.simpleRouteJson.bounds.minX +
+            boardEdgeClearance * 2,
           height:
             this.inputProblem.simpleRouteJson.bounds.maxY -
-            this.inputProblem.simpleRouteJson.bounds.minY,
+            this.inputProblem.simpleRouteJson.bounds.minY +
+            boardEdgeClearance * 2,
         },
         this.inputProblem.simpleRouteJson.outline ?? [],
         {
           minGridSize: this.inputProblem.simpleRouteJson.minTraceWidth,
         },
-      )
+      ).map((rect) => padRect(rect, boardEdgeClearance))
     }
   }
 
