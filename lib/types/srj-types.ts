@@ -4,6 +4,7 @@ export interface SimpleRouteJson {
   layerCount: number
   minTraceWidth: number
   minViaDiameter?: number
+  minBoardEdgeClearance?: number
   obstacles: Obstacle[]
   connections: Array<SimpleRouteConnection>
   bounds: { minX: number; maxX: number; minY: number; maxY: number }
