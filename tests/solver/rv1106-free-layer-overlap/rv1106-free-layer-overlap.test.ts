@@ -8,14 +8,35 @@ test("RV1106 free regions across the inner copper pour", async () => {
   solver.solve()
   expect(solver.failed).toBe(false)
   expect(solver.solved).toBe(true)
-  const sharedNodes = solver.getOutput().meshNodes.filter(
-    (node) =>
-      !node._containsObstacle &&
-      node.availableZ.includes(0) &&
-      node.availableZ.includes(2),
-  )
+  const sharedNodes = solver
+    .getOutput()
+    .meshNodes.filter(
+      (node) =>
+        !node._containsObstacle &&
+        node.availableZ.includes(0) &&
+        node.availableZ.includes(2),
+    )
   expect(sharedNodes).toHaveLength(0)
-  const svg = getSvgFromGraphicsObject(solver.visualize(), {
+  const graphics = solver.visualize()
+  graphics.rects = [
+    ...(graphics.rects ?? []),
+    ...sharedNodes.map((node) => ({
+      center: node.center,
+      width: node.width,
+      height: node.height,
+      fill: "rgba(16, 185, 129, 0.35)",
+      stroke: "rgba(5, 150, 105, 0.6)",
+    })),
+  ]
+  graphics.texts = [
+    {
+      x: 0,
+      y: 26,
+      text: `Shared top/inner2 free regions: ${sharedNodes.length}`,
+      fontSize: 1,
+    },
+  ]
+  const svg = getSvgFromGraphicsObject(graphics, {
     svgWidth: 900,
     svgHeight: 900,
   })
