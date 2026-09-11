@@ -58,6 +58,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           zIndexByName: rectDiffPipeline.zIndexByName,
           minTraceWidth:
             rectDiffPipeline.inputProblem.simpleRouteJson.minTraceWidth,
+          minViaDiameter:
+            rectDiffPipeline.inputProblem.simpleRouteJson.minViaDiameter,
           obstacleClearance: rectDiffPipeline.inputProblem.obstacleClearance,
         },
       ],

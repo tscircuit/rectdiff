@@ -1,25 +1,23 @@
 import { expect, test } from "bun:test"
-import { refineFreeLayerOverlaps } from "lib/solvers/OuterLayerContainmentMergeSolver/refineFreeLayerOverlaps"
-import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
+import { refineFreeLayerOverlaps } from "lib/solvers/RectDiffExpansionSolver/refineFreeLayerOverlaps"
+import type { Rect3d } from "lib/rectdiff-types"
 import type { SimpleRouteJson } from "lib/types/srj-types"
 
 test("free-layer refinement preserves remainders and rejects blocked or narrow transit", () => {
-  const meshNodes: CapacityMeshNode[] = [
+  const rects: Rect3d[] = [
     {
-      capacityMeshNodeId: "top",
-      center: { x: 1, y: 1 },
-      width: 2,
-      height: 2,
-      layer: "top",
-      availableZ: [0],
+      minX: 0,
+      minY: 0,
+      maxX: 2,
+      maxY: 2,
+      zLayers: [0],
     },
     {
-      capacityMeshNodeId: "lower",
-      center: { x: 2, y: 1 },
-      width: 2,
-      height: 2,
-      layer: "bottom",
-      availableZ: [2, 3],
+      minX: 1,
+      minY: 0,
+      maxX: 3,
+      maxY: 2,
+      zLayers: [2, 3],
     },
   ]
   const simpleRouteJson: SimpleRouteJson = {
@@ -41,7 +39,7 @@ test("free-layer refinement preserves remainders and rejects blocked or narrow t
     ],
   }
   const input = {
-    meshNodes,
+    rects,
     simpleRouteJson,
     zIndexByName: new Map([
       ["top", 0],
@@ -52,37 +50,40 @@ test("free-layer refinement preserves remainders and rejects blocked or narrow t
   }
   const refined = refineFreeLayerOverlaps(input)
   expect(refined).toHaveLength(3)
-  expect(refined.find((node) => node.availableZ.length === 3)).toMatchObject({
-    center: { x: 1.5, y: 1 },
-    width: 1,
-    height: 2,
-    availableZ: [0, 2, 3],
+  expect(refined.find((node) => node.zLayers.length === 3)).toMatchObject({
+    minX: 1,
+    minY: 0,
+    maxX: 2,
+    maxY: 2,
+    zLayers: [0, 2, 3],
   })
-  expect(refined.find((node) => node.availableZ.length === 1)).toMatchObject({
-    center: { x: 0.5, y: 1 },
-    width: 1,
-    height: 2,
-    availableZ: [0],
+  expect(refined.find((node) => node.zLayers.length === 1)).toMatchObject({
+    minX: 0,
+    minY: 0,
+    maxX: 1,
+    maxY: 2,
+    zLayers: [0],
   })
-  expect(refined.find((node) => node.availableZ.length === 2)).toMatchObject({
-    center: { x: 2.5, y: 1 },
-    width: 1,
-    height: 2,
-    availableZ: [2, 3],
+  expect(refined.find((node) => node.zLayers.length === 2)).toMatchObject({
+    minX: 2,
+    minY: 0,
+    maxX: 3,
+    maxY: 2,
+    zLayers: [2, 3],
   })
   const solid = structuredClone(input)
   solid.simpleRouteJson.obstacles[0]!.isCopperPour = false
-  expect(refineFreeLayerOverlaps(solid)).toEqual(meshNodes)
+  expect(refineFreeLayerOverlaps(solid)).toEqual(rects)
   const uncovered = structuredClone(input)
   uncovered.simpleRouteJson.obstacles[0]!.width = 0.5
-  expect(refineFreeLayerOverlaps(uncovered)).toEqual(meshNodes)
+  expect(refineFreeLayerOverlaps(uncovered)).toEqual(rects)
   const narrow = structuredClone(input)
-  narrow.meshNodes[1]!.center.x = 2.9
-  expect(refineFreeLayerOverlaps(narrow)).toEqual(narrow.meshNodes)
+  narrow.rects[1]!.minX = 1.9
+  expect(refineFreeLayerOverlaps(narrow)).toEqual(narrow.rects)
   const touching = structuredClone(input)
-  touching.meshNodes[1]!.center.x = 3
-  expect(refineFreeLayerOverlaps(touching)).toEqual(touching.meshNodes)
+  touching.rects[1]!.minX = 2
+  expect(refineFreeLayerOverlaps(touching)).toEqual(touching.rects)
   const target = structuredClone(input)
-  target.meshNodes[0]!._containsTarget = true
-  expect(refineFreeLayerOverlaps(target)).toEqual(target.meshNodes)
+  target.rects[0]!.isObstacle = true
+  expect(refineFreeLayerOverlaps(target)).toEqual(target.rects)
 })

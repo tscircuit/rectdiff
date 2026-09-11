@@ -8,6 +8,10 @@ test("RV1106 free regions across the inner copper pour", async () => {
   solver.solve()
   expect(solver.failed).toBe(false)
   expect(solver.solved).toBe(true)
+  const meshNodes = solver.getOutput().meshNodes
+  expect(new Set(meshNodes.map((node) => node.capacityMeshNodeId)).size).toBe(
+    meshNodes.length,
+  )
   const sharedNodes = solver
     .getOutput()
     .meshNodes.filter(
