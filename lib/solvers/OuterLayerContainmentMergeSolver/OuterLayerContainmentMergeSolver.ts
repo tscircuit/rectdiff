@@ -122,9 +122,7 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
         (isSingletonOuterNode(node, topZ) ||
           isSingletonOuterNode(node, bottomZ)),
     )
-    const immutableNodes = originalNodes.filter(
-      (node) => !mutableOuterNodes.includes(node),
-    )
+    const immutableNodes = originalNodes.filter((node) => !isFreeNode(node))
     const freeSupportRectsByOuterLayer = new Map<number, XYRect[]>()
     freeSupportRectsByOuterLayer.set(
       topZ,
@@ -155,6 +153,10 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
       const oppositeSupportRects =
         freeSupportRectsByOuterLayer.get(oppositeZ) ?? []
 
+      if (promotedRects.some((rect) => overlaps(candidateRect, rect))) {
+        continue
+      }
+
       if (
         !this.isTransitCompatibleAcrossIntermediateLayers({
           rect: candidateRect,
@@ -178,15 +180,22 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
       this.promotedNodeIds.add(candidate.capacityMeshNodeId)
     }
 
+    if (promotedNodes.length === 0) return originalNodes
+
     let nextResidualId = 0
     const residualNodes: CapacityMeshNode[] = []
 
-    for (const node of mutableOuterNodes) {
+    for (const node of originalNodes.filter(isFreeNode)) {
       if (this.promotedNodeIds.has(node.capacityMeshNodeId)) {
         continue
       }
 
       const nodeRect = nodeToRect(node)
+      const outerZs = node.availableZ.filter((z) => z === topZ || z === bottomZ)
+      if (outerZs.length === 0) {
+        residualNodes.push(node)
+        continue
+      }
       const remainingPieces = subtractRects(nodeRect, promotedRects)
 
       if (
@@ -197,9 +206,20 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
         continue
       }
 
+      // A supporting region may also contain a free inner layer. Only its
+      // outer layers are transferred to the promoted region.
+      const innerZs = node.availableZ.filter((z) => z !== topZ && z !== bottomZ)
+      if (innerZs.length > 0) {
+        residualNodes.push({
+          ...node,
+          availableZ: innerZs,
+          layer: `z${innerZs.join(",")}`,
+        })
+      }
+
       for (const piece of remainingPieces) {
         const residualNode = cloneNodeWithRect(
-          node,
+          { ...node, availableZ: outerZs },
           piece,
           `${node.capacityMeshNodeId}-outer-merge-${nextResidualId++}`,
         )
@@ -244,24 +264,16 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
 
     if (hi - lo < 2) return false
 
+    // Empty inner layers also permit transit; they need no copper-pour
+    // coverage. Solid obstacles still prevent an outer-layer promotion.
     for (let z = lo + 1; z < hi; z++) {
       const overlapping = (obstaclesByLayer[z] ?? []).filter((entry) =>
         overlaps(entry.rect, rect),
       )
-      if (overlapping.length === 0) return false
-
       const nonCopperOverlap = overlapping.some(
         (entry) => !entry.obstacle.isCopperPour,
       )
       if (nonCopperOverlap) return false
-
-      const copperRects = overlapping
-        .filter((entry) => entry.obstacle.isCopperPour)
-        .map((entry) => entry.rect)
-
-      if (!isFullyCoveredByRects(rect, copperRects)) {
-        return false
-      }
     }
 
     return true
