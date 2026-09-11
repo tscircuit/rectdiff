@@ -123,18 +123,18 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
           isSingletonOuterNode(node, bottomZ)),
     )
     const immutableNodes = originalNodes.filter((node) => !isFreeNode(node))
-    const freeSupportRectsByOuterLayer = new Map<number, XYRect[]>()
-    freeSupportRectsByOuterLayer.set(
+    const freeSupportNodesByOuterLayer = new Map<number, CapacityMeshNode[]>()
+    freeSupportNodesByOuterLayer.set(
       topZ,
-      originalNodes
-        .filter((node) => isFreeNode(node) && node.availableZ.includes(topZ))
-        .map(nodeToRect),
+      originalNodes.filter(
+        (node) => isFreeNode(node) && node.availableZ.includes(topZ),
+      ),
     )
-    freeSupportRectsByOuterLayer.set(
+    freeSupportNodesByOuterLayer.set(
       bottomZ,
-      originalNodes
-        .filter((node) => isFreeNode(node) && node.availableZ.includes(bottomZ))
-        .map(nodeToRect),
+      originalNodes.filter(
+        (node) => isFreeNode(node) && node.availableZ.includes(bottomZ),
+      ),
     )
 
     const promotedNodes: CapacityMeshNode[] = []
@@ -150,8 +150,11 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
       const candidateZ = candidate.availableZ[0]!
       const oppositeZ = candidateZ === topZ ? bottomZ : topZ
       const candidateRect = nodeToRect(candidate)
-      const oppositeSupportRects =
-        freeSupportRectsByOuterLayer.get(oppositeZ) ?? []
+      const oppositeSupportNodes = (
+        freeSupportNodesByOuterLayer.get(oppositeZ) ?? []
+      ).filter((node) => overlaps(candidateRect, nodeToRect(node)))
+      const supportZs = oppositeSupportNodes[0]?.availableZ
+      if (!supportZs) continue
 
       if (promotedRects.some((rect) => overlaps(candidateRect, rect))) {
         continue
@@ -167,17 +170,66 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
       ) {
         continue
       }
-      if (!isFullyCoveredByRects(candidateRect, oppositeSupportRects)) {
+      if (
+        !isFullyCoveredByRects(
+          candidateRect,
+          oppositeSupportNodes.map(nodeToRect),
+        )
+      ) {
         continue
       }
 
-      promotedNodes.push({
-        ...candidate,
-        availableZ: [topZ, bottomZ],
-        layer: `z${topZ},${bottomZ}`,
-      })
-      promotedRects.push(candidateRect)
-      this.promotedNodeIds.add(candidate.capacityMeshNodeId)
+      // Keep a large region when the supporting layers are uniform. Otherwise
+      // split at support boundaries so no inner-layer access is lost or added.
+      const hasUniformSupport = oppositeSupportNodes.every(
+        (node) =>
+          node.availableZ.length === supportZs.length &&
+          node.availableZ.every((z) => supportZs.includes(z)),
+      )
+      const pieces = hasUniformSupport
+        ? [{ rect: candidateRect, availableZ: supportZs }]
+        : oppositeSupportNodes.map((node) => {
+            const supportRect = nodeToRect(node)
+            const x = Math.max(candidateRect.x, supportRect.x)
+            const y = Math.max(candidateRect.y, supportRect.y)
+            return {
+              rect: {
+                x,
+                y,
+                width:
+                  Math.min(
+                    candidateRect.x + candidateRect.width,
+                    supportRect.x + supportRect.width,
+                  ) - x,
+                height:
+                  Math.min(
+                    candidateRect.y + candidateRect.height,
+                    supportRect.y + supportRect.height,
+                  ) - y,
+              },
+              availableZ: node.availableZ,
+            }
+          })
+      for (const [index, piece] of pieces.entries()) {
+        if (
+          piece.rect.width + EPS < viaMinSize ||
+          piece.rect.height + EPS < viaMinSize
+        ) {
+          continue
+        }
+        const availableZ = [...new Set([candidateZ, ...piece.availableZ])].sort(
+          (a, b) => a - b,
+        )
+        const nodeId =
+          index === 0
+            ? candidate.capacityMeshNodeId
+            : `${candidate.capacityMeshNodeId}-outer-support-${index}`
+        promotedNodes.push(
+          cloneNodeWithRect({ ...candidate, availableZ }, piece.rect, nodeId),
+        )
+        promotedRects.push(piece.rect)
+        this.promotedNodeIds.add(nodeId)
+      }
     }
 
     if (promotedNodes.length === 0) return originalNodes
@@ -186,10 +238,6 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
     const residualNodes: CapacityMeshNode[] = []
 
     for (const node of originalNodes.filter(isFreeNode)) {
-      if (this.promotedNodeIds.has(node.capacityMeshNodeId)) {
-        continue
-      }
-
       const nodeRect = nodeToRect(node)
       const outerZs = node.availableZ.filter((z) => z === topZ || z === bottomZ)
       if (outerZs.length === 0) {
@@ -206,20 +254,9 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
         continue
       }
 
-      // A supporting region may also contain a free inner layer. Only its
-      // outer layers are transferred to the promoted region.
-      const innerZs = node.availableZ.filter((z) => z !== topZ && z !== bottomZ)
-      if (innerZs.length > 0) {
-        residualNodes.push({
-          ...node,
-          availableZ: innerZs,
-          layer: `z${innerZs.join(",")}`,
-        })
-      }
-
       for (const piece of remainingPieces) {
         const residualNode = cloneNodeWithRect(
-          { ...node, availableZ: outerZs },
+          node,
           piece,
           `${node.capacityMeshNodeId}-outer-merge-${nextResidualId++}`,
         )

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { RectDiffPipeline } from "lib/RectDiffPipeline"
 import type { SimpleRouteJson } from "lib/types/srj-types"
 
-test("outer-layer promotion preserves free routing area on every layer", async (): Promise<void> => {
+test("outer-layer promotion preserves free routing area and existing layer transitions", async (): Promise<void> => {
   const fixturePaths = [
     "tests/solver/bugreport24-05597c/bugreport24-05597c.json",
     "tests/solver/bugreport22-2a75ce/bugreport22-2a75ce.json",
@@ -35,6 +35,23 @@ test("outer-layer promotion preserves free routing area on every layer", async (
             .reduce((area, node) => area + node.width * node.height, 0),
       )
       expect(outputArea!).toBeCloseTo(originalArea!, 8)
+      for (let otherZ = z + 1; otherZ < simpleRouteJson.layerCount; otherZ++) {
+        const [originalViaArea, outputViaArea] = [
+          originalNodes,
+          outputNodes,
+        ].map((nodes) =>
+          nodes
+            .filter(
+              (node) =>
+                node.availableZ.includes(z) &&
+                node.availableZ.includes(otherZ) &&
+                !node._containsTarget &&
+                !node._containsObstacle,
+            )
+            .reduce((area, node) => area + node.width * node.height, 0),
+        )
+        expect(outputViaArea! + 1e-8).toBeGreaterThanOrEqual(originalViaArea!)
+      }
     }
   }
 })

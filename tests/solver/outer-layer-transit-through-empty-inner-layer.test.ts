@@ -56,7 +56,7 @@ test("outer layers connect through a copper plane and an empty inner layer witho
   const outputNodes = solver.getOutput().outputNodes
   expect(
     outputNodes.find((node) => node.capacityMeshNodeId === "top")?.availableZ,
-  ).toEqual([0, 3])
+  ).toEqual([0, 2, 3])
   for (const [z, expectedArea] of [4, 0, 16, 16].entries()) {
     const nodesOnLayer = outputNodes.filter((node) =>
       node.availableZ.includes(z),
