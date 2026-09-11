@@ -1,10 +1,12 @@
 import { boundsIntersection } from "@tscircuit/math-utils"
 import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
-import type { SimpleRouteJson } from "../../types/srj-types"
+import type { Obstacle, SimpleRouteJson } from "../../types/srj-types"
 import type { XYRect } from "../../rectdiff-types"
 import { obstacleToXYRect, obstacleZs } from "../RectDiffSeedingSolver/layers"
 import { EPS, overlaps, subtractRect2D } from "../../utils/rectdiff-geometry"
 import { padRect } from "../../utils/padRect"
+
+type PreparedObstacle = { obstacle: Obstacle; rect: XYRect; layers: number[] }
 
 const nodeRect = (node: CapacityMeshNode): XYRect => ({
   x: node.center.x - node.width / 2,
@@ -36,6 +38,38 @@ function createRefinedNode(
     width: rect.width,
     height: rect.height,
   }
+}
+
+function isCopperPourTransit(
+  {
+    rect,
+    availableZ,
+    skippedLayers,
+  }: {
+    rect: XYRect
+    availableZ: number[]
+    skippedLayers: number[]
+  },
+  obstacles: PreparedObstacle[],
+): boolean {
+  const crossingObstacles = obstacles.filter(
+    (entry) =>
+      entry.layers.some(
+        (z) => z >= availableZ[0]! && z <= availableZ.at(-1)!,
+      ) && overlaps(entry.rect, rect),
+  )
+  if (crossingObstacles.some((entry) => !entry.obstacle.isCopperPour))
+    return false
+  return skippedLayers.every((z) => {
+    let uncovered = [rect]
+    for (const entry of crossingObstacles) {
+      if (!entry.layers.includes(z)) continue
+      uncovered = uncovered.flatMap((piece) =>
+        subtractRect2D(piece, entry.rect),
+      )
+    }
+    return uncovered.length === 0
+  })
 }
 
 /** Refine free meshes across copper-pour layers while retaining each remainder. */
@@ -72,7 +106,12 @@ export function refineFreeLayerOverlaps({
       },
     ]
   })
-  const pieces = new Map(meshNodes.map((node) => [node, [nodeRect(node)]]))
+  const pieces = new Map(
+    meshNodes.map((node) => {
+      const original = nodeRect(node)
+      return [node, { original, remaining: [original] }]
+    }),
+  )
   const sharedNodes: CapacityMeshNode[] = []
   const minViaSize = Math.max(
     simpleRouteJson.minViaDiameter ?? 0,
@@ -94,12 +133,18 @@ export function refineFreeLayerOverlaps({
         if (!availableZ.includes(z)) skippedLayers.push(z)
       }
       if (skippedLayers.length === 0) continue
-      const singlePieces = pieces.get(single)!
-      const multiPieces = pieces.get(multi)!
-      for (let a = 0; a < singlePieces.length; a++) {
-        for (let b = 0; b < multiPieces.length; b++) {
-          const singleRect = singlePieces[a]!
-          const multiRect = multiPieces[b]!
+      const singlePieces = pieces.get(single)!.remaining
+      const multiPieces = pieces.get(multi)!.remaining
+      let singlePieceIndex = 0
+      while (singlePieceIndex < singlePieces.length) {
+        const singleRect = singlePieces[singlePieceIndex]!
+        let merged = false
+        for (
+          let multiPieceIndex = 0;
+          multiPieceIndex < multiPieces.length;
+          multiPieceIndex++
+        ) {
+          const multiRect = multiPieces[multiPieceIndex]!
           const overlap = boundsIntersection(
             rectBounds(singleRect),
             rectBounds(multiRect),
@@ -113,52 +158,38 @@ export function refineFreeLayerOverlaps({
           }
           if (rect.width + EPS < minViaSize || rect.height + EPS < minViaSize)
             continue
-          const crossingObstacles = obstacles.filter(
-            (entry) =>
-              entry.layers.some(
-                (z) => z >= availableZ[0]! && z <= availableZ.at(-1)!,
-              ) && overlaps(entry.rect, rect),
+          if (
+            !isCopperPourTransit({ rect, availableZ, skippedLayers }, obstacles)
           )
-          if (crossingObstacles.some((entry) => !entry.obstacle.isCopperPour))
             continue
-          const coveredByPour = skippedLayers.every((z) => {
-            let uncovered = [rect]
-            for (const entry of crossingObstacles) {
-              if (entry.layers.includes(z))
-                uncovered = uncovered.flatMap((piece) =>
-                  subtractRect2D(piece, entry.rect),
-                )
-            }
-            return uncovered.length === 0
-          })
-          if (!coveredByPour) continue
           sharedNodes.push({
             ...createRefinedNode({ source: single, rect }, ids),
             availableZ,
             layer: `z${availableZ.join(",")}`,
           })
-          singlePieces.splice(a, 1, ...subtractRect2D(singleRect, rect))
-          multiPieces.splice(b, 1, ...subtractRect2D(multiRect, rect))
-          a--
+          singlePieces.splice(
+            singlePieceIndex,
+            1,
+            ...subtractRect2D(singleRect, rect),
+          )
+          multiPieces.splice(
+            multiPieceIndex,
+            1,
+            ...subtractRect2D(multiRect, rect),
+          )
+          merged = true
           break
         }
+        // A split replaces this piece; inspect its remainders before advancing.
+        if (!merged) singlePieceIndex++
       }
     }
   }
   if (sharedNodes.length === 0) return meshNodes
   return meshNodes
     .flatMap((node) => {
-      const remaining = pieces.get(node)!
-      if (remaining.length === 1) {
-        const original = nodeRect(node)
-        if (
-          remaining[0]!.x === original.x &&
-          remaining[0]!.y === original.y &&
-          remaining[0]!.width === original.width &&
-          remaining[0]!.height === original.height
-        )
-          return [node]
-      }
+      const { original, remaining } = pieces.get(node)!
+      if (remaining.length === 1 && remaining[0] === original) return [node]
       return remaining.map((rect) =>
         createRefinedNode({ source: node, rect }, ids),
       )
