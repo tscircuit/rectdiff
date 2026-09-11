@@ -116,6 +116,13 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
     const viaMinSize = Math.max(srj.minViaDiameter ?? 0, srj.minTraceWidth || 0)
     const originalNodes = this.input.meshNodes.map(cloneNode)
     const obstaclesByLayer = this.buildObstaclesByLayer(layerCount)
+    if (
+      !obstaclesByLayer
+        .slice(1, -1)
+        .some((entries) => entries.some((entry) => entry.obstacle.isCopperPour))
+    ) {
+      return originalNodes
+    }
     const mutableOuterNodes = originalNodes.filter(
       (node) =>
         isFreeNode(node) &&
@@ -301,19 +308,30 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
 
     if (hi - lo < 2) return false
 
-    // Empty inner layers also permit transit; they need no copper-pour
-    // coverage. Solid obstacles still prevent an outer-layer promotion.
+    // This merge reconnects outer regions separated by copper planes. Empty
+    // inner layers permit transit, but do not require a containment merge.
+    let crossesCopperPlane = false
     for (let z = lo + 1; z < hi; z++) {
       const overlapping = (obstaclesByLayer[z] ?? []).filter((entry) =>
         overlaps(entry.rect, rect),
       )
+      if (overlapping.length === 0) continue
       const nonCopperOverlap = overlapping.some(
         (entry) => !entry.obstacle.isCopperPour,
       )
       if (nonCopperOverlap) return false
+      if (
+        !isFullyCoveredByRects(
+          rect,
+          overlapping.map((entry) => entry.rect),
+        )
+      ) {
+        return false
+      }
+      crossesCopperPlane = true
     }
 
-    return true
+    return crossesCopperPlane
   }
 
   override getOutput(): { outputNodes: CapacityMeshNode[] } {

@@ -13,8 +13,8 @@ test("outer-layer promotion does not extend inner-layer access beyond its suppor
       availableZ: [0],
     },
     ...[
-      [1, 3],
-      [2, 3],
+      [2, 5],
+      [3, 5],
     ].map((availableZ, index) => ({
       capacityMeshNodeId: `support-${index}`,
       center: { x: index === 0 ? -1 : 1, y: 0 },
@@ -27,14 +27,24 @@ test("outer-layer promotion does not extend inner-layer access beyond its suppor
   const solver = new OuterLayerContainmentMergeSolver({
     meshNodes,
     simpleRouteJson: {
-      layerCount: 4,
+      layerCount: 6,
       bounds: { minX: -2, maxX: 2, minY: -2, maxY: 2 },
       minTraceWidth: 0.08,
       minViaDiameter: 0.45,
-      obstacles: [],
+      obstacles: [
+        {
+          type: "rect",
+          center: { x: 0, y: 0 },
+          width: 4,
+          height: 4,
+          layers: ["inner1"],
+          connectedTo: ["ground"],
+          isCopperPour: true,
+        },
+      ],
       connections: [],
     },
-    zIndexByName: new Map(),
+    zIndexByName: new Map([["inner1", 1]]),
   })
   solver.solve()
   const { outputNodes } = solver.getOutput()
@@ -42,6 +52,6 @@ test("outer-layer promotion does not extend inner-layer access beyond its suppor
   for (const node of outputNodes) {
     expect(node.width).toBe(2)
     expect(node.height).toBe(4)
-    expect(node.availableZ).toEqual(node.center.x < 0 ? [0, 1, 3] : [0, 2, 3])
+    expect(node.availableZ).toEqual(node.center.x < 0 ? [0, 2, 5] : [0, 3, 5])
   }
 })

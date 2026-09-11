@@ -29,10 +29,20 @@ test("outer-layer promotion preserves existing inner-to-bottom via access", (): 
         bounds: { minX: -2, maxX: 2, minY: -2, maxY: 2 },
         minTraceWidth: 0.08,
         minViaDiameter: 0.45,
-        obstacles: [],
+        obstacles: [
+          {
+            type: "rect",
+            center: { x: 0, y: 0 },
+            width: 4,
+            height: 4,
+            layers: ["inner1"],
+            connectedTo: ["ground"],
+            isCopperPour: true,
+          },
+        ],
         connections: [],
       },
-      zIndexByName: new Map(),
+      zIndexByName: new Map([["inner1", 1]]),
     })
     solver.solve()
     const { outputNodes } = solver.getOutput()
