@@ -7,6 +7,7 @@ import { obstacleToXYRect, obstacleZs } from "../RectDiffSeedingSolver/layers"
 import { getColorForZLayer } from "../../utils/getColorForZLayer"
 import { subtractRect2D, overlaps, EPS } from "../../utils/rectdiff-geometry"
 import { padRect } from "../../utils/padRect"
+import { refineFreeLayerOverlaps } from "./refineFreeLayerOverlaps"
 
 type OuterLayerContainmentMergeSolverInput = {
   meshNodes: CapacityMeshNode[]
@@ -100,7 +101,10 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
   }
 
   override _step() {
-    this.outputNodes = this.processOuterLayerContainmentMerges()
+    this.outputNodes = refineFreeLayerOverlaps({
+      ...this.input,
+      meshNodes: this.processOuterLayerContainmentMerges(),
+    })
     this.solved = true
   }
 
