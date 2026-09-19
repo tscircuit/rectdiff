@@ -108,7 +108,7 @@ export function refineFreeLayerOverlaps({
   const minViaSize = Math.max(
     simpleRouteJson.minViaDiameter ?? 0,
     simpleRouteJson.minTraceWidth,
-  )
+  ) + 2 * obstacleClearance
 
   for (const single of singleLayerRects) {
     for (const multi of multilayerRects) {
