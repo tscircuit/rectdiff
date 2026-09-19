@@ -8,6 +8,7 @@ import { expandRectFromSeed } from "../../utils/expandRectFromSeed"
 import { finalizeRects } from "../../utils/finalizeRects"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { rectsToMeshNodes } from "./rectsToMeshNodes"
+import { refineFreeLayerOverlaps } from "./refineFreeLayerOverlaps"
 import type { XYRect, Candidate3D, Placed3D } from "../../rectdiff-types"
 import type { Obstacle } from "../../types/srj-types"
 import RBush from "rbush"
@@ -15,6 +16,8 @@ import { rectToTree } from "../../utils/rectToTree"
 import { sameTreeRect } from "../../utils/sameTreeRect"
 
 export type RectDiffExpansionSolverInput = {
+  minTraceWidth?: number
+  minViaDiameter?: number
   layerNames: string[]
   layerCount: number
   bounds: XYRect
@@ -35,6 +38,7 @@ export type RectDiffExpansionSolverInput = {
   layerNamesCanonical: string[]
   obstacles: Obstacle[]
   obstacleClearance?: number
+  transitClearance?: number
 }
 
 /**
@@ -143,7 +147,21 @@ export class RectDiffExpansionSolver extends BaseSolver {
       boardVoidRects: this.input.boardVoidRects,
       obstacleClearance: this.input.obstacleClearance,
     })
-    this._meshNodes = rectsToMeshNodes(rects)
+    let refinedRects = rects
+    if (this.input.minTraceWidth !== undefined) {
+      refinedRects = refineFreeLayerOverlaps({
+        rects,
+        simpleRouteJson: {
+          obstacles: this.input.obstacles,
+          minTraceWidth: this.input.minTraceWidth,
+          minViaDiameter: this.input.minViaDiameter,
+        },
+        zIndexByName: this.input.zIndexByName,
+        obstacleClearance: this.input.obstacleClearance,
+        transitClearance: this.input.transitClearance,
+      })
+    }
+    this._meshNodes = rectsToMeshNodes(refinedRects)
     this.solved = true
   }
 

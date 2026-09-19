@@ -27,7 +27,9 @@ export type RectDiffGridSolverPipelineInput = {
   outline?: Pick<SimpleRouteJson, "outline">
   layerCount: number
   minTraceWidth: number
+  minViaDiameter?: number
   obstacleClearance?: number
+  transitClearance?: number
   gridOptions?: Partial<GridFill3DOptions>
   boardVoidRects?: XYRect[]
   layerNames?: string[]
@@ -95,6 +97,8 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
         return [
           {
             layerNames: output.layerNames ?? [],
+            minTraceWidth: pipeline.inputProblem.minTraceWidth,
+            minViaDiameter: pipeline.inputProblem.minViaDiameter,
             boardVoidRects: pipeline.inputProblem.boardVoidRects ?? [],
             layerCount: pipeline.inputProblem.layerCount,
             bounds: output.bounds!,
@@ -111,6 +115,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
             layerNamesCanonical: pipeline.layerNames,
             obstacles: pipeline.inputProblem.obstacles,
             obstacleClearance: pipeline.inputProblem.obstacleClearance,
+            transitClearance: pipeline.inputProblem.transitClearance,
           },
         ]
       },

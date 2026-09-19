@@ -8,6 +8,10 @@ test("RV1106 free regions across the inner copper pour", async () => {
   solver.solve()
   expect(solver.failed).toBe(false)
   expect(solver.solved).toBe(true)
+  const meshNodes = solver.getOutput().meshNodes
+  expect(new Set(meshNodes.map((node) => node.capacityMeshNodeId)).size).toBe(
+    meshNodes.length,
+  )
   const sharedNodes = solver
     .getOutput()
     .meshNodes.filter(
@@ -16,7 +20,7 @@ test("RV1106 free regions across the inner copper pour", async () => {
         node.availableZ.includes(0) &&
         node.availableZ.includes(2),
     )
-  expect(sharedNodes).toHaveLength(0)
+  expect(sharedNodes.length).toBeGreaterThan(0)
   const graphics = solver.visualize()
   graphics.rects = [
     ...(graphics.rects ?? []),

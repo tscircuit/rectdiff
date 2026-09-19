@@ -22,6 +22,7 @@ export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
   obstacleClearance?: number
+  transitClearance?: number
   /**
    * Maximum number of gap-fill expansion passes to run after the initial
    * rect-diff grid is built. Set to 1 for the original single-pass behavior;
@@ -58,7 +59,10 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           zIndexByName: rectDiffPipeline.zIndexByName,
           minTraceWidth:
             rectDiffPipeline.inputProblem.simpleRouteJson.minTraceWidth,
+          minViaDiameter:
+            rectDiffPipeline.inputProblem.simpleRouteJson.minViaDiameter,
           obstacleClearance: rectDiffPipeline.inputProblem.obstacleClearance,
+          transitClearance: rectDiffPipeline.inputProblem.transitClearance,
         },
       ],
     ),
