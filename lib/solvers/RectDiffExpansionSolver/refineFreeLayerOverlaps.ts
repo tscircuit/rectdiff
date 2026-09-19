@@ -4,6 +4,7 @@ import type { Rect3d, XYRect } from "../../rectdiff-types"
 import { obstacleToXYRect, obstacleZs } from "../RectDiffSeedingSolver/layers"
 import { EPS, overlaps, subtractRect2D } from "../../utils/rectdiff-geometry"
 import { padRect } from "../../utils/padRect"
+import { mergeAdjacentFreeRects } from "./mergeAdjacentFreeRects"
 
 type PreparedObstacle = { obstacle: Obstacle; rect: XYRect; layers: number[] }
 
@@ -173,7 +174,7 @@ export function refineFreeLayerOverlaps({
     }
   }
   if (sharedRects.length === 0) return rects
-  return rects
+  const refinedRects = rects
     .flatMap((region) => {
       const { original, remaining } = pieces.get(region)!
       if (remaining.length === 1 && remaining[0] === original) return [region]
@@ -182,4 +183,5 @@ export function refineFreeLayerOverlaps({
       )
     })
     .concat(sharedRects)
+  return mergeAdjacentFreeRects(refinedRects)
 }
