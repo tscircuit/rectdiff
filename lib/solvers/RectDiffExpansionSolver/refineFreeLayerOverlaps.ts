@@ -68,6 +68,7 @@ export function refineFreeLayerOverlaps({
   simpleRouteJson,
   zIndexByName,
   obstacleClearance = 0,
+  transitClearance = 0,
 }: {
   rects: Rect3d[]
   simpleRouteJson: Pick<
@@ -76,6 +77,7 @@ export function refineFreeLayerOverlaps({
   >
   zIndexByName: Map<string, number>
   obstacleClearance?: number
+  transitClearance?: number
 }): Rect3d[] {
   const freeRects = rects.filter((region) => !region.isObstacle)
   const singleLayerRects = freeRects.filter(
@@ -108,7 +110,7 @@ export function refineFreeLayerOverlaps({
   const minViaSize = Math.max(
     simpleRouteJson.minViaDiameter ?? 0,
     simpleRouteJson.minTraceWidth,
-  ) + 2 * obstacleClearance
+  ) + 2 * transitClearance
 
   for (const single of singleLayerRects) {
     for (const multi of multilayerRects) {

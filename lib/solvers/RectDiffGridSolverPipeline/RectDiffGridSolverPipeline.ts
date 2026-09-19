@@ -29,6 +29,7 @@ export type RectDiffGridSolverPipelineInput = {
   minTraceWidth: number
   minViaDiameter?: number
   obstacleClearance?: number
+  transitClearance?: number
   gridOptions?: Partial<GridFill3DOptions>
   boardVoidRects?: XYRect[]
   layerNames?: string[]
@@ -114,6 +115,7 @@ export class RectDiffGridSolverPipeline extends BasePipelineSolver<RectDiffGridS
             layerNamesCanonical: pipeline.layerNames,
             obstacles: pipeline.inputProblem.obstacles,
             obstacleClearance: pipeline.inputProblem.obstacleClearance,
+            transitClearance: pipeline.inputProblem.transitClearance,
           },
         ]
       },

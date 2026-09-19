@@ -84,7 +84,7 @@ test("free-layer refinement preserves remainders and rejects blocked or narrow t
   clearanceNarrow.rects[1]!.minX = 1.5
   clearanceNarrow.simpleRouteJson.minViaDiameter = 0.45
   expect(
-    refineFreeLayerOverlaps({ ...clearanceNarrow, obstacleClearance: 0.1 }),
+    refineFreeLayerOverlaps({ ...clearanceNarrow, transitClearance: 0.1 }),
   ).toEqual(clearanceNarrow.rects)
   const touching = structuredClone(input)
   touching.rects[1]!.minX = 2
