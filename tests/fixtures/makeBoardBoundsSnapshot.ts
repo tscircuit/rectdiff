@@ -47,6 +47,6 @@ ${srj.obstacles.map((o: { center: { x: number; y: number }; width: number; heigh
 <rect x="${x(-5.5)}" y="${y(6)}" width="297" height="324" fill="none" stroke="#2563eb" stroke-width="3"/>
 <text x="510" y="402" font-size="14" fill="#2563eb">minY = -6.000</text>
 <text x="24" y="522" font-size="16">${outside.length ? "BUG: generated mesh crosses the lower board edge" : "FIXED: generated mesh stays inside the board"}</text>
-<text x="24" y="548" font-size="14">Generated lower edge: ${lowerEdge.toFixed(3)} mm · purple: external obstacle</text>
+<text x="24" y="548" font-size="14">Generated lower edge: ${generated.length ? `${lowerEdge.toFixed(3)} mm` : "none needed (grid fills board)"} · purple: external obstacle</text>
 </g></svg>`
 }

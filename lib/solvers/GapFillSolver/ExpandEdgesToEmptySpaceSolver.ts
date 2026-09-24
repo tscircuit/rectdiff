@@ -12,6 +12,8 @@ import type { XYRect } from "../../rectdiff-types"
 const EPS = 1e-4
 
 export type ExpandEdgesToEmptySpaceSolverInput = {
+  /** Optional for standalone callers; the full board pipeline always supplies it. */
+  bounds?: Bounds
   inputMeshNodes: CapacityMeshNode[]
   segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace>
   boardVoid?: {
@@ -80,7 +82,7 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
       return
     }
 
-    const segment = this.unprocessedSegments.shift()!
+    let segment = this.unprocessedSegments.shift()!
     this.lastSegment = segment
 
     const { dx, dy } = EDGE_MAP[segment.facingDirection]
@@ -90,15 +92,44 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     // bounds that we search for empty space. As soon as any rect appears in our
     // bounds we know the maximum size of the empty space that can be created.
 
+    // Clip the seed edge itself: inputs may include obstacle nodes outside the
+    // board or spanning its edge. Only the portion inside can seed new space.
+    const bounds = this.input.bounds
+    if (bounds) {
+      const start = { ...segment.start }
+      const end = { ...segment.end }
+      if (dx !== 0) {
+        if (start.x < bounds.minX || start.x > bounds.maxX) return
+        start.y = Math.max(bounds.minY, Math.min(bounds.maxY, start.y))
+        end.y = Math.max(bounds.minY, Math.min(bounds.maxY, end.y))
+      } else {
+        if (start.y < bounds.minY || start.y > bounds.maxY) return
+        start.x = Math.max(bounds.minX, Math.min(bounds.maxX, start.x))
+        end.x = Math.max(bounds.minX, Math.min(bounds.maxX, end.x))
+      }
+      segment = { ...segment, start, end }
+    }
     const deltaStartEnd = {
       x: segment.end.x - segment.start.x,
       y: segment.end.y - segment.start.y,
     }
     const segLength = Math.sqrt(deltaStartEnd.x ** 2 + deltaStartEnd.y ** 2)
+    if (segLength < EPS) return
     const normDeltaStartEnd = {
       x: deltaStartEnd.x / segLength,
       y: deltaStartEnd.y / segLength,
     }
+
+    const boundaryDistance = !bounds
+      ? Infinity
+      : dx > 0
+        ? bounds.maxX - segment.start.x
+        : dx < 0
+          ? segment.start.x - bounds.minX
+          : dy > 0
+            ? bounds.maxY - segment.start.y
+            : segment.start.y - bounds.minY
+    if (boundaryDistance < EPS) return
 
     let collidingNodes: CapacityMeshNode[] | null = null
     let searchDistance = 1
@@ -114,18 +145,18 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     this.lastSearchCorner2 = searchCorner2
     while (
       (!collidingNodes || collidingNodes.length === 0) &&
-      searchDistance < 1000
+      (bounds || searchDistance < 1000)
     ) {
       const searchBounds = getBoundsFromCorners([
         searchCorner1,
         searchCorner2,
         {
-          x: searchCorner1.x + dx * searchDistance,
-          y: searchCorner1.y + dy * searchDistance,
+          x: searchCorner1.x + dx * Math.min(searchDistance, boundaryDistance),
+          y: searchCorner1.y + dy * Math.min(searchDistance, boundaryDistance),
         },
         {
-          x: searchCorner2.x + dx * searchDistance,
-          y: searchCorner2.y + dy * searchDistance,
+          x: searchCorner2.x + dx * Math.min(searchDistance, boundaryDistance),
+          y: searchCorner2.y + dy * Math.min(searchDistance, boundaryDistance),
         },
       ])
       this.lastSearchBounds = searchBounds
@@ -136,18 +167,16 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
           (n) => n.capacityMeshNodeId !== segment.parent.capacityMeshNodeId,
         )
 
+      if (searchDistance >= boundaryDistance) break
       searchDistance *= 4
     }
 
-    if (!collidingNodes || collidingNodes.length === 0) {
-      // TODO, this means we need to expand the node to the boundary
-      return
-    }
+    if ((!collidingNodes || collidingNodes.length === 0) && !bounds) return
     this.lastCollidingNodes = collidingNodes
 
     // Determine the expand distance from the colliding nodes
-    let smallestDistance = Infinity
-    for (const node of collidingNodes) {
+    let smallestDistance = boundaryDistance
+    for (const node of collidingNodes ?? []) {
       const distance = segmentToBoxMinDistance(segment.start, segment.end, node)
       if (distance < smallestDistance) {
         smallestDistance = distance

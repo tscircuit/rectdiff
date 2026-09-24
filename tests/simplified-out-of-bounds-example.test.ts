@@ -3,7 +3,7 @@ import { expect, test } from "bun:test"
 import simpleRouteJson from "../test-assets/simplified-out-of-bounds-example.json"
 import { RectDiffPipeline } from "../lib/RectDiffPipeline"
 
-test("simplified out-of-bounds fixture currently creates a generated node outside the board bounds", async () => {
+test("simplified out-of-bounds fixture keeps generated nodes within the board bounds", async () => {
   const solver = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
 
   solver.solve()
@@ -27,12 +27,11 @@ test("simplified out-of-bounds fixture currently creates a generated node outsid
 
   expect(solver.solved).toBe(true)
   expect(meshNodes.length).toBeGreaterThan(0)
-  expect(outsideGeneratedNodes.length).toBeGreaterThan(0)
-  expect(outsideGeneratedNodes[0]!.capacityMeshNodeId.startsWith("new-")).toBe(
-    true,
+  expect(outsideGeneratedNodes).toEqual([])
+  // The grid already fills this board; the only old addition was outside it.
+  expect(meshNodes.length).toBe(
+    solver.rectDiffGridSolverPipeline!.getOutput().meshNodes.length,
   )
-  const highlighted = outsideGeneratedNodes[0]!
-  expect(highlighted.center.y - highlighted.height / 2).toBeCloseTo(-7.2754361)
   await expect(makeBoardBoundsSnapshot(meshNodes)).toMatchSvgSnapshot(
     import.meta.path,
   )

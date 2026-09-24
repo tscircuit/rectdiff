@@ -1,3 +1,4 @@
+import type { Bounds } from "@tscircuit/math-utils"
 import {
   BasePipelineSolver,
   definePipelineStep,
@@ -13,6 +14,7 @@ import {
 import type { XYRect } from "../../rectdiff-types"
 
 type GapFillSolverInput = {
+  bounds?: Bounds
   meshNodes: CapacityMeshNode[]
   boardVoid?: {
     boardVoidRects: XYRect[]
@@ -72,6 +74,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
             gapFillPipeline.findSegmentsWithAdjacentEmptySpaceSolver!.getOutput()
               .segmentsWithAdjacentEmptySpace,
           boardVoid: gapFillPipeline.inputProblem.boardVoid,
+          bounds: gapFillPipeline.inputProblem.bounds,
         },
       ],
       {

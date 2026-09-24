@@ -70,6 +70,7 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           meshNodes:
             rectDiffPipeline.rectDiffGridSolverPipeline?.getOutput()
               .meshNodes ?? [],
+          bounds: rectDiffPipeline.inputProblem.simpleRouteJson.bounds,
           boardVoid: {
             boardVoidRects: rectDiffPipeline.boardVoidRects || [],
             layerCount:
