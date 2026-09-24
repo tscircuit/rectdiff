@@ -90,7 +90,7 @@ function diagram(input: CapacityMeshNode[], output: CapacityMeshNode[]) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="740" viewBox="0 0 1000 740"><rect width="1000" height="740" fill="white"/><g font-family="Arial, sans-serif" fill="#172033"><text x="40" y="40" font-size="25" font-weight="bold">Immutable outer-layer support overlap</text><text x="40" y="75" font-size="17">4 x 4 footprint; inner copper on z=1,2 makes promotion eligible.</text>${panels}<text x="40" y="675" font-size="17">Green dashed: candidate. Purple solid: unchanged multilayer support.</text><text x="40" y="705" font-size="17">Same-layer overlapping pairs: input ${conflicts(input).length}; output ${conflicts(output).length}.</text></g></svg>`
 }
 
-test("reproduces promotion overlapping unchanged multilayer support", async () => {
+test("preserves disjointness when opposite support is immutable", async () => {
   const input = [node("candidate", [0]), node("support", [1, 3])]
   const output = solve(input)
   expect(conflicts(input)).toHaveLength(0)
@@ -99,9 +99,50 @@ test("reproduces promotion overlapping unchanged multilayer support", async () =
   )
   expect(
     output.find((n) => n.capacityMeshNodeId === "candidate")!.availableZ,
-  ).toEqual([0, 3])
-  expect(conflicts(output)).toHaveLength(1)
+  ).toEqual([0])
+  expect(conflicts(output)).toHaveLength(0)
   expect(area(input, 3)).toBe(16)
-  expect(area(output, 3)).toBe(32)
+  expect(area(output, 3)).toBe(16)
+  expect(area(output, 0)).toBe(area(input, 0))
   await expect(diagram(input, output)).toMatchSvgSnapshot(import.meta.path)
+})
+
+test("rejects the symmetric bottom promotion onto unchanged top support", () => {
+  const input = [node("candidate", [3]), node("support", [0, 2])]
+  const output = solve(input)
+  expect(conflicts(output)).toHaveLength(0)
+  expect(output).toEqual([input[1]!, input[0]!])
+  for (const z of [0, 3]) expect(area(output, z)).toBe(area(input, z))
+})
+
+test("rejects partial immutable coverage without removing candidate area", () => {
+  const input = [
+    node("candidate", [0]),
+    node("support", [1, 3], 0, 2),
+    node("bottom", [3], 2, 2),
+  ]
+  const output = solve(input)
+  expect(conflicts(output)).toHaveLength(0)
+  expect(output.find((n) => n.capacityMeshNodeId === "support")).toEqual(
+    input[1],
+  )
+  // The adjacent mutable half can still promote, leaving a top-only residual.
+  expect(
+    output.find((n) => n.capacityMeshNodeId === "bottom")!.availableZ,
+  ).toEqual([0, 3])
+  for (const z of [0, 3]) expect(area(output, z)).toBe(area(input, z))
+})
+
+test("an adjacent immutable outer footprint does not block promotion", () => {
+  const input = [
+    node("candidate", [0]),
+    node("bottom", [3], -1, 6),
+    node("support", [1, 3], 5, 1),
+  ]
+  const output = solve(input)
+  expect(
+    output.find((n) => n.capacityMeshNodeId === "candidate")!.availableZ,
+  ).toEqual([0, 3])
+  expect(conflicts(output)).toHaveLength(0)
+  for (const z of [0, 3]) expect(area(output, z)).toBe(area(input, z))
 })

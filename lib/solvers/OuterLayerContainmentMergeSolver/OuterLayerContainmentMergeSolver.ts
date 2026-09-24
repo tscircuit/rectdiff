@@ -125,6 +125,14 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
     const immutableNodes = originalNodes.filter(
       (node) => !mutableOuterNodes.includes(node),
     )
+    // Immutable nodes are returned unchanged, so a promotion cannot consume
+    // any of their existing outer-layer footprints.
+    const immutableOuterRects = immutableNodes
+      .filter(
+        (node) =>
+          node.availableZ.includes(topZ) || node.availableZ.includes(bottomZ),
+      )
+      .map(nodeToRect)
     const freeSupportRectsByOuterLayer = new Map<number, XYRect[]>()
     freeSupportRectsByOuterLayer.set(
       topZ,
@@ -152,6 +160,9 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
       const candidateZ = candidate.availableZ[0]!
       const oppositeZ = candidateZ === topZ ? bottomZ : topZ
       const candidateRect = nodeToRect(candidate)
+      if (immutableOuterRects.some((rect) => overlaps(rect, candidateRect))) {
+        continue
+      }
       const oppositeSupportRects =
         freeSupportRectsByOuterLayer.get(oppositeZ) ?? []
 

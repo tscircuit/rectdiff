@@ -24,3 +24,17 @@ disjointness for the examples only.
 Residual subtraction, unchanged-node safety, board bounds, and complete pipeline
 correctness are outside this proof. Runtime regressions also check area
 preservation, residuals, and reversed candidate order.
+
+## Unchanged outer-layer footprints
+
+Run `cd proofs && lean OuterLayerPromotion.lean` for the extended model. Its
+`select_preserves` proves both nonconflict with prior accepted candidates and
+nonconflict with immutable outer-layer footprints. `select_safe` specializes
+this to an empty accepted list, and examples exercise immutable rejection as
+well as duplicate rejection and edge adjacency.
+
+This corresponds to the additional immutable-footprint guard: unchanged nodes
+on either outer layer are collected before selection, and an overlapping
+candidate is rejected. The same modeling limitations above apply. This extends
+selection safety only; residual subtraction, area preservation, board bounds,
+and the complete pipeline remain outside the formal claim.
