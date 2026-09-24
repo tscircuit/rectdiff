@@ -33,5 +33,7 @@ test("simplified out-of-bounds fixture currently creates a generated node outsid
   )
   const highlighted = outsideGeneratedNodes[0]!
   expect(highlighted.center.y - highlighted.height / 2).toBeCloseTo(-7.2754361)
-  await expect(makeBoardBoundsSnapshot(meshNodes)).toMatchSvgSnapshot(import.meta.path)
+  await expect(makeBoardBoundsSnapshot(meshNodes)).toMatchSvgSnapshot(
+    import.meta.path,
+  )
 })
