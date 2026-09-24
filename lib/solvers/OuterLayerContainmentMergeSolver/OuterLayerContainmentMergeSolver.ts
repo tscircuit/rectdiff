@@ -155,6 +155,12 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
       const oppositeSupportRects =
         freeSupportRectsByOuterLayer.get(oppositeZ) ?? []
 
+      // Earlier promotions already occupy both outer layers and are not
+      // carved into residuals. Never promote overlapping free space twice.
+      if (promotedRects.some((rect) => overlaps(rect, candidateRect))) {
+        continue
+      }
+
       if (
         !this.isTransitCompatibleAcrossIntermediateLayers({
           rect: candidateRect,
