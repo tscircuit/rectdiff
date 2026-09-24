@@ -1,8 +1,9 @@
+import { makeBoardBoundsSnapshot } from "./fixtures/makeBoardBoundsSnapshot"
 import { expect, test } from "bun:test"
 import simpleRouteJson from "../test-assets/simplified-out-of-bounds-example.json"
 import { RectDiffPipeline } from "../lib/RectDiffPipeline"
 
-test("simplified out-of-bounds fixture currently creates a generated node outside the board bounds", () => {
+test("simplified out-of-bounds fixture currently creates a generated node outside the board bounds", async () => {
   const solver = new RectDiffPipeline({ simpleRouteJson, maxGapFillPasses: 1 })
 
   solver.solve()
@@ -30,4 +31,7 @@ test("simplified out-of-bounds fixture currently creates a generated node outsid
   expect(outsideGeneratedNodes[0]!.capacityMeshNodeId.startsWith("new-")).toBe(
     true,
   )
+  const highlighted = outsideGeneratedNodes[0]!
+  expect(highlighted.center.y - highlighted.height / 2).toBeCloseTo(-7.2754361)
+  await expect(makeBoardBoundsSnapshot(meshNodes)).toMatchSvgSnapshot(import.meta.path)
 })

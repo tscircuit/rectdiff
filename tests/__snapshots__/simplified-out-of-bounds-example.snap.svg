@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="570" viewBox="0 0 700 570">
+<rect width="700" height="570" fill="white"/>
+<g font-family="sans-serif" fill="#18212b">
+<text x="24" y="30" font-size="20">Gap fill must stay inside the board</text>
+<text x="24" y="54" font-size="14">Top layer · blue: board · green: generated mesh · red: outside</text>
+<rect x="201.5" y="78" width="297" height="324" fill="#64748b" stroke="#64748b" fill-opacity="0.18"/>
+<rect x="164.8638873586629" y="436.4367747518593" width="54" height="54" fill="#64748b" stroke="#64748b" fill-opacity="0.18"/>
+<rect x="201.5" y="402" width="297" height="34.43677475185925" fill="#dc2626" stroke="#dc2626" fill-opacity="0.18"/>
+<rect x="164.8638873586629" y="436.4367747518593" width="54" height="54" fill="#9333ea" stroke="#9333ea" fill-opacity="0.18"/>
+<rect x="201.5" y="78" width="297" height="324" fill="none" stroke="#2563eb" stroke-width="3"/>
+<text x="510" y="402" font-size="14" fill="#2563eb">minY = -6.000</text>
+<text x="24" y="522" font-size="16">BUG: generated mesh crosses the lower board edge</text>
+<text x="24" y="548" font-size="14">Generated lower edge: -7.275 mm · purple: external obstacle</text>
+</g></svg>
