@@ -142,3 +142,5 @@ for (const node of output.meshNodes) {
 - `computeProgress()`: Get current progress (0.0 to 1.0)
 - `getOutput()`: Get the capacity mesh nodes result
 - `visualize()`: Get GraphicsObject for visualization with graphics-debug
+
+hi
