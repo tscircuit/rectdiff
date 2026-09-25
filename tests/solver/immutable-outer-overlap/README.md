@@ -1,39 +1,31 @@
-# Preserve unchanged outer-layer support during promotion
+# Preserve multilayer support and routing area during promotion
 
-This minimal four-layer case starts with two disjoint nodes: a 4-by-4 candidate
-on top `[0]`, and an identically positioned support node on `[1, 3]`. Copper
-pours cover both intermediate layers, satisfying the solver's transit checks.
-The support is free, so it satisfies opposite-layer coverage. However, it is
-not a singleton outer node: the solver preserves it unchanged.
+This four-layer fixture starts with a 4-by-4 top candidate `[0]` and an
+identically positioned free support node `[1, 3]`. They do not overlap on any
+shared layer. Copper pours allow transit across the intermediate layers.
 
-Previously the candidate promoted to `[0, 3]` over the unchanged support. Bottom
-node area doubled from 16 to 32 despite a union area of 16, creating a same-layer
-overlap from a disjoint input. The [reproduction PR](https://github.com/tscircuit/rectdiff/pull/150)
-records the old output and explains its assertions.
+The original overlap reproduction treated the free multilayer support as
+immutable. Promoting the candidate to `[0, 3]` while retaining that support
+doubled bottom-layer area from 16 to 32. A conservative guard prevented the
+overlap but also prevented useful transit.
 
-The fix collects immutable footprints occupying either outer layer and rejects
-any overlapping candidate before promotion. Both nodes retain their original
-layers in this example, preserving area and disjointness. Rejected candidates
-still participate in normal residual subtraction if another candidate promotes.
+The transit merge now consumes free support within the promoted footprint and
+inherits its layers. This fixture produces one node on `[0, 1, 3]`. Every
+layer retains exactly its input area, the existing inner-to-bottom transition
+remains, and top-to-bottom transit is added without any shared-layer overlap.
+The tests therefore assert this behavior rather than requiring rejection of
+free multilayer support.
 
-![Corrected geometry](__snapshots__/immutable-outer-overlap.snap.svg)
+![Merged geometry](__snapshots__/immutable-outer-overlap.snap.svg)
 
-The four panels separate input/output and top/bottom. Green dashed outlines
-identify the candidate; purple solid outlines identify unchanged support. Layer
-lists, area sums, union areas, and the overlap counter show the corrected output.
+The eight panels show input and output separately on all four layers, including
+the empty layer. The layer area labels expose lost or duplicated mesh area.
 
-Regressions cover identical support, the symmetric bottom-to-top case, partial
-immutable support with an adjacent successful promotion, and an adjacent
-immutable node that must not block promotion. Assertions check unchanged support,
-no same-layer overlap, and preserved outer-layer area. The existing Arduino
-inner1-power snapshot also updates because previously unsafe promotions are
-suppressed in that pipeline fixture.
-
-This guard conservatively rejects a whole candidate; it does not split a
-candidate into promotable pieces. Conflicts between two newly promoted mutable
-nodes are a separate issue handled by another PR pair.
+Regressions also cover the symmetric bottom promotion, mixed support that must
+split at layer boundaries, larger support that must leave residual pieces,
+and adjacent multilayer support. Every fixture checks area on all four layers,
+absence of same-layer overlap, and preservation of every existing pairwise
+layer transition. Explicit obstacle and target nodes must stay unchanged, must
+not qualify as free opposite support, and must not block adjacent promotion.
 
 Run: `bun test tests/solver/immutable-outer-overlap/immutable-outer-overlap.test.ts`
-
-Validation: 4 focused tests pass; `bunx tsc --noEmit` passes; full `bun test`
-reports 79 passes, 1 skip, and no failures after updating the two snapshots.

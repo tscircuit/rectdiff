@@ -22,9 +22,9 @@ const rect = (n: CapacityMeshNode) => ({
   width: n.width,
   height: n.height,
 })
-const area = (nodes: CapacityMeshNode[], z: number) =>
+const area = (nodes: CapacityMeshNode[], zs: number[]) =>
   nodes
-    .filter((n) => n.availableZ.includes(z))
+    .filter((n) => zs.every((z) => n.availableZ.includes(z)))
     .reduce((sum, n) => sum + n.width * n.height, 0)
 const conflicts = (nodes: CapacityMeshNode[]) =>
   nodes.flatMap((a, i) =>
@@ -43,7 +43,7 @@ function solve(meshNodes: CapacityMeshNode[]) {
       layerCount: 4,
       minTraceWidth: 0.1,
       minViaDiameter: 0.3,
-      bounds: { minX: 0, maxX: 8, minY: 0, maxY: 4 },
+      bounds: { minX: -1, maxX: 8, minY: 0, maxY: 4 },
       connections: [],
       obstacles: [
         {
@@ -69,80 +69,106 @@ function solve(meshNodes: CapacityMeshNode[]) {
   return solver.getOutput().outputNodes
 }
 
-// Four explicit layer panels avoid hiding the bug behind coincident outlines.
+function expectPreservedMesh(
+  input: CapacityMeshNode[],
+  output: CapacityMeshNode[],
+) {
+  expect(conflicts(input)).toHaveLength(0)
+  expect(conflicts(output)).toHaveLength(0)
+  for (let z = 0; z < 4; z++) {
+    expect(area(output, [z])).toBe(area(input, [z]))
+    for (let other = z + 1; other < 4; other++) {
+      expect(area(output, [z, other])).toBeGreaterThanOrEqual(
+        area(input, [z, other]),
+      )
+    }
+  }
+}
+
 function diagram(input: CapacityMeshNode[], output: CapacityMeshNode[]) {
   const panels = [input, output]
     .flatMap((nodes, col) =>
-      [0, 3].map((z, row) => {
+      [0, 1, 2, 3].map((z, row) => {
         const active = nodes.filter((n) => n.availableZ.includes(z))
-        const ox = 40 + col * 480,
-          oy = 130 + row * 270
+        const ox = 40 + col * 480
+        const oy = 130 + row * 160
         const shapes = active
-          .map((n) => {
-            const isCandidate = n.capacityMeshNodeId === "candidate"
-            return `<rect x="${ox + 25}" y="${oy + 40}" width="180" height="180" fill="${isCandidate ? "#22c55e33" : "#a855f733"}" stroke="${isCandidate ? "#15803d" : "#7e22ce"}" stroke-width="${isCandidate ? 3 : 7}" ${isCandidate ? 'stroke-dasharray="10 7"' : ""}/>`
-          })
+          .map(
+            (n) =>
+              `<rect x="${ox}" y="${oy + 20}" width="120" height="120" fill="#22c55e33" stroke="#15803d" stroke-width="3"/>`,
+          )
           .join("")
-        return `<g><text x="${ox}" y="${oy}" font-size="20" font-weight="bold">${col ? "Output" : "Input"} / ${z === 0 ? "top (z=0)" : "bottom (z=3)"}</text>${shapes}${active.map((n, i) => `<text x="${ox + 225}" y="${oy + 65 + i * 30}" font-size="16">${n.capacityMeshNodeId} [${n.availableZ}]</text>`).join("")}<text x="${ox + 225}" y="${oy + 150}" font-size="16">node area sum: ${area(nodes, z)}</text><text x="${ox + 225}" y="${oy + 177}" font-size="16">union area: 16</text></g>`
+        return `<g><text x="${ox}" y="${oy}" font-size="20" font-weight="bold">${col ? "Output" : "Input"} / z=${z}</text>${shapes}${active.map((n, i) => `<text x="${ox + 145}" y="${oy + 55 + i * 25}" font-size="16">${n.capacityMeshNodeId} [${n.availableZ}]</text>`).join("")}<text x="${ox + 145}" y="${oy + 115}" font-size="16">layer area: ${area(nodes, [z])}</text></g>`
       }),
     )
     .join("")
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="740" viewBox="0 0 1000 740"><rect width="1000" height="740" fill="white"/><g font-family="Arial, sans-serif" fill="#172033"><text x="40" y="40" font-size="25" font-weight="bold">Immutable outer-layer support overlap</text><text x="40" y="75" font-size="17">4 x 4 footprint; inner copper on z=1,2 makes promotion eligible.</text>${panels}<text x="40" y="675" font-size="17">Green dashed: candidate. Purple solid: unchanged multilayer support.</text><text x="40" y="705" font-size="17">Same-layer overlapping pairs: input ${conflicts(input).length}; output ${conflicts(output).length}.</text></g></svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="820" viewBox="0 0 1000 820"><rect width="1000" height="820" fill="white"/><g font-family="Arial, sans-serif" fill="#172033"><text x="40" y="40" font-size="25" font-weight="bold">Free multilayer support is merged safely</text><text x="40" y="75" font-size="17">The promoted candidate inherits [1,3]; consumed support is removed.</text>${panels}<text x="40" y="795" font-size="17">Same-layer overlapping pairs: input ${conflicts(input).length}; output ${conflicts(output).length}.</text></g></svg>`
 }
 
-test("preserves disjointness when opposite support is immutable", async () => {
+test("merges free multilayer support without overlap or losing transit", async () => {
   const input = [node("candidate", [0]), node("support", [1, 3])]
   const output = solve(input)
-  expect(conflicts(input)).toHaveLength(0)
-  expect(output.find((n) => n.capacityMeshNodeId === "support")).toEqual(
-    input[1],
-  )
-  expect(
-    output.find((n) => n.capacityMeshNodeId === "candidate")!.availableZ,
-  ).toEqual([0])
-  expect(conflicts(output)).toHaveLength(0)
-  expect(area(input, 3)).toBe(16)
-  expect(area(output, 3)).toBe(16)
-  expect(area(output, 0)).toBe(area(input, 0))
+  expectPreservedMesh(input, output)
+  expect(output).toHaveLength(1)
+  expect(output[0]!.availableZ).toEqual([0, 1, 3])
+  expect(area(output, [0, 3])).toBe(16)
   await expect(diagram(input, output)).toMatchSvgSnapshot(import.meta.path)
 })
 
-test("rejects the symmetric bottom promotion onto unchanged top support", () => {
+test("preserves transit when bottom promotes into free top support", () => {
   const input = [node("candidate", [3]), node("support", [0, 2])]
   const output = solve(input)
-  expect(conflicts(output)).toHaveLength(0)
-  expect(output).toEqual([input[1]!, input[0]!])
-  for (const z of [0, 3]) expect(area(output, z)).toBe(area(input, z))
+  expectPreservedMesh(input, output)
+  expect(output).toHaveLength(1)
+  expect(output[0]!.availableZ).toEqual([0, 2, 3])
 })
 
-test("rejects partial immutable coverage without removing candidate area", () => {
+test("splits mixed support while preserving every layer and transition", () => {
   const input = [
     node("candidate", [0]),
     node("support", [1, 3], 0, 2),
     node("bottom", [3], 2, 2),
   ]
   const output = solve(input)
-  expect(conflicts(output)).toHaveLength(0)
-  expect(output.find((n) => n.capacityMeshNodeId === "support")).toEqual(
-    input[1],
-  )
-  // The adjacent mutable half can still promote, leaving a top-only residual.
-  expect(
-    output.find((n) => n.capacityMeshNodeId === "bottom")!.availableZ,
-  ).toEqual([0, 3])
-  for (const z of [0, 3]) expect(area(output, z)).toBe(area(input, z))
+  expectPreservedMesh(input, output)
+  expect(area(output, [0, 3])).toBe(16)
+  expect(area(output, [0, 1, 3])).toBe(8)
+  expect(output).toHaveLength(2)
 })
 
-test("an adjacent immutable outer footprint does not block promotion", () => {
+test("carves larger support and preserves adjacent multilayer support", () => {
   const input = [
     node("candidate", [0]),
     node("bottom", [3], -1, 6),
     node("support", [1, 3], 5, 1),
   ]
   const output = solve(input)
+  expectPreservedMesh(input, output)
   expect(
     output.find((n) => n.capacityMeshNodeId === "candidate")!.availableZ,
   ).toEqual([0, 3])
-  expect(conflicts(output)).toHaveLength(0)
-  for (const z of [0, 3]) expect(area(output, z)).toBe(area(input, z))
+  expect(output.find((n) => n.capacityMeshNodeId === "support")).toEqual(
+    input[2],
+  )
 })
+
+for (const flag of ["_containsObstacle", "_containsTarget"] as const) {
+  test(`${flag} is preserved and cannot count as free opposite support`, () => {
+    const immutable = { ...node("immutable", [1, 3]), [flag]: true }
+    const input = [node("candidate", [0]), immutable]
+    const output = solve(input)
+    expectPreservedMesh(input, output)
+    expect(output).toEqual(input)
+  })
+
+  test(`adjacent ${flag} does not block free support promotion`, () => {
+    const immutable = { ...node("immutable", [1, 3], 4, 2), [flag]: true }
+    const input = [node("candidate", [0]), node("support", [1, 3]), immutable]
+    const output = solve(input)
+    expectPreservedMesh(input, output)
+    expect(area(output, [0, 1, 3])).toBe(16)
+    expect(output.find((n) => n.capacityMeshNodeId === "immutable")).toEqual(
+      immutable,
+    )
+  })
+}
