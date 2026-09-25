@@ -174,6 +174,21 @@ test("carves larger support and preserves adjacent multilayer support", () => {
 })
 
 for (const flag of ["_containsObstacle", "_containsTarget"] as const) {
+  test(`overlapping free support does not permit promotion across ${flag}`, () => {
+    const input = [
+      node({ capacityMeshNodeId: "candidate", availableZ: [0] }),
+      node({ capacityMeshNodeId: "support", availableZ: [3] }),
+      {
+        ...node({ capacityMeshNodeId: "immutable", availableZ: [3] }),
+        [flag]: true,
+      },
+    ]
+    // Deliberately overlap free and immutable support, as pipeline inputs can.
+    // Free coverage alone must not allow consuming the immutable footprint.
+    expect(conflicts(input)).toHaveLength(1)
+    expect(solve(input)).toEqual(input)
+  })
+
   test(`${flag} is preserved and cannot count as free opposite support`, () => {
     const immutable = {
       ...node({ capacityMeshNodeId: "immutable", availableZ: [1, 3] }),

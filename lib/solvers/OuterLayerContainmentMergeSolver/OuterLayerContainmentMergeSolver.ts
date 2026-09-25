@@ -130,6 +130,14 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
           isSingletonOuterNode(node, bottomZ)),
     )
     const immutableNodes = originalNodes.filter((node) => !isFreeNode(node))
+    // Target and obstacle footprints can overlap free support in pipeline
+    // input. They stay unchanged, so promotions must not consume their space.
+    const immutableOuterRects = immutableNodes
+      .filter(
+        (node) =>
+          node.availableZ.includes(topZ) || node.availableZ.includes(bottomZ),
+      )
+      .map(nodeToRect)
     const freeSupportNodesByOuterLayer = new Map<number, CapacityMeshNode[]>()
     freeSupportNodesByOuterLayer.set(
       topZ,
@@ -157,6 +165,9 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
       const candidateZ = candidate.availableZ[0]!
       const oppositeZ = candidateZ === topZ ? bottomZ : topZ
       const candidateRect = nodeToRect(candidate)
+      if (immutableOuterRects.some((rect) => overlaps(rect, candidateRect))) {
+        continue
+      }
       const oppositeSupportNodes = (
         freeSupportNodesByOuterLayer.get(oppositeZ) ?? []
       ).filter((node) => overlaps(candidateRect, nodeToRect(node)))
