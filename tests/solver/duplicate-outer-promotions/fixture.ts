@@ -3,21 +3,29 @@ import { OuterLayerContainmentMergeSolver } from "../../../lib/solvers/OuterLaye
 import type { CapacityMeshNode } from "../../../lib/types/capacity-mesh-types"
 import type { SimpleRouteJson } from "../../../lib/types/srj-types"
 
-export const node = (
-  id: string,
-  z: number,
-  x = 0,
+export const node = ({
+  capacityMeshNodeId,
+  z,
+  minX = 0,
   width = 4,
-): CapacityMeshNode => ({
-  capacityMeshNodeId: id,
-  center: { x: x + width / 2, y: 2 },
+}: {
+  capacityMeshNodeId: string
+  z: number
+  minX?: number
+  width?: number
+}): CapacityMeshNode => ({
+  capacityMeshNodeId,
+  center: { x: minX + width / 2, y: 2 },
   width,
   height: 4,
   availableZ: [z],
   layer: `z${z}`,
 })
 
-export const inputNodes = [node("top", 0), node("bottom", 3)]
+export const inputNodes = [
+  node({ capacityMeshNodeId: "top", z: 0 }),
+  node({ capacityMeshNodeId: "bottom", z: 3 }),
+]
 
 export function solve(meshNodes = inputNodes) {
   const simpleRouteJson: SimpleRouteJson = {

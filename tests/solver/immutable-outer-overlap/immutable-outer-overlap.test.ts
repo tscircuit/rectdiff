@@ -3,14 +3,19 @@ import { OuterLayerContainmentMergeSolver } from "../../../lib/solvers/OuterLaye
 import type { CapacityMeshNode } from "../../../lib/types/capacity-mesh-types"
 import { overlaps } from "../../../lib/utils/rectdiff-geometry"
 
-const node = (
-  id: string,
-  availableZ: number[],
-  x = 0,
+const node = ({
+  capacityMeshNodeId,
+  availableZ,
+  minX = 0,
   width = 4,
-): CapacityMeshNode => ({
-  capacityMeshNodeId: id,
-  center: { x: x + width / 2, y: 2 },
+}: {
+  capacityMeshNodeId: string
+  availableZ: number[]
+  minX?: number
+  width?: number
+}): CapacityMeshNode => ({
+  capacityMeshNodeId,
+  center: { x: minX + width / 2, y: 2 },
   width,
   height: 4,
   availableZ,
@@ -106,7 +111,10 @@ function diagram(input: CapacityMeshNode[], output: CapacityMeshNode[]) {
 }
 
 test("merges free multilayer support without overlap or losing transit", async () => {
-  const input = [node("candidate", [0]), node("support", [1, 3])]
+  const input = [
+    node({ capacityMeshNodeId: "candidate", availableZ: [0] }),
+    node({ capacityMeshNodeId: "support", availableZ: [1, 3] }),
+  ]
   const output = solve(input)
   expectPreservedMesh(input, output)
   expect(output).toHaveLength(1)
@@ -116,7 +124,10 @@ test("merges free multilayer support without overlap or losing transit", async (
 })
 
 test("preserves transit when bottom promotes into free top support", () => {
-  const input = [node("candidate", [3]), node("support", [0, 2])]
+  const input = [
+    node({ capacityMeshNodeId: "candidate", availableZ: [3] }),
+    node({ capacityMeshNodeId: "support", availableZ: [0, 2] }),
+  ]
   const output = solve(input)
   expectPreservedMesh(input, output)
   expect(output).toHaveLength(1)
@@ -125,9 +136,14 @@ test("preserves transit when bottom promotes into free top support", () => {
 
 test("splits mixed support while preserving every layer and transition", () => {
   const input = [
-    node("candidate", [0]),
-    node("support", [1, 3], 0, 2),
-    node("bottom", [3], 2, 2),
+    node({ capacityMeshNodeId: "candidate", availableZ: [0] }),
+    node({
+      capacityMeshNodeId: "support",
+      availableZ: [1, 3],
+      minX: 0,
+      width: 2,
+    }),
+    node({ capacityMeshNodeId: "bottom", availableZ: [3], minX: 2, width: 2 }),
   ]
   const output = solve(input)
   expectPreservedMesh(input, output)
@@ -138,9 +154,14 @@ test("splits mixed support while preserving every layer and transition", () => {
 
 test("carves larger support and preserves adjacent multilayer support", () => {
   const input = [
-    node("candidate", [0]),
-    node("bottom", [3], -1, 6),
-    node("support", [1, 3], 5, 1),
+    node({ capacityMeshNodeId: "candidate", availableZ: [0] }),
+    node({ capacityMeshNodeId: "bottom", availableZ: [3], minX: -1, width: 6 }),
+    node({
+      capacityMeshNodeId: "support",
+      availableZ: [1, 3],
+      minX: 5,
+      width: 1,
+    }),
   ]
   const output = solve(input)
   expectPreservedMesh(input, output)
@@ -154,16 +175,34 @@ test("carves larger support and preserves adjacent multilayer support", () => {
 
 for (const flag of ["_containsObstacle", "_containsTarget"] as const) {
   test(`${flag} is preserved and cannot count as free opposite support`, () => {
-    const immutable = { ...node("immutable", [1, 3]), [flag]: true }
-    const input = [node("candidate", [0]), immutable]
+    const immutable = {
+      ...node({ capacityMeshNodeId: "immutable", availableZ: [1, 3] }),
+      [flag]: true,
+    }
+    const input = [
+      node({ capacityMeshNodeId: "candidate", availableZ: [0] }),
+      immutable,
+    ]
     const output = solve(input)
     expectPreservedMesh(input, output)
     expect(output).toEqual(input)
   })
 
   test(`adjacent ${flag} does not block free support promotion`, () => {
-    const immutable = { ...node("immutable", [1, 3], 4, 2), [flag]: true }
-    const input = [node("candidate", [0]), node("support", [1, 3]), immutable]
+    const immutable = {
+      ...node({
+        capacityMeshNodeId: "immutable",
+        availableZ: [1, 3],
+        minX: 4,
+        width: 2,
+      }),
+      [flag]: true,
+    }
+    const input = [
+      node({ capacityMeshNodeId: "candidate", availableZ: [0] }),
+      node({ capacityMeshNodeId: "support", availableZ: [1, 3] }),
+      immutable,
+    ]
     const output = solve(input)
     expectPreservedMesh(input, output)
     expect(area(output, [0, 1, 3])).toBe(16)

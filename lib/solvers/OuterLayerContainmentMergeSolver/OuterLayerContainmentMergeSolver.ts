@@ -130,14 +130,6 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
           isSingletonOuterNode(node, bottomZ)),
     )
     const immutableNodes = originalNodes.filter((node) => !isFreeNode(node))
-    // Free multilayer support is carved below, preserving its inner-layer
-    // access. Obstacle and target nodes stay unchanged and cannot be consumed.
-    const immutableOuterRects = immutableNodes
-      .filter(
-        (node) =>
-          node.availableZ.includes(topZ) || node.availableZ.includes(bottomZ),
-      )
-      .map(nodeToRect)
     const freeSupportNodesByOuterLayer = new Map<number, CapacityMeshNode[]>()
     freeSupportNodesByOuterLayer.set(
       topZ,
@@ -165,9 +157,6 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
       const candidateZ = candidate.availableZ[0]!
       const oppositeZ = candidateZ === topZ ? bottomZ : topZ
       const candidateRect = nodeToRect(candidate)
-      if (immutableOuterRects.some((rect) => overlaps(rect, candidateRect))) {
-        continue
-      }
       const oppositeSupportNodes = (
         freeSupportNodesByOuterLayer.get(oppositeZ) ?? []
       ).filter((node) => overlaps(candidateRect, nodeToRect(node)))

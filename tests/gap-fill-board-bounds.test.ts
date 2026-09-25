@@ -84,12 +84,41 @@ test("seed spanning the board edge only grows from its in-board portion", () => 
     ],
   })
   solver.solve()
-  expect(solver.getOutput().expandedSegments[0]!.newNode).toMatchObject({
+  const expanded = solver.getOutput().expandedSegments[0]!
+  expect(expanded.newNode).toMatchObject({
     center: { x: 3, y: 0 },
     width: 4,
     height: 10,
   })
+  expect(solver.lastSegment).toBe(expanded.segment)
+  expect(solver.lastSegment).toMatchObject({
+    start: { x: 1, y: -5 },
+    end: { x: 1, y: 5 },
+  })
 })
+
+const invalidBoundsCases = [
+  { name: "NaN", bounds: { ...bounds, maxX: Number.NaN }, error: /finite/ },
+  {
+    name: "infinite",
+    bounds: { ...bounds, maxY: Number.POSITIVE_INFINITY },
+    error: /finite/,
+  },
+  { name: "reversed", bounds: { ...bounds, minX: 6 }, error: /minX <= maxX/ },
+]
+
+for (const invalidCase of invalidBoundsCases) {
+  test(`${invalidCase.name} bounds are rejected on construction`, () => {
+    expect(
+      () =>
+        new ExpandEdgesToEmptySpaceSolver({
+          bounds: invalidCase.bounds,
+          inputMeshNodes: [parent],
+          segmentsWithAdjacentEmptySpace: [],
+        }),
+    ).toThrow(invalidCase.error)
+  })
+}
 
 test("outline void clearance still stops expansion before the board edge", () => {
   const solver = new ExpandEdgesToEmptySpaceSolver({
