@@ -48,6 +48,7 @@ test("bounded recursive gap filling keeps useful space and respects blockers", (
     bounds,
     meshNodes: [parent, blocker],
     maxGapFillPasses: 3,
+    minTraceWidth: 0.1,
   })
   solver.solve()
   const generated = solver

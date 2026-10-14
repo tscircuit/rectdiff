@@ -27,6 +27,7 @@ type GapFillSolverInput = {
    * expanded nodes; values below 1 are clamped to 1.
    */
   maxGapFillPasses: number
+  minTraceWidth: number
 }
 
 type GapFillOutput = {
@@ -75,6 +76,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
               .segmentsWithAdjacentEmptySpace,
           boardVoid: gapFillPipeline.inputProblem.boardVoid,
           bounds: gapFillPipeline.inputProblem.bounds,
+          minTraceWidth: gapFillPipeline.inputProblem.minTraceWidth,
         },
       ],
       {

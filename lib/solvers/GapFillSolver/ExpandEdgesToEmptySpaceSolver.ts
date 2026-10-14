@@ -79,6 +79,7 @@ const getDistanceToBoardEdge = (
 export type ExpandEdgesToEmptySpaceSolverInput = {
   /** Optional for standalone callers; the full board pipeline always supplies it. */
   bounds?: Bounds
+  minTraceWidth?: number
   inputMeshNodes: CapacityMeshNode[]
   segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace>
   boardVoid?: {
@@ -261,6 +262,11 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     const nodeWidth = nodeBounds.maxX - nodeBounds.minX
     const nodeHeight = nodeBounds.maxY - nodeBounds.minY
 
+    const minRoutableDimension = Math.max(EPS, this.input.minTraceWidth ?? 0)
+    if (nodeWidth < minRoutableDimension || nodeHeight < minRoutableDimension) {
+      return
+    }
+
     const expandedSegment = {
       segment,
       newNode: {
@@ -273,11 +279,6 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
       },
     }
     this.lastExpandedSegment = expandedSegment
-
-    if (nodeWidth < EPS || nodeHeight < EPS) {
-      // Node is too small, skipping
-      return
-    }
 
     this.expandedSegments.push(expandedSegment)
     this.rectSpatialIndex.insert({

@@ -77,6 +77,8 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
               rectDiffPipeline.inputProblem.simpleRouteJson.layerCount || 0,
           },
           maxGapFillPasses: rectDiffPipeline.inputProblem.maxGapFillPasses,
+          minTraceWidth:
+            rectDiffPipeline.inputProblem.simpleRouteJson.minTraceWidth,
         },
       ],
     ),

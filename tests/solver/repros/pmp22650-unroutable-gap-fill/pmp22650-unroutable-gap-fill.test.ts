@@ -34,6 +34,7 @@ const platedHoleRegion: CapacityMeshNode = {
 
 test("PMP22650 does not fill a gap narrower than minTraceWidth", async () => {
   const solver = new ExpandEdgesToEmptySpaceSolver({
+    minTraceWidth: 0.1,
     inputMeshNodes: [lowerRegion, upperRegion, platedHoleRegion],
     segmentsWithAdjacentEmptySpace: [
       {
@@ -51,11 +52,7 @@ test("PMP22650 does not fill a gap narrower than minTraceWidth", async () => {
   const expandedNodes = solver
     .getOutput()
     .expandedSegments.map(({ newNode }) => newNode)
-  expect(expandedNodes).toHaveLength(1)
-  expect(expandedNodes[0]).toMatchObject({
-    width: 5.059939270000001,
-    height: 0.002759999999966567,
-  })
+  expect(expandedNodes).toHaveLength(0)
   const verticalScale = 40
   await expect(
     getSvgFromGraphicsObject(
