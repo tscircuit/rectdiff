@@ -184,7 +184,7 @@ test("PMP22650 has a local top-to-bottom routing region near C241 and R188", asy
     ),
   )
 
-  expect(closestTopBottomTransitionDistance).toBeGreaterThan(5)
+  expect(closestTopBottomTransitionDistance).toBeLessThan(1.5)
 
   const topObstacles = getLocalObstacleRects(rectDiffSample024.obstacles, "top")
   const bottomObstacles = getLocalObstacleRects(

@@ -116,13 +116,6 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
     const viaMinSize = Math.max(srj.minViaDiameter ?? 0, srj.minTraceWidth || 0)
     const originalNodes = this.input.meshNodes.map(cloneNode)
     const obstaclesByLayer = this.buildObstaclesByLayer(layerCount)
-    if (
-      !obstaclesByLayer
-        .slice(1, -1)
-        .some((entries) => entries.some((entry) => entry.obstacle.isCopperPour))
-    ) {
-      return originalNodes
-    }
     const mutableOuterNodes = originalNodes.filter(
       (node) =>
         isFreeNode(node) &&
@@ -312,17 +305,16 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
     fromZ: number
     toZ: number
     obstaclesByLayer: ObstacleWithRect[][]
-  }) {
+  }): boolean {
     const { rect, fromZ, toZ, obstaclesByLayer } = params
-    const lo = Math.min(fromZ, toZ)
-    const hi = Math.max(fromZ, toZ)
+    const firstZ = Math.min(fromZ, toZ)
+    const lastZ = Math.max(fromZ, toZ)
 
-    if (hi - lo < 2) return false
+    if (lastZ - firstZ < 2) return false
 
-    // This merge reconnects outer regions separated by copper planes. Empty
-    // inner layers permit transit, but do not require a containment merge.
-    let crossesCopperPlane = false
-    for (let z = lo + 1; z < hi; z++) {
+    // Empty inner layers permit a through-via. An inner copper pour also permits
+    // transit when it covers the whole region, while ordinary obstacles do not.
+    for (let z = firstZ + 1; z < lastZ; z++) {
       const overlapping = (obstaclesByLayer[z] ?? []).filter((entry) =>
         overlaps(entry.rect, rect),
       )
@@ -339,10 +331,9 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
       ) {
         return false
       }
-      crossesCopperPlane = true
     }
 
-    return crossesCopperPlane
+    return true
   }
 
   override getOutput(): { outputNodes: CapacityMeshNode[] } {
