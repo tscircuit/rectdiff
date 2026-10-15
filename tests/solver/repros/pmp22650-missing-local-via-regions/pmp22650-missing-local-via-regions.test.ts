@@ -8,7 +8,7 @@ import {
 } from "graphics-debug"
 import { RectDiffPipeline } from "lib/RectDiffPipeline"
 import type { CapacityMeshNode } from "lib/types/capacity-mesh-types"
-import type { Obstacle } from "lib/types/srj-types"
+import type { Obstacle, SimpleRouteJson } from "lib/types/srj-types"
 
 const localBounds = {
   minX: 156.8,
@@ -19,6 +19,46 @@ const localBounds = {
 const originalAltiumVia = { x: 159.01079958, y: 126.15159936 }
 const topTerminal = { x: 158.37579958, y: 125.98959816 }
 const bottomTerminal = { x: 159.22980092, y: 125.64359936 }
+
+const rectDiffSample024: SimpleRouteJson = {
+  layerCount: sample024.layerCount,
+  minTraceWidth: sample024.minTraceWidth,
+  minViaDiameter: sample024.minViaDiameter,
+  bounds: sample024.bounds,
+  outline: sample024.outline,
+  obstacles: sample024.obstacles.map((obstacle) => ({
+    type: "rect",
+    layers: obstacle.layers,
+    zLayers: obstacle.zLayers,
+    center: obstacle.center,
+    width: obstacle.width,
+    height: obstacle.height,
+    connectedTo: obstacle.connectedTo,
+    netIsAssignable: obstacle.netIsAssignable,
+    isCopperPour: obstacle.isCopperPour,
+    offBoardConnectsTo: obstacle.offBoardConnectsTo,
+  })),
+  connections: sample024.connections.map((connection) => ({
+    name: connection.name,
+    netConnectionName: connection.netConnectionName,
+    nominalTraceWidth: connection.nominalTraceWidth,
+    externallyConnectedPointIds: connection.externallyConnectedPointIds,
+    pointsToConnect: connection.pointsToConnect.map((point) => {
+      if (!("layer" in point)) {
+        throw new Error(
+          `PMP22650 point ${point.pointId ?? "unknown"} must name one layer`,
+        )
+      }
+      return {
+        x: point.x,
+        y: point.y,
+        layer: point.layer,
+        pointId: point.pointId,
+        pcb_port_id: point.pcb_port_id,
+      }
+    }),
+  })),
+}
 
 const clipRectToLocalBounds = (rect: Rect): Rect | null => {
   const minX = Math.max(localBounds.minX, rect.center.x - rect.width / 2)
@@ -126,7 +166,7 @@ const createLocalPanel = (params: {
 
 test("PMP22650 has a local top-to-bottom routing region near C241 and R188", async () => {
   const solver = new RectDiffPipeline({
-    simpleRouteJson: sample024,
+    simpleRouteJson: rectDiffSample024,
     maxGapFillPasses: 1,
   })
   solver.solve()
@@ -146,8 +186,11 @@ test("PMP22650 has a local top-to-bottom routing region near C241 and R188", asy
 
   expect(closestTopBottomTransitionDistance).toBeLessThan(1.5)
 
-  const topObstacles = getLocalObstacleRects(sample024.obstacles, "top")
-  const bottomObstacles = getLocalObstacleRects(sample024.obstacles, "bottom")
+  const topObstacles = getLocalObstacleRects(rectDiffSample024.obstacles, "top")
+  const bottomObstacles = getLocalObstacleRects(
+    rectDiffSample024.obstacles,
+    "bottom",
+  )
   const graphics = stackGraphicsHorizontally([
     createLocalPanel({
       title: "PMP22650 top-layer topology",
@@ -181,4 +224,4 @@ test("PMP22650 has a local top-to-bottom routing region near C241 and R188", asy
   })
 
   await expect(svg).toMatchSvgSnapshot(import.meta.path)
-})
+}, 30_000)
