@@ -3,6 +3,7 @@ import { EPS, distancePointToRectEdges } from "../../utils/rectdiff-geometry"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
 import type RBush from "rbush"
+import Flatbush from "flatbush"
 import type { RTreeRect } from "../../types/capacity-mesh-types"
 const quantize = (value: number, precision = 1e-6) =>
   Math.round(value / precision) * precision
@@ -17,81 +18,122 @@ const toRect = (rect: XYRect | RTreeRect): XYRect =>
       }
     : rect
 
-/**
- * Compute exact uncovered segments along a 1D line.
- */
-function computeUncoveredSegments(params: {
+type ProjectedBlocker = {
+  start: number
+  end: number
+  sourceIndex: number
+}
+
+type EdgeBounds = {
   lineStart: number
   lineEnd: number
-  coveringIntervals: Array<{ start: number; end: number }>
+  clipStart: number
+  clipEnd: number
+  sourceIndex?: number
+}
+
+/**
+ * Project sorted blocker intervals onto an edge, preserving the original
+ * normalization of clipped intervals outside that edge.
+ */
+function computeUncoveredSegments(params: {
+  segment: EdgeBounds
+  coveringIntervals: ProjectedBlocker[]
+  hasReversedIntervals: boolean
   minSegmentLength: number
 }): Array<{ start: number; end: number; center: number }> {
-  const { lineStart, lineEnd, coveringIntervals, minSegmentLength } = params
-  const lineStartQ = quantize(lineStart)
-  const lineEndQ = quantize(lineEnd)
-  const normalizedIntervals = coveringIntervals
-    .map((i) => {
-      const s = quantize(i.start)
-      const e = quantize(i.end)
-      return { start: Math.min(s, e), end: Math.max(s, e) }
-    })
-    .filter((i) => i.end > i.start + EPS)
+  const { segment, coveringIntervals, hasReversedIntervals, minSegmentLength } =
+    params
+  const lineStartQ = quantize(segment.lineStart)
+  const lineEndQ = quantize(segment.lineEnd)
+  const clipStartQ = quantize(segment.clipStart)
+  const clipEndQ = quantize(segment.clipEnd)
+  let normalizedIntervals: Array<{ start: number; end: number }> = []
+
+  if (hasReversedIntervals || clipStartQ > clipEndQ) {
+    // Reversed extents have no monotonic projection; retain the general
+    // normalization and ordering used by the exhaustive implementation.
+    normalizedIntervals = coveringIntervals
+      .filter((interval) => interval.sourceIndex !== segment.sourceIndex)
+      .map((interval) => {
+        const start = Math.max(clipStartQ, interval.start)
+        const end = Math.min(clipEndQ, interval.end)
+        return { start: Math.min(start, end), end: Math.max(start, end) }
+      })
+      .filter((interval) => interval.end > interval.start + EPS)
+      .sort((a, b) => a.start - b.start)
+  } else {
+    let beforeStart = Infinity
+    let afterEnd = -Infinity
+    for (const interval of coveringIntervals) {
+      if (interval.sourceIndex === segment.sourceIndex) continue
+      const start = Math.max(clipStartQ, interval.start)
+      const end = Math.min(clipEndQ, interval.end)
+      if (end < start) {
+        // A disjoint clipped interval is reversed by the original algorithm.
+        // All intervals before the edge share clipStartQ as their end;
+        // all intervals after it share clipEndQ as their start.
+        if (interval.end < clipStartQ) {
+          beforeStart = Math.min(beforeStart, end)
+        } else {
+          afterEnd = Math.max(afterEnd, start)
+        }
+      } else if (end > start + EPS) {
+        // Clipping preserves start order for overlapping intervals.
+        normalizedIntervals.push({ start, end })
+      }
+    }
+    if (clipStartQ > beforeStart + EPS) {
+      normalizedIntervals.unshift({ start: beforeStart, end: clipStartQ })
+    }
+    if (afterEnd > clipEndQ + EPS) {
+      normalizedIntervals.push({ start: clipEndQ, end: afterEnd })
+    }
+  }
 
   if (normalizedIntervals.length === 0) {
     const center = (lineStartQ + lineEndQ) / 2
     return [{ start: lineStartQ, end: lineEndQ, center }]
   }
 
-  // Sort intervals by start position
-  const sorted = [...normalizedIntervals].sort((a, b) => a.start - b.start)
-
-  // Merge overlapping intervals
-  const merged: Array<{ start: number; end: number }> = []
-  let current = { ...sorted[0]! }
-
-  for (let i = 1; i < sorted.length; i++) {
-    const interval = sorted[i]!
-    if (interval.start <= current.end + EPS) {
-      // Overlapping or adjacent - merge
-      current.end = Math.max(current.end, interval.end)
-    } else {
-      // No overlap - save current and start new
-      merged.push(current)
-      current = { ...interval }
-    }
-  }
-  merged.push(current)
-
-  // Find gaps between merged intervals
   const uncovered: Array<{ start: number; end: number; center: number }> = []
-
-  // Check gap before first interval
-  if (merged[0]!.start > lineStartQ + EPS) {
-    const start = lineStartQ
-    const end = merged[0]!.start
-    if (end - start >= minSegmentLength) {
-      uncovered.push({ start, end, center: (start + end) / 2 })
+  const currentStart = normalizedIntervals[0]!.start
+  let currentEnd = normalizedIntervals[0]!.end
+  if (
+    currentStart > lineStartQ + EPS &&
+    currentStart - lineStartQ >= minSegmentLength
+  ) {
+    uncovered.push({
+      start: lineStartQ,
+      end: currentStart,
+      center: (lineStartQ + currentStart) / 2,
+    })
+  }
+  for (let i = 1; i < normalizedIntervals.length; i++) {
+    const interval = normalizedIntervals[i]!
+    if (interval.start <= currentEnd + EPS) {
+      currentEnd = Math.max(currentEnd, interval.end)
+    } else {
+      if (interval.start - currentEnd >= minSegmentLength) {
+        uncovered.push({
+          start: currentEnd,
+          end: interval.start,
+          center: (currentEnd + interval.start) / 2,
+        })
+      }
+      currentEnd = interval.end
     }
   }
-
-  // Check gaps between intervals
-  for (let i = 0; i < merged.length - 1; i++) {
-    const start = merged[i]!.end
-    const end = merged[i + 1]!.start
-    if (end - start >= minSegmentLength) {
-      uncovered.push({ start, end, center: (start + end) / 2 })
-    }
+  if (
+    currentEnd < lineEndQ - EPS &&
+    lineEndQ - currentEnd >= minSegmentLength
+  ) {
+    uncovered.push({
+      start: currentEnd,
+      end: lineEndQ,
+      center: (currentEnd + lineEndQ) / 2,
+    })
   }
-
-  // Check gap after last interval
-  if (merged[merged.length - 1]!.end < lineEndQ - EPS) {
-    const start = merged[merged.length - 1]!.end
-    const end = lineEndQ
-    if (end - start >= minSegmentLength) {
-      uncovered.push({ start, end, center: (start + end) / 2 })
-    }
-  }
-
   return uncovered
 }
 
@@ -118,13 +160,38 @@ export function computeEdgeCandidates3D(params: {
   const out: Candidate3D[] = []
   // Use small inset from edges for placement
   const δ = Math.max(minSize * 0.15, EPS * 3)
-  const dedup = new Set<string>()
+  const edgesPerAxis = 2
+  const edgesPerRectangle = 4
+  let nextOrder = 0
+  const acceptedSeeds = new Map<
+    string,
+    { x: number; y: number; z: number; order: number; pointOrder: number }
+  >()
   const hardRectsByLayer = Array.from({ length: layerCount }, (_, z) =>
     [
       ...(obstacleIndexByLayer[z]?.all() ?? []),
       ...(hardPlacedByLayer[z] ?? []),
     ].map(toRect),
   )
+  // Ranking measures the original rectangle edges, before line-test rounding.
+  const hardRectIndexByLayer = hardRectsByLayer.map((rects) => {
+    if (rects.length === 0) return null
+    const index = new Flatbush(rects.length)
+    for (const rect of rects) {
+      const endX = rect.x + rect.width
+      const endY = rect.y + rect.height
+      // The index needs ordered bounds, including for reversed extents.
+      // Exact ranking still uses the original rectangle and distance helper.
+      index.add(
+        Math.min(rect.x, endX),
+        Math.min(rect.y, endY),
+        Math.max(rect.x, endX),
+        Math.max(rect.y, endY),
+      )
+    }
+    index.finish()
+    return index
+  })
   const key = (p: { x: number; y: number; z: number }) =>
     `${p.z}|${p.x.toFixed(6)}|${p.y.toFixed(6)}`
 
@@ -137,7 +204,13 @@ export function computeEdgeCandidates3D(params: {
     })
   }
 
-  function pushIfFree(p: { x: number; y: number; z: number }) {
+  function pushIfFree(p: {
+    x: number
+    y: number
+    z: number
+    order: number
+    pointOrder: number
+  }) {
     const qx = quantize(p.x)
     const qy = quantize(p.y)
     const { z } = p
@@ -150,19 +223,249 @@ export function computeEdgeCandidates3D(params: {
       y > bounds.y + bounds.height - EPS
     )
       return
-    if (fullyOcc({ x, y })) return // new rule: only drop if truly impossible
+    const k = key({ x, y, z })
+    const previous = acceptedSeeds.get(k)
+    if (
+      previous &&
+      (previous.order < p.order ||
+        (previous.order === p.order && previous.pointOrder <= p.pointOrder))
+    )
+      return
+    if (fullyOcc({ x, y })) return
+    // Grouped lines run out of source order. Keep the first accepted point in
+    // the original order, including its exact quantized float representation.
+    acceptedSeeds.set(k, { x, y, z, order: p.order, pointOrder: p.pointOrder })
+  }
 
+  for (let z = 0; z < layerCount; z++) {
+    const blockers = (hardRectsByLayer[z] ?? []).map((b) => ({
+      x: quantize(b.x),
+      y: quantize(b.y),
+      width: quantize(b.width),
+      height: quantize(b.height),
+    }))
+
+    // Query quantized blockers on the full line. Clipping a disjoint
+    // interval can reverse its endpoints, so the query must remain unbounded.
+    const blockerIndex =
+      blockers.length > 0 ? new Flatbush(blockers.length) : null
+    if (blockerIndex) {
+      for (const blocker of blockers) {
+        blockerIndex.add(
+          blocker.x,
+          blocker.y,
+          blocker.x + blocker.width,
+          blocker.y + blocker.height,
+        )
+      }
+      blockerIndex.finish()
+    }
+
+    // Group only query descriptions, not their hits: retained memory is linear
+    // in the number of edges, even when every line crosses every blocker.
+    const verticalLines = new Map<number, number[]>()
+    const horizontalLines = new Map<number, number[]>()
+    const addLine = (params: {
+      vertical: boolean
+      coordinate: number
+      edgeOrdinal: number
+    }) => {
+      const lines = params.vertical ? verticalLines : horizontalLines
+      const segments = lines.get(params.coordinate)
+      if (segments) segments.push(params.edgeOrdinal)
+      else lines.set(params.coordinate, [params.edgeOrdinal])
+    }
+
+    // These ordinals follow the original walk: four corners, four board
+    // edges, then left/right/top/bottom for each blocker. Reserve each edge's
+    // slot even when it lies outside the board, so its source remains derivable.
+    const layerOrder = nextOrder
+    let nextEdgeOrdinal = 0
+
+    const corners = [
+      { x: bounds.x + δ, y: bounds.y + δ },
+      { x: bounds.x + bounds.width - δ, y: bounds.y + δ },
+      { x: bounds.x + δ, y: bounds.y + bounds.height - δ },
+      { x: bounds.x + bounds.width - δ, y: bounds.y + bounds.height - δ },
+    ]
+    for (const corner of corners) {
+      pushIfFree({
+        ...corner,
+        z,
+        order: layerOrder + nextEdgeOrdinal++,
+        pointOrder: 0,
+      })
+    }
+
+    const firstBoardEdgeOrdinal = nextEdgeOrdinal
+    for (const coordinate of [bounds.y + δ, bounds.y + bounds.height - δ]) {
+      addLine({
+        vertical: false,
+        coordinate,
+        edgeOrdinal: nextEdgeOrdinal++,
+      })
+    }
+    for (const coordinate of [bounds.x + δ, bounds.x + bounds.width - δ]) {
+      addLine({
+        vertical: true,
+        coordinate,
+        edgeOrdinal: nextEdgeOrdinal++,
+      })
+    }
+
+    const firstBlockerEdgeOrdinal = nextEdgeOrdinal
+    for (let sourceIndex = 0; sourceIndex < blockers.length; sourceIndex++) {
+      const blocker = blockers[sourceIndex]!
+      for (const coordinate of [blocker.x - δ, blocker.x + blocker.width + δ]) {
+        const edgeOrdinal = nextEdgeOrdinal++
+        if (
+          !(
+            coordinate > bounds.x + EPS &&
+            coordinate < bounds.x + bounds.width - EPS
+          )
+        )
+          continue
+        addLine({
+          vertical: true,
+          coordinate,
+          edgeOrdinal,
+        })
+      }
+      for (const coordinate of [
+        blocker.y - δ,
+        blocker.y + blocker.height + δ,
+      ]) {
+        const edgeOrdinal = nextEdgeOrdinal++
+        if (
+          !(
+            coordinate > bounds.y + EPS &&
+            coordinate < bounds.y + bounds.height - EPS
+          )
+        )
+          continue
+        addLine({
+          vertical: false,
+          coordinate,
+          edgeOrdinal,
+        })
+      }
+    }
+
+    nextOrder = layerOrder + nextEdgeOrdinal
+    for (const vertical of [true, false]) {
+      const lines = vertical ? verticalLines : horizontalLines
+      for (const [coordinate, segments] of lines) {
+        const indices = blockerIndex
+          ? vertical
+            ? blockerIndex.search(coordinate, -Infinity, coordinate, Infinity)
+            : blockerIndex.search(-Infinity, coordinate, Infinity, coordinate)
+          : []
+        const coveringIntervals: ProjectedBlocker[] = []
+        let hasReversedIntervals = false
+        for (const sourceIndex of indices) {
+          const blocker = blockers[sourceIndex]!
+          if (
+            vertical
+              ? blocker.x > coordinate || blocker.x + blocker.width < coordinate
+              : blocker.y > coordinate ||
+                blocker.y + blocker.height < coordinate
+          )
+            continue
+          const start = quantize(vertical ? blocker.y : blocker.x)
+          const end = quantize(
+            vertical ? blocker.y + blocker.height : blocker.x + blocker.width,
+          )
+          coveringIntervals.push({ start, end, sourceIndex })
+          if (end < start) hasReversedIntervals = true
+        }
+        coveringIntervals.sort((a, b) => a.start - b.start)
+        for (const edgeOrdinal of segments) {
+          const isBoardEdge = edgeOrdinal < firstBlockerEdgeOrdinal
+          const blockerEdgeOffset = edgeOrdinal - firstBlockerEdgeOrdinal
+          const sourceIndex = isBoardEdge
+            ? undefined
+            : Math.floor(blockerEdgeOffset / edgesPerRectangle)
+          const source = isBoardEdge ? bounds : blockers[sourceIndex!]!
+          const leading = isBoardEdge
+            ? edgeOrdinal === firstBoardEdgeOrdinal ||
+              edgeOrdinal === firstBoardEdgeOrdinal + edgesPerAxis
+            : blockerEdgeOffset % edgesPerRectangle === 0 ||
+              blockerEdgeOffset % edgesPerRectangle === edgesPerAxis
+          const start = vertical ? source.x : source.y
+          const extent = vertical ? source.width : source.height
+          // Recompute the original expression instead of emitting the group's
+          // Map key: numerically equal keys can have different signed zeros.
+          const exactCoordinate = isBoardEdge
+            ? leading
+              ? start + δ
+              : start + extent - δ
+            : leading
+              ? start - δ
+              : start + extent + δ
+          const clipStart = vertical ? source.y : source.x
+          const clipEnd = vertical
+            ? source.y + source.height
+            : source.x + source.width
+          const uncovered = computeUncoveredSegments({
+            segment: {
+              lineStart: isBoardEdge ? clipStart + δ : clipStart,
+              lineEnd: isBoardEdge ? clipEnd - δ : clipEnd,
+              clipStart,
+              clipEnd,
+              sourceIndex,
+            },
+            coveringIntervals,
+            hasReversedIntervals,
+            minSegmentLength: minSize * 0.5,
+          })
+          let pointOrder = 0
+          for (const gap of uncovered) {
+            const pushAt = (position: number) =>
+              pushIfFree({
+                ...(vertical
+                  ? { x: exactCoordinate, y: position, z }
+                  : { x: position, y: exactCoordinate, z }),
+                order: layerOrder + edgeOrdinal,
+                pointOrder: pointOrder++,
+              })
+            const length = gap.end - gap.start
+            if (isBoardEdge) {
+              if (length < minSize) continue
+              pushAt(gap.center)
+              if (length > minSize * 1.5) {
+                pushAt(gap.start + minSize * 0.4)
+                pushAt(gap.end - minSize * 0.4)
+              }
+            } else {
+              pushAt(gap.center)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Rank each accepted point once, in the same order as the exhaustive walk.
+  const seeds = [...acceptedSeeds.values()].sort(
+    (a, b) => a.order - b.order || a.pointOrder - b.pointOrder,
+  )
+  for (const { x, y, z } of seeds) {
     // Distance uses obstacles + hard nodes (soft nodes ignored for ranking)
     const hard = hardRectsByLayer[z] ?? []
     let d = distancePointToRectEdges({ x, y }, bounds)
-    for (const blocker of hard) {
-      d = Math.min(d, distancePointToRectEdges({ x, y }, blocker))
+    const hardRectIndex = hardRectIndexByLayer[z]
+    if (hardRectIndex) {
+      // A nearest box supplies an upper bound, not necessarily the nearest
+      // edge: several rectangles may contain the point with different gaps.
+      const nearestIndex = hardRectIndex.neighbors(x, y, 1)[0]!
+      d = Math.min(d, distancePointToRectEdges({ x, y }, hard[nearestIndex]!))
+      // Any edge closer than d belongs to a rectangle intersecting this square.
+      const nearbyIndices = hardRectIndex.search(x - d, y - d, x + d, y + d)
+      for (const index of nearbyIndices) {
+        d = Math.min(d, distancePointToRectEdges({ x, y }, hard[index]!))
+      }
     }
     const distance = quantize(d)
-
-    const k = key({ x, y, z })
-    if (dedup.has(k)) return
-    dedup.add(k)
 
     // Approximate z-span strength at this z (ignoring soft nodes)
     const span = longestFreeSpanAroundZ({
@@ -183,228 +486,6 @@ export function computeEdgeCandidates3D(params: {
       zSpanLen: span.length,
       isEdgeSeed: true,
     })
-  }
-
-  for (let z = 0; z < layerCount; z++) {
-    const blockers = (hardRectsByLayer[z] ?? []).map((b) => ({
-      x: quantize(b.x),
-      y: quantize(b.y),
-      width: quantize(b.width),
-      height: quantize(b.height),
-    }))
-
-    // 1) Board edges — find exact uncovered segments along each edge
-
-    // First, check corners explicitly
-    const corners = [
-      { x: bounds.x + δ, y: bounds.y + δ }, // top-left
-      { x: bounds.x + bounds.width - δ, y: bounds.y + δ }, // top-right
-      { x: bounds.x + δ, y: bounds.y + bounds.height - δ }, // bottom-left
-      { x: bounds.x + bounds.width - δ, y: bounds.y + bounds.height - δ }, // bottom-right
-    ]
-    for (const corner of corners) {
-      pushIfFree({ x: corner.x, y: corner.y, z })
-    }
-
-    // Top edge (y = bounds.y + δ)
-    const topY = bounds.y + δ
-    const topCovering = blockers
-      .filter((b) => b.y <= topY && b.y + b.height >= topY)
-      .map((b) => ({
-        start: Math.max(bounds.x, b.x),
-        end: Math.min(bounds.x + bounds.width, b.x + b.width),
-      }))
-    // Find uncovered segments that are large enough to potentially fill
-    const topUncovered = computeUncoveredSegments({
-      lineStart: bounds.x + δ,
-      lineEnd: bounds.x + bounds.width - δ,
-      coveringIntervals: topCovering,
-      minSegmentLength: minSize * 0.5,
-    })
-    for (const seg of topUncovered) {
-      const segLen = seg.end - seg.start
-      if (segLen >= minSize) {
-        // Seed center and a few strategic points
-        pushIfFree({ x: seg.center, y: topY, z })
-        if (segLen > minSize * 1.5) {
-          pushIfFree({ x: seg.start + minSize * 0.4, y: topY, z })
-          pushIfFree({ x: seg.end - minSize * 0.4, y: topY, z })
-        }
-      }
-    }
-
-    // Bottom edge (y = bounds.y + bounds.height - δ)
-    const bottomY = bounds.y + bounds.height - δ
-    const bottomCovering = blockers
-      .filter((b) => b.y <= bottomY && b.y + b.height >= bottomY)
-      .map((b) => ({
-        start: Math.max(bounds.x, b.x),
-        end: Math.min(bounds.x + bounds.width, b.x + b.width),
-      }))
-    const bottomUncovered = computeUncoveredSegments({
-      lineStart: bounds.x + δ,
-      lineEnd: bounds.x + bounds.width - δ,
-      coveringIntervals: bottomCovering,
-      minSegmentLength: minSize * 0.5,
-    })
-    for (const seg of bottomUncovered) {
-      const segLen = seg.end - seg.start
-      if (segLen >= minSize) {
-        pushIfFree({ x: seg.center, y: bottomY, z })
-        if (segLen > minSize * 1.5) {
-          pushIfFree({ x: seg.start + minSize * 0.4, y: bottomY, z })
-          pushIfFree({ x: seg.end - minSize * 0.4, y: bottomY, z })
-        }
-      }
-    }
-
-    // Left edge (x = bounds.x + δ)
-    const leftX = bounds.x + δ
-    const leftCovering = blockers
-      .filter((b) => b.x <= leftX && b.x + b.width >= leftX)
-      .map((b) => ({
-        start: Math.max(bounds.y, b.y),
-        end: Math.min(bounds.y + bounds.height, b.y + b.height),
-      }))
-    const leftUncovered = computeUncoveredSegments({
-      lineStart: bounds.y + δ,
-      lineEnd: bounds.y + bounds.height - δ,
-      coveringIntervals: leftCovering,
-      minSegmentLength: minSize * 0.5,
-    })
-    for (const seg of leftUncovered) {
-      const segLen = seg.end - seg.start
-      if (segLen >= minSize) {
-        pushIfFree({ x: leftX, y: seg.center, z })
-        if (segLen > minSize * 1.5) {
-          pushIfFree({ x: leftX, y: seg.start + minSize * 0.4, z })
-          pushIfFree({ x: leftX, y: seg.end - minSize * 0.4, z })
-        }
-      }
-    }
-
-    // Right edge (x = bounds.x + bounds.width - δ)
-    const rightX = bounds.x + bounds.width - δ
-    const rightCovering = blockers
-      .filter((b) => b.x <= rightX && b.x + b.width >= rightX)
-      .map((b) => ({
-        start: Math.max(bounds.y, b.y),
-        end: Math.min(bounds.y + bounds.height, b.y + b.height),
-      }))
-    const rightUncovered = computeUncoveredSegments({
-      lineStart: bounds.y + δ,
-      lineEnd: bounds.y + bounds.height - δ,
-      coveringIntervals: rightCovering,
-      minSegmentLength: minSize * 0.5,
-    })
-    for (const seg of rightUncovered) {
-      const segLen = seg.end - seg.start
-      if (segLen >= minSize) {
-        pushIfFree({ x: rightX, y: seg.center, z })
-        if (segLen > minSize * 1.5) {
-          pushIfFree({ x: rightX, y: seg.start + minSize * 0.4, z })
-          pushIfFree({ x: rightX, y: seg.end - minSize * 0.4, z })
-        }
-      }
-    }
-
-    // 2) Around every obstacle and placed rect edge — find exact uncovered segments
-    for (const b of blockers) {
-      // Left edge of blocker (x = b.x - δ)
-      const obLeftX = b.x - δ
-      if (obLeftX > bounds.x + EPS && obLeftX < bounds.x + bounds.width - EPS) {
-        const obLeftCovering = blockers
-          .filter(
-            (bl) => bl !== b && bl.x <= obLeftX && bl.x + bl.width >= obLeftX,
-          )
-          .map((bl) => ({
-            start: Math.max(b.y, bl.y),
-            end: Math.min(b.y + b.height, bl.y + bl.height),
-          }))
-        const obLeftUncovered = computeUncoveredSegments({
-          lineStart: b.y,
-          lineEnd: b.y + b.height,
-          coveringIntervals: obLeftCovering,
-          minSegmentLength: minSize * 0.5,
-        })
-        for (const seg of obLeftUncovered) {
-          pushIfFree({ x: obLeftX, y: seg.center, z })
-        }
-      }
-
-      // Right edge of blocker (x = b.x + b.width + δ)
-      const obRightX = b.x + b.width + δ
-      if (
-        obRightX > bounds.x + EPS &&
-        obRightX < bounds.x + bounds.width - EPS
-      ) {
-        const obRightCovering = blockers
-          .filter(
-            (bl) => bl !== b && bl.x <= obRightX && bl.x + bl.width >= obRightX,
-          )
-          .map((bl) => ({
-            start: Math.max(b.y, bl.y),
-            end: Math.min(b.y + b.height, bl.y + bl.height),
-          }))
-        const obRightUncovered = computeUncoveredSegments({
-          lineStart: b.y,
-          lineEnd: b.y + b.height,
-          coveringIntervals: obRightCovering,
-          minSegmentLength: minSize * 0.5,
-        })
-        for (const seg of obRightUncovered) {
-          pushIfFree({ x: obRightX, y: seg.center, z })
-        }
-      }
-
-      // Top edge of blocker (y = b.y - δ)
-      const obTopY = b.y - δ
-      if (obTopY > bounds.y + EPS && obTopY < bounds.y + bounds.height - EPS) {
-        const obTopCovering = blockers
-          .filter(
-            (bl) => bl !== b && bl.y <= obTopY && bl.y + bl.height >= obTopY,
-          )
-          .map((bl) => ({
-            start: Math.max(b.x, bl.x),
-            end: Math.min(b.x + b.width, bl.x + bl.width),
-          }))
-        const obTopUncovered = computeUncoveredSegments({
-          lineStart: b.x,
-          lineEnd: b.x + b.width,
-          coveringIntervals: obTopCovering,
-          minSegmentLength: minSize * 0.5,
-        })
-        for (const seg of obTopUncovered) {
-          pushIfFree({ x: seg.center, y: obTopY, z })
-        }
-      }
-
-      // Bottom edge of blocker (y = b.y + b.height + δ)
-      const obBottomY = b.y + b.height + δ
-      if (
-        obBottomY > bounds.y + EPS &&
-        obBottomY < bounds.y + bounds.height - EPS
-      ) {
-        const obBottomCovering = blockers
-          .filter(
-            (bl) =>
-              bl !== b && bl.y <= obBottomY && bl.y + bl.height >= obBottomY,
-          )
-          .map((bl) => ({
-            start: Math.max(b.x, bl.x),
-            end: Math.min(b.x + b.width, bl.x + bl.width),
-          }))
-        const obBottomUncovered = computeUncoveredSegments({
-          lineStart: b.x,
-          lineEnd: b.x + b.width,
-          coveringIntervals: obBottomCovering,
-          minSegmentLength: minSize * 0.5,
-        })
-        for (const seg of obBottomUncovered) {
-          pushIfFree({ x: seg.center, y: obBottomY, z })
-        }
-      }
-    }
   }
 
   // Strong multi-layer preference then distance.

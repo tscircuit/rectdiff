@@ -26,9 +26,9 @@ export function resizeSoftOverlaps(
     // Protect full-stack nodes
     if (old.zLayers.length >= layerCount) continue
 
+    if (!overlaps(old.rect, newR)) continue
     const sharedZ = old.zLayers.filter((z) => newZs.includes(z))
     if (sharedZ.length === 0) continue
-    if (!overlaps(old.rect, newR)) continue
 
     // Carve the overlap on the shared layers
     const parts = subtractRect2D(old.rect, newR)
