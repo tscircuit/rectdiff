@@ -15,7 +15,6 @@ import { computeDefaultGridSizes } from "./computeDefaultGridSizes"
 import { computeCandidates3D } from "./computeCandidates3D"
 import { computeEdgeCandidates3D } from "./computeEdgeCandidates3D"
 import { longestFreeSpanAroundZ } from "./longestFreeSpanAroundZ"
-import { allLayerNode } from "../../utils/buildHardPlacedByLayer"
 import { isFullyOccupiedAtPoint } from "../../utils/isFullyOccupiedAtPoint"
 import { resizeSoftOverlaps } from "../../utils/resizeSoftOverlaps"
 import { getColorForZLayer } from "../../utils/getColorForZLayer"
@@ -292,10 +291,13 @@ export class RectDiffSeedingSolver extends BaseSolver {
         },
         newIndex,
       )
-      this.hardPlacedByLayer = allLayerNode({
-        layerCount: this.layerCount,
-        placed: this.placed,
-      })
+      // Full-stack nodes are protected from soft-overlap carving, so their
+      // layer lists only grow during seeding.
+      if (placed.zLayers.length >= this.layerCount) {
+        for (const z of placed.zLayers) {
+          this.hardPlacedByLayer[z]!.push(placed.rect)
+        }
+      }
 
       return // processed one candidate
     }

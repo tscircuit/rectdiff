@@ -226,12 +226,31 @@ export function expandRectFromSeed(params: {
   const blockers: XYRect[] = []
   const seen = new Set<RTreeRect>()
   const totalLayers = placedIndexByLayer.length
+  const queriedBounds: Array<{
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
+  }> = []
 
   // Ignore the existing placement we are expanding so it doesn't self-block.
 
   const collectBlockers = (searchRect: XYRect) => {
     const query = toQueryRect({ bounds, rect: searchRect })
     if (!query) return
+    // The indexes stay unchanged throughout this expansion, and blockers are
+    // shared by all strategies. A completed containing query has already
+    // collected every blocker this query could return.
+    for (const previous of queriedBounds) {
+      if (
+        previous.minX <= query.minX &&
+        previous.minY <= query.minY &&
+        previous.maxX >= query.maxX &&
+        previous.maxY >= query.maxY
+      ) {
+        return
+      }
+    }
     for (const z of params.zLayers) {
       const blockersIndex = obsticalIndexByLayer[z]
       if (blockersIndex) {
@@ -258,6 +277,19 @@ export function expandRectFromSeed(params: {
         }
       }
     }
+    // Retain only maximal query boxes to keep later containment checks small.
+    for (let i = queriedBounds.length - 1; i >= 0; i--) {
+      const previous = queriedBounds[i]!
+      if (
+        query.minX <= previous.minX &&
+        query.minY <= previous.minY &&
+        query.maxX >= previous.maxX &&
+        query.maxY >= previous.maxY
+      ) {
+        queriedBounds.splice(i, 1)
+      }
+    }
+    queriedBounds.push(query)
   }
 
   const strategies = [
