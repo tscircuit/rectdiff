@@ -24,7 +24,7 @@ test("board109's circular outline does not generate floating-point sliver blocke
     { minGridSize: board109Outline.minTraceWidth },
   )
 
-  await expect(getBoard109OutlineSnapshot(rects)).toMatchSvgSnapshot(
+  await expect(getBoard109OutlineSnapshot()).toMatchSvgSnapshot(
     import.meta.path,
   )
 
