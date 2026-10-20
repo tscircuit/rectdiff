@@ -8,6 +8,22 @@ type ComputeInverseRectsOptions = {
   minGridSize?: number
 }
 
+/** Merge grid lines separated only by floating-point roundoff. */
+function getUniqueGridCoordinates(coordinates: Set<number>): number[] {
+  const sortedCoordinates = Array.from(coordinates).sort((a, b) => a - b)
+  const uniqueCoordinates: number[] = []
+  for (const coordinate of sortedCoordinates) {
+    const previousCoordinate = uniqueCoordinates.at(-1)
+    if (
+      previousCoordinate === undefined ||
+      coordinate - previousCoordinate > EPS
+    ) {
+      uniqueCoordinates.push(coordinate)
+    }
+  }
+  return uniqueCoordinates
+}
+
 /**
  * Simplify a polygon by reducing coordinate precision to avoid excessive grid cells.
  * This rounds coordinates to a grid and removes duplicates.
@@ -121,8 +137,11 @@ export function computeInverseRects(
         Math.max(bounds.width, bounds.height) / MAX_DIAGONAL_SUBDIVISIONS,
     ),
   })
-  const xSorted = Array.from(xs).sort((a, b) => a - b)
-  const ySorted = Array.from(ys).sort((a, b) => a - b)
+  // Symmetric diagonal edges can produce coordinates that differ only by
+  // floating-point roundoff. Treat them as the same grid line before forming
+  // cells; otherwise slivers fragment the subsequent merge passes.
+  const xSorted = getUniqueGridCoordinates(xs)
+  const ySorted = getUniqueGridCoordinates(ys)
 
   // 2. Generate grid cells and classify them
   const rawRects: XYRect[] = []
