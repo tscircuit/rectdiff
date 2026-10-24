@@ -9,9 +9,11 @@ type GapFillFootprintEntry = {
 export function mergeCoincidentGapFillNodes({
   nodes,
   layerCount,
+  minViaDiameter,
 }: {
   nodes: CapacityMeshNode[]
   layerCount: number
+  minViaDiameter: number
 }): CapacityMeshNode[] {
   const entries = nodes.map(
     (node): GapFillFootprintEntry => ({
@@ -47,7 +49,15 @@ export function mergeCoincidentGapFillNodes({
           source._connectedTo?.length,
       ),
     )
-    if (!coversAllLayers || containsCopper || group.length === 1) return [node]
+    if (
+      !coversAllLayers ||
+      containsCopper ||
+      group.length === 1 ||
+      node.width < minViaDiameter ||
+      node.height < minViaDiameter
+    ) {
+      return [node]
+    }
     if (node !== group[0]) return []
     return [{ ...node, availableZ, layer: `z${availableZ.join(",")}` }]
   })

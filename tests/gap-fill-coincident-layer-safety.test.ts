@@ -14,7 +14,11 @@ test("coalescing preserves layer area, input order, copper and missing-layer bar
     }),
   )
   const original = structuredClone(nodes)
-  const merged = mergeCoincidentGapFillNodes({ nodes, layerCount: 4 })
+  const merged = mergeCoincidentGapFillNodes({
+    nodes,
+    layerCount: 4,
+    minViaDiameter: 0.3,
+  })
   expect(merged).toHaveLength(1)
   expect(merged[0]?.capacityMeshNodeId).toBe("gap-0")
   expect(merged[0]?.availableZ).toEqual([0, 1, 2, 3])
@@ -49,6 +53,7 @@ test("coalescing preserves layer area, input order, copper and missing-layer bar
     const output = mergeCoincidentGapFillNodes({
       nodes: separated,
       layerCount: 4,
+      minViaDiameter: 0.3,
     })
     expect(output).toEqual(separated)
     for (let index = 0; index < separated.length; index++) {

@@ -20,6 +20,8 @@ import { mergeCoincidentGapFillNodes } from "./mergeCoincidentGapFillNodes"
 type GapFillSolverInput = {
   bounds?: Bounds
   meshNodes: CapacityMeshNode[]
+  viaDiameter?: number
+  mergeGapFillLayers?: boolean
   boardVoid?: {
     boardVoidRects: XYRect[]
     layerCount: number
@@ -122,7 +124,11 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
       this.currentPassIndex + 1 >= this.maxGapFillPasses
     ) {
       const layerCount = this.inputProblem.boardVoid?.layerCount
-      if (layerCount !== undefined && layerCount > 1) {
+      if (
+        this.inputProblem.mergeGapFillLayers !== false &&
+        layerCount !== undefined &&
+        layerCount > 1
+      ) {
         // Identical free footprints on every layer share one via-capable region.
         this.outputNodes = [
           ...this.inputProblem.meshNodes,
@@ -131,6 +137,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
               this.expandedNodeIds.has(node.capacityMeshNodeId),
             ),
             layerCount,
+            minViaDiameter: this.inputProblem.viaDiameter ?? 0.3,
           }),
         ]
       }
