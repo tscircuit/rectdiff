@@ -40,6 +40,7 @@ test("show the real sample024 gap beside MP1.4 and its layer connectivity", asyn
   )
   expect(solver.solved).toBe(true)
   expect(gapNodes.length).toBeGreaterThan(0)
+  expect(fullStackNodes).toHaveLength(1)
   expect(
     [...new Set(gapNodes.flatMap((node): number[] => node.availableZ))].sort(),
   ).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
@@ -104,7 +105,7 @@ test("show the real sample024 gap beside MP1.4 and its layer connectivity", asyn
       {
         x: 17.6,
         y: 45.8,
-        text: `${fullStackNodes.length} through-via regions / ${gapNodes.length} gap nodes`,
+        text: `Via-capable regions: ${fullStackNodes.length} / Gap nodes: ${gapNodes.length}`,
         fontSize: 0.55,
         anchorSide: "bottom_left",
       },
