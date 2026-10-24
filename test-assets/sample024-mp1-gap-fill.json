@@ -1,0 +1,91 @@
+{
+  "source": "@tscircuit/dataset-srj24/samples/sample024.json / MP1.4",
+  "bounds": {
+    "minX": 16.57679492,
+    "maxX": 305.8762,
+    "minY": 37.96359746,
+    "maxY": 172.88179491999998
+  },
+  "boardVoid": {
+    "layerCount": 8,
+    "boardVoidRects": [
+      {
+        "x": 16.57679492,
+        "y": 38.9636,
+        "width": 1.0000050799999975,
+        "height": 1.6409653693827266
+      }
+    ]
+  },
+  "meshNodes": [
+    {
+      "capacityMeshNodeId": "cmn_237",
+      "center": {
+        "x": 28.774499999999996,
+        "y": 40.866699499999996
+      },
+      "width": 11.082599999999996,
+      "height": 3.8061989999999994,
+      "layer": "top",
+      "availableZ": [0, 1, 2, 3, 4, 5, 6, 7]
+    },
+    {
+      "capacityMeshNodeId": "cmn_5235",
+      "center": {
+        "x": 20.733199579999997,
+        "y": 42.37039786
+      },
+      "width": 5.000000159999999,
+      "height": 5.000000159999999,
+      "layer": "top",
+      "availableZ": [0, 1, 2, 3, 4, 5, 6, 7],
+      "_containsObstacle": true,
+      "_containsTarget": true,
+      "_connectedTo": [
+        "pcb_plated_hole_altium_6144",
+        "connectivity_net13098",
+        "pcb_trace_altium_31391",
+        "pcb_trace_altium_31390",
+        "pcb_plated_hole_altium_6244",
+        "pcb_plated_hole_altium_6242",
+        "pcb_plated_hole_altium_6239",
+        "pcb_plated_hole_altium_6238",
+        "pcb_plated_hole_altium_6222",
+        "pcb_plated_hole_altium_6183",
+        "pcb_plated_hole_altium_6172",
+        "pcb_plated_hole_altium_6147",
+        "pcb_plated_hole_altium_6146",
+        "pcb_plated_hole_altium_6145",
+        "source_trace_altium_pcb_307",
+        "source_port_altium_6144",
+        "source_port_altium_6145",
+        "source_port_altium_6146",
+        "source_port_altium_6147",
+        "source_port_altium_6172",
+        "source_port_altium_6183",
+        "source_port_altium_6222",
+        "source_port_altium_6238",
+        "source_port_altium_6239",
+        "source_port_altium_6242",
+        "source_port_altium_6244",
+        "source_net_altium_pcb_307",
+        "pcb_port_altium_6144",
+        "pcb_port_altium_6145",
+        "pcb_port_altium_6146",
+        "pcb_port_altium_6147",
+        "pcb_port_altium_6172",
+        "pcb_port_altium_6183",
+        "pcb_port_altium_6222",
+        "pcb_port_altium_6238",
+        "pcb_port_altium_6239",
+        "pcb_port_altium_6242",
+        "pcb_port_altium_6244"
+      ]
+    }
+  ],
+  "viaCenter": {
+    "x": 20.404997829999996,
+    "y": 39.41699889
+  },
+  "viaDiameter": 0.3
+}
