@@ -109,6 +109,8 @@ export class ExpandEdgesToEmptySpaceSolver extends BaseSolver {
     super()
     if (this.input.bounds) assertValidBounds(this.input.bounds)
     this.unprocessedSegments = [...this.input.segmentsWithAdjacentEmptySpace]
+    // Each step consumes one seed, including clipped and boundary-only seeds.
+    this.MAX_ITERATIONS = this.unprocessedSegments.length + 1
     this.rectSpatialIndex = new RBush<CapacityMeshNode>()
     // create fake bound for the boardVoidRects
     this.rectSpatialIndex.load(

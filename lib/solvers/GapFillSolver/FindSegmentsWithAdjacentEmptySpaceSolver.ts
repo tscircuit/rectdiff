@@ -105,6 +105,8 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
     )
 
     this.unprocessedEdges = getEdgesForMeshNodes(targetMeshNodes)
+    // One step consumes each target edge; one final step marks completion.
+    this.MAX_ITERATIONS = this.unprocessedEdges.length + 1
     this.allEdges = [
       ...this.unprocessedEdges,
       ...getEdgesForMeshNodes(contextMeshNodes),
