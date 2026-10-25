@@ -10,11 +10,14 @@ export function mergeCoincidentGapFillNodes({
   nodes,
   layerCount,
   minViaDiameter,
+  viaClearance = 0,
 }: {
   nodes: CapacityMeshNode[]
   layerCount: number
   minViaDiameter: number
+  viaClearance?: number
 }): CapacityMeshNode[] {
+  const minimumSide = minViaDiameter + 2 * viaClearance
   const entries = nodes.map(
     (node): GapFillFootprintEntry => ({
       node,
@@ -53,8 +56,8 @@ export function mergeCoincidentGapFillNodes({
       !coversAllLayers ||
       containsCopper ||
       group.length === 1 ||
-      node.width < minViaDiameter ||
-      node.height < minViaDiameter
+      node.width < minimumSide ||
+      node.height < minimumSide
     ) {
       return [node]
     }

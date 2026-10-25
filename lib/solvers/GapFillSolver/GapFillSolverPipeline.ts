@@ -21,6 +21,8 @@ type GapFillSolverInput = {
   bounds?: Bounds
   meshNodes: CapacityMeshNode[]
   viaDiameter?: number
+  /** Additional clearance not already included in the input mesh. */
+  viaClearance?: number
   mergeGapFillLayers?: boolean
   boardVoid?: {
     boardVoidRects: XYRect[]
@@ -138,6 +140,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
             ),
             layerCount,
             minViaDiameter: this.inputProblem.viaDiameter ?? 0.3,
+            viaClearance: this.inputProblem.viaClearance ?? 0,
           }),
         ]
       }

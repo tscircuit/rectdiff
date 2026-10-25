@@ -85,6 +85,16 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
           viaDiameter:
             rectDiffPipeline.inputProblem.viaDiameter ??
             rectDiffPipeline.inputProblem.simpleRouteJson.minViaDiameter,
+          // The mesh may already include some or all of the via clearance.
+          viaClearance: Math.max(
+            0,
+            (rectDiffPipeline.inputProblem.simpleRouteJson
+              .minViaEdgeToPadEdgeClearance ??
+              rectDiffPipeline.inputProblem.simpleRouteJson
+                .defaultObstacleMargin ??
+              0.15) -
+              Math.max(0, rectDiffPipeline.inputProblem.obstacleClearance ?? 0),
+          ),
         },
       ],
     ),
