@@ -4,7 +4,10 @@ import {
   definePipelineStep,
   type PipelineStep,
 } from "@tscircuit/solver-utils"
-import type { CapacityMeshNode } from "../../types/capacity-mesh-types"
+import type {
+  CapacityMeshNode,
+  CapacityMeshNodeId,
+} from "../../types/capacity-mesh-types"
 import type { GraphicsObject } from "graphics-debug"
 import { FindSegmentsWithAdjacentEmptySpaceSolver } from "./FindSegmentsWithAdjacentEmptySpaceSolver"
 import {
@@ -12,10 +15,15 @@ import {
   type ExpandedSegment,
 } from "./ExpandEdgesToEmptySpaceSolver"
 import type { XYRect } from "../../rectdiff-types"
+import { mergeCoincidentGapFillNodes } from "./mergeCoincidentGapFillNodes"
 
 type GapFillSolverInput = {
   bounds?: Bounds
   meshNodes: CapacityMeshNode[]
+  viaDiameter?: number
+  /** Additional clearance not already included in the input mesh. */
+  viaClearance?: number
+  mergeGapFillLayers?: boolean
   boardVoid?: {
     boardVoidRects: XYRect[]
     layerCount: number
@@ -45,7 +53,7 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
   private currentPassNodes: CapacityMeshNode[] = []
   private currentTargetNodes: CapacityMeshNode[] = []
   private currentPassIndex: number = 0
-  private readonly expandedNodeIds: Set<string> = new Set()
+  private readonly expandedNodeIds: Set<CapacityMeshNodeId> = new Set()
   private maxGapFillPasses: number = 1
 
   override pipelineDef: GapFillPipelineStep[] = [
@@ -117,6 +125,25 @@ export class GapFillSolverPipeline extends BasePipelineSolver<GapFillSolverInput
       expandedNodes.length === 0 ||
       this.currentPassIndex + 1 >= this.maxGapFillPasses
     ) {
+      const layerCount = this.inputProblem.boardVoid?.layerCount
+      if (
+        this.inputProblem.mergeGapFillLayers !== false &&
+        layerCount !== undefined &&
+        layerCount > 1
+      ) {
+        // Identical free footprints on every layer share one via-capable region.
+        this.outputNodes = [
+          ...this.inputProblem.meshNodes,
+          ...mergeCoincidentGapFillNodes({
+            nodes: this.currentPassNodes.filter((node): boolean =>
+              this.expandedNodeIds.has(node.capacityMeshNodeId),
+            ),
+            layerCount,
+            minViaDiameter: this.inputProblem.viaDiameter ?? 0.3,
+            viaClearance: this.inputProblem.viaClearance ?? 0,
+          }),
+        ]
+      }
       return
     }
 

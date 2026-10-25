@@ -8,6 +8,7 @@ import {
 import { GapFillSolverPipeline } from "../lib/solvers/GapFillSolver/GapFillSolverPipeline"
 import type { CapacityMeshNode } from "../lib/types/capacity-mesh-types"
 import { overlaps } from "../lib/utils/rectdiff-geometry"
+import { padRect } from "../lib/utils/padRect"
 import fixture from "../test-assets/sample024-mp1-gap-fill.json"
 
 test("show the real sample024 gap beside MP1.4 and its layer connectivity", async (): Promise<void> => {
@@ -17,6 +18,8 @@ test("show the real sample024 gap beside MP1.4 and its layer connectivity", asyn
     boardVoid: fixture.boardVoid,
     meshNodes: inputNodes,
     maxGapFillPasses: 1,
+    viaDiameter: fixture.viaDiameter,
+    viaClearance: 0.15,
   })
   solver.solve()
   const radius = fixture.viaDiameter / 2
@@ -26,20 +29,24 @@ test("show the real sample024 gap beside MP1.4 and its layer connectivity", asyn
     width: fixture.viaDiameter,
     height: fixture.viaDiameter,
   }
+  const clearanceRect = padRect(viaRect, 0.15)
   const gapNodes = solver
     .getOutput()
     .outputNodes.filter(
       (node): boolean =>
-        node.center.x - node.width / 2 <= viaRect.x &&
-        node.center.x + node.width / 2 >= viaRect.x + viaRect.width &&
-        node.center.y - node.height / 2 <= viaRect.y &&
-        node.center.y + node.height / 2 >= viaRect.y + viaRect.height,
+        node.center.x - node.width / 2 <= clearanceRect.x &&
+        node.center.x + node.width / 2 >=
+          clearanceRect.x + clearanceRect.width &&
+        node.center.y - node.height / 2 <= clearanceRect.y &&
+        node.center.y + node.height / 2 >=
+          clearanceRect.y + clearanceRect.height,
     )
   const fullStackNodes = gapNodes.filter(
     (node): boolean => node.availableZ.length === fixture.boardVoid.layerCount,
   )
   expect(solver.solved).toBe(true)
   expect(gapNodes.length).toBeGreaterThan(0)
+  expect(fullStackNodes).toHaveLength(1)
   expect(
     [...new Set(gapNodes.flatMap((node): number[] => node.availableZ))].sort(),
   ).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
@@ -47,7 +54,7 @@ test("show the real sample024 gap beside MP1.4 and its layer connectivity", asyn
     Boolean(node._containsObstacle),
   )) {
     expect(
-      overlaps(viaRect, {
+      overlaps(clearanceRect, {
         x: node.center.x - node.width / 2,
         y: node.center.y - node.height / 2,
         width: node.width,
@@ -56,7 +63,7 @@ test("show the real sample024 gap beside MP1.4 and its layer connectivity", asyn
     ).toBe(false)
   }
   for (const outlineRect of fixture.boardVoid.boardVoidRects) {
-    expect(overlaps(viaRect, outlineRect)).toBe(false)
+    expect(overlaps(clearanceRect, outlineRect)).toBe(false)
   }
   const gap = gapNodes[0]!
   const graphics: GraphicsObject = {
@@ -104,7 +111,7 @@ test("show the real sample024 gap beside MP1.4 and its layer connectivity", asyn
       {
         x: 17.6,
         y: 45.8,
-        text: `${fullStackNodes.length} through-via regions / ${gapNodes.length} gap nodes`,
+        text: `Via-capable regions: ${fullStackNodes.length} / Gap nodes: ${gapNodes.length}`,
         fontSize: 0.55,
         anchorSide: "bottom_left",
       },

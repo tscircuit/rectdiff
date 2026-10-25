@@ -22,6 +22,10 @@ export interface RectDiffPipelineInput {
   simpleRouteJson: SimpleRouteJson
   gridOptions?: Partial<GridFill3DOptions>
   obstacleClearance?: number
+  /** Physical via pad diameter used to reject gaps that cannot host a via. */
+  viaDiameter?: number
+  /** Disable when existing copper is modeled outside the RectDiff mesh. */
+  mergeGapFillLayers?: boolean
   /**
    * Maximum number of gap-fill expansion passes to run after the initial
    * rect-diff grid is built. Set to 1 for the original single-pass behavior;
@@ -77,6 +81,20 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
               rectDiffPipeline.inputProblem.simpleRouteJson.layerCount || 0,
           },
           maxGapFillPasses: rectDiffPipeline.inputProblem.maxGapFillPasses,
+          mergeGapFillLayers: rectDiffPipeline.inputProblem.mergeGapFillLayers,
+          viaDiameter:
+            rectDiffPipeline.inputProblem.viaDiameter ??
+            rectDiffPipeline.inputProblem.simpleRouteJson.minViaDiameter,
+          // The mesh may already include some or all of the via clearance.
+          viaClearance: Math.max(
+            0,
+            (rectDiffPipeline.inputProblem.simpleRouteJson
+              .minViaEdgeToPadEdgeClearance ??
+              rectDiffPipeline.inputProblem.simpleRouteJson
+                .defaultObstacleMargin ??
+              0.15) -
+              Math.max(0, rectDiffPipeline.inputProblem.obstacleClearance ?? 0),
+          ),
         },
       ],
     ),
