@@ -87,7 +87,7 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
 
   segmentsWithAdjacentEmptySpace: Array<SegmentWithAdjacentEmptySpace> = []
 
-  edgeSpatialIndex: Flatbush
+  edgeSpatialIndex: Flatbush | null = null
 
   lastCandidateEdge: SegmentWithAdjacentEmptySpace | null = null
   lastOverlappingEdges: Array<SegmentWithAdjacentEmptySpace> | null = null
@@ -109,6 +109,9 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
       ...this.unprocessedEdges,
       ...getEdgesForMeshNodes(contextMeshNodes),
     ]
+
+    // Flatbush requires at least one item; _step completes empty meshes directly.
+    if (this.allEdges.length === 0) return
 
     this.edgeSpatialIndex = new Flatbush(this.allEdges.length)
     for (const edge of this.allEdges) {
@@ -135,7 +138,7 @@ export class FindSegmentsWithAdjacentEmptySpaceSolver extends BaseSolver {
     this.lastCandidateEdge = candidateEdge
 
     // Find all edges that are nearby
-    const nearbyEdges = this.edgeSpatialIndex.search(
+    const nearbyEdges = this.edgeSpatialIndex!.search(
       candidateEdge.start.x - EPS,
       candidateEdge.start.y - EPS,
       candidateEdge.end.x + EPS,
