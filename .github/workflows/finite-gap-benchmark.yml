@@ -1,0 +1,44 @@
+name: Finite gap queue benchmark
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  benchmark:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          path: base
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: head
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Install before timing
+        run: |
+          (cd base && bun install)
+          (cd head && bun install)
+      - name: Identical finite queue cases
+        run: |
+          mkdir -p results
+          bun head/scripts/benchmark-finite-gap-queues.ts base results/base.json
+          bun head/scripts/benchmark-finite-gap-queues.ts head results/head.json
+      - name: Full canonical routing benchmark on base
+        run: |
+          cd base
+          bun scripts/benchmark/index.ts --concurrent 4 > ../results/base-canonical.log 2>&1
+      - name: Full canonical routing benchmark on head
+        if: ${{ !cancelled() }}
+        run: |
+          cd head
+          bun scripts/benchmark/index.ts --concurrent 4 > ../results/head-canonical.log 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: finite-gap-benchmark-comparison
+          path: results/
+          retention-days: 30
