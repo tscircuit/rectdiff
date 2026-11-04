@@ -48,10 +48,8 @@ export const buildObstacleIndexesByLayer = (params: {
     obstacleIndexByLayer[z]?.insert(treeRect)
   }
 
-  if (srj.outline && srj.outline.length > 2) {
-    for (const voidRect of boardVoidRects ?? []) {
-      for (let z = 0; z < layerCount; z++) insertObstacle(voidRect, z)
-    }
+  for (const voidRect of boardVoidRects ?? []) {
+    for (let z = 0; z < layerCount; z++) insertObstacle(voidRect, z)
   }
 
   for (const obstacle of srj.obstacles ?? []) {

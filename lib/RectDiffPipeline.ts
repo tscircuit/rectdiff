@@ -105,25 +105,27 @@ export class RectDiffPipeline extends BasePipelineSolver<RectDiffPipelineInput> 
     })
     this.zIndexByName = zIndexByName
     this.layerNames = layerNames
-    if (this.inputProblem.simpleRouteJson.outline) {
-      const boardEdgeClearance = Math.max(
-        0,
-        this.inputProblem.simpleRouteJson.minBoardEdgeClearance ?? 0,
-      )
+    const { bounds, minBoardEdgeClearance } = this.inputProblem.simpleRouteJson
+    const boardEdgeClearance = Math.max(0, minBoardEdgeClearance ?? 0)
+    const outline =
+      this.inputProblem.simpleRouteJson.outline ??
+      (boardEdgeClearance > 0
+        ? [
+            { x: bounds.minX, y: bounds.minY },
+            { x: bounds.maxX, y: bounds.minY },
+            { x: bounds.maxX, y: bounds.maxY },
+            { x: bounds.minX, y: bounds.maxY },
+          ]
+        : undefined)
+    if (outline) {
       this.boardVoidRects = computeInverseRects(
         {
-          x: this.inputProblem.simpleRouteJson.bounds.minX - boardEdgeClearance,
-          y: this.inputProblem.simpleRouteJson.bounds.minY - boardEdgeClearance,
-          width:
-            this.inputProblem.simpleRouteJson.bounds.maxX -
-            this.inputProblem.simpleRouteJson.bounds.minX +
-            boardEdgeClearance * 2,
-          height:
-            this.inputProblem.simpleRouteJson.bounds.maxY -
-            this.inputProblem.simpleRouteJson.bounds.minY +
-            boardEdgeClearance * 2,
+          x: bounds.minX - boardEdgeClearance,
+          y: bounds.minY - boardEdgeClearance,
+          width: bounds.maxX - bounds.minX + boardEdgeClearance * 2,
+          height: bounds.maxY - bounds.minY + boardEdgeClearance * 2,
         },
-        this.inputProblem.simpleRouteJson.outline ?? [],
+        outline,
         {
           minGridSize: this.inputProblem.simpleRouteJson.minTraceWidth,
         },
