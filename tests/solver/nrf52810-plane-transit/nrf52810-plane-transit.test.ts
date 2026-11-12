@@ -94,7 +94,7 @@ beforeAll(async () => {
   await expect(createBoardMeshSnapshot()).toMatchSvgSnapshot(import.meta.path)
 })
 
-test.failing("nRF52810 SWD reaches Inner2 across the ground plane", () => {
+test("nRF52810 SWD reaches Inner2 across the ground plane", () => {
   expect(meshNodes.filter(hasTopToInner2Transit).length).toBeGreaterThan(0)
   expect(
     meshNodes.filter(isFree).some((node) => node.availableZ.includes(1)),
