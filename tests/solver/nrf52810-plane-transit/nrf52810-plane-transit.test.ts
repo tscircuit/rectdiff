@@ -94,27 +94,24 @@ beforeAll(async () => {
   await expect(createBoardMeshSnapshot()).toMatchSvgSnapshot(import.meta.path)
 })
 
-test.failing(
-  "nRF52810 SWD has usable Top-to-Inner2 via regions across its ground plane",
-  () => {
-    expect(meshNodes.filter(hasTopToInner2Transit).length).toBeGreaterThan(0)
-    expect(
-      meshNodes.filter(isFree).some((node) => node.availableZ.includes(1)),
-    ).toBe(false)
+test.failing("nRF52810 SWD reaches Inner2 across the ground plane", () => {
+  expect(meshNodes.filter(hasTopToInner2Transit).length).toBeGreaterThan(0)
+  expect(
+    meshNodes.filter(isFree).some((node) => node.availableZ.includes(1)),
+  ).toBe(false)
 
-    // Reconnecting layers must preserve the actual free area on every layer.
-    for (const z of [0, 1, 2, 3]) {
-      const areaOnLayer = (nodes: CapacityMeshNode[]) =>
-        nodes
-          .filter((node) => isFree(node) && node.availableZ.includes(z))
-          .reduce((area, node) => area + node.width * node.height, 0)
-      expect(areaOnLayer(meshNodes)).toBeCloseTo(
-        areaOnLayer(meshBeforeTransit),
-        8,
-      )
-    }
-    expect(new Set(meshNodes.map((node) => node.capacityMeshNodeId)).size).toBe(
-      meshNodes.length,
+  // Reconnecting layers must preserve the actual free area on every layer.
+  for (const z of [0, 1, 2, 3]) {
+    const areaOnLayer = (nodes: CapacityMeshNode[]) =>
+      nodes
+        .filter((node) => isFree(node) && node.availableZ.includes(z))
+        .reduce((area, node) => area + node.width * node.height, 0)
+    expect(areaOnLayer(meshNodes)).toBeCloseTo(
+      areaOnLayer(meshBeforeTransit),
+      8,
     )
-  },
-)
+  }
+  expect(new Set(meshNodes.map((node) => node.capacityMeshNodeId)).size).toBe(
+    meshNodes.length,
+  )
+})
