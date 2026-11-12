@@ -56,8 +56,8 @@ const createBoardMeshSnapshot = () => {
       <rect width="800" height="120" fill="#121212"/>
       <text x="400" y="30" fill="white" font-family="Arial, sans-serif" font-size="23" text-anchor="middle">nRF52810 SWD interface — ${layer}</text>
       <text x="400" y="61" fill="#4ade80" font-family="Arial, sans-serif" font-size="20" text-anchor="middle">Shared Top / Inner2 routing regions: ${sharedCount}</text>
-      <text x="400" y="88" fill="white" font-family="Arial, sans-serif" font-size="17" text-anchor="middle">Inner1 = GND plane; Inner2 = signal; through-vias cross all layers</text>
-      <text x="400" y="110" fill="#94a3b8" font-family="Arial, sans-serif" font-size="16" text-anchor="middle">Outer views: green = shared via access; gray = separate regions</text>
+      <text x="400" y="88" fill="white" font-family="Arial, sans-serif" font-size="17" text-anchor="middle">Inner1: ground | Inner2: signal | Through-vias cross the plane</text>
+      <text x="400" y="110" fill="#94a3b8" font-family="Arial, sans-serif" font-size="16" text-anchor="middle">Outer views: green = shared access; gray = separate regions</text>
     </svg>`
     return stackSvgsVertically(
       [
@@ -70,7 +70,16 @@ const createBoardMeshSnapshot = () => {
       { gap: 0, normalizeSize: false },
     )
   })
-  return stackSvgsHorizontally(panels, { gap: 16, normalizeSize: false })
+  return stackSvgsVertically(
+    [
+      stackSvgsHorizontally(panels.slice(0, 2), {
+        gap: 16,
+        normalizeSize: false,
+      }),
+      stackSvgsHorizontally(panels.slice(2), { gap: 16, normalizeSize: false }),
+    ],
+    { gap: 16, normalizeSize: false },
+  )
 }
 
 beforeAll(async () => {
