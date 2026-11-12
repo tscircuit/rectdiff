@@ -5,7 +5,12 @@ import type { XYRect } from "../../rectdiff-types"
 import type { Obstacle, SimpleRouteJson } from "../../types/srj-types"
 import { obstacleToXYRect, obstacleZs } from "../RectDiffSeedingSolver/layers"
 import { getColorForZLayer } from "../../utils/getColorForZLayer"
-import { subtractRect2D, overlaps, EPS } from "../../utils/rectdiff-geometry"
+import {
+  subtractRect2D,
+  overlaps,
+  intersect1D,
+  EPS,
+} from "../../utils/rectdiff-geometry"
 import { padRect } from "../../utils/padRect"
 
 type OuterLayerContainmentMergeSolverInput = {
@@ -100,8 +105,156 @@ export class OuterLayerContainmentMergeSolver extends BaseSolver {
   }
 
   override _step() {
-    this.outputNodes = this.processOuterLayerContainmentMerges()
+    this.outputNodes = this.connectInnerLayerSupport(
+      this.processOuterLayerContainmentMerges(),
+    )
     this.solved = true
+  }
+
+  /**
+   * Join existing through-via regions to overlapping inner-layer free space.
+   * Rectangles are board-world mm (+X right, +Y up); no transform is applied.
+   * Subtract each shared footprint from both inputs to preserve layer area.
+   */
+  private connectInnerLayerSupport(
+    nodes: CapacityMeshNode[],
+  ): CapacityMeshNode[] {
+    const layerCount = this.input.simpleRouteJson.layerCount
+    if (layerCount < 3) return nodes
+    const bottomZ = layerCount - 1
+    const minViaSize = Math.max(
+      this.input.simpleRouteJson.minViaDiameter ?? 0,
+      this.input.simpleRouteJson.minTraceWidth,
+    )
+    const obstaclesByLayer = this.buildObstaclesByLayer(layerCount)
+    let transitNodes: CapacityMeshNode[] = []
+    const innerNodes: CapacityMeshNode[] = []
+    const retainedNodes: CapacityMeshNode[] = []
+    for (const node of nodes) {
+      if (
+        isFreeNode(node) &&
+        node.availableZ.includes(0) &&
+        node.availableZ.includes(bottomZ)
+      ) {
+        transitNodes.push(node)
+      } else if (
+        isFreeNode(node) &&
+        node.availableZ.every((z) => z > 0 && z < bottomZ)
+      ) {
+        innerNodes.push(node)
+      } else {
+        retainedNodes.push(node)
+      }
+    }
+    if (transitNodes.length === 0 || innerNodes.length === 0) return nodes
+
+    const occupiedIds = new Set(nodes.map((node) => node.capacityMeshNodeId))
+    let nextRegionId = 0
+    let changed = false
+    const createRegion = (
+      source: CapacityMeshNode,
+      rect: XYRect,
+      availableZ = source.availableZ,
+    ): CapacityMeshNode => {
+      let regionId: string
+      do {
+        regionId = `${source.capacityMeshNodeId}-inner-transit-${nextRegionId++}`
+      } while (occupiedIds.has(regionId))
+      occupiedIds.add(regionId)
+      return cloneNodeWithRect({ ...source, availableZ }, rect, regionId)
+    }
+
+    for (const innerNode of innerNodes) {
+      const innerRect = nodeToRect(innerNode)
+      let remainingInnerRects = [innerRect]
+      const nextTransitNodes: CapacityMeshNode[] = []
+      for (const transitNode of transitNodes) {
+        if (
+          innerNode.availableZ.some((z) => transitNode.availableZ.includes(z))
+        ) {
+          nextTransitNodes.push(transitNode)
+          continue
+        }
+        const transitRect = nodeToRect(transitNode)
+        let remainingTransitRects = [transitRect]
+        const sharedNodes: CapacityMeshNode[] = []
+        remainingInnerRects = remainingInnerRects.flatMap(
+          (remainingInnerRect) => {
+            const x = intersect1D(
+              [transitRect.x, transitRect.x + transitRect.width],
+              [
+                remainingInnerRect.x,
+                remainingInnerRect.x + remainingInnerRect.width,
+              ],
+            )
+            const y = intersect1D(
+              [transitRect.y, transitRect.y + transitRect.height],
+              [
+                remainingInnerRect.y,
+                remainingInnerRect.y + remainingInnerRect.height,
+              ],
+            )
+            if (!x || !y) return [remainingInnerRect]
+            const sharedRect = {
+              x: x[0],
+              y: y[0],
+              width: x[1] - x[0],
+              height: y[1] - y[0],
+            }
+            if (
+              sharedRect.width + EPS < minViaSize ||
+              sharedRect.height + EPS < minViaSize
+            ) {
+              return [remainingInnerRect]
+            }
+            if (
+              !this.isTransitCompatibleAcrossIntermediateLayers({
+                rect: sharedRect,
+                fromZ: 0,
+                toZ: bottomZ,
+                obstaclesByLayer,
+              })
+            ) {
+              return [remainingInnerRect]
+            }
+            const availableZ = [
+              ...transitNode.availableZ,
+              ...innerNode.availableZ,
+            ].sort((a, b) => a - b)
+            const sharedNode = createRegion(transitNode, sharedRect, availableZ)
+            sharedNodes.push(sharedNode)
+            this.promotedNodeIds.add(sharedNode.capacityMeshNodeId)
+            remainingTransitRects = remainingTransitRects.flatMap((rect) =>
+              subtractRect2D(rect, sharedRect),
+            )
+            changed = true
+            return subtractRect2D(remainingInnerRect, sharedRect)
+          },
+        )
+        if (sharedNodes.length === 0) {
+          nextTransitNodes.push(transitNode)
+        } else {
+          nextTransitNodes.push(
+            ...remainingTransitRects.map((rect) =>
+              createRegion(transitNode, rect),
+            ),
+            ...sharedNodes,
+          )
+        }
+      }
+      transitNodes = nextTransitNodes
+      if (
+        remainingInnerRects.length === 1 &&
+        remainingInnerRects[0] === innerRect
+      ) {
+        retainedNodes.push(innerNode)
+      } else {
+        retainedNodes.push(
+          ...remainingInnerRects.map((rect) => createRegion(innerNode, rect)),
+        )
+      }
+    }
+    return changed ? [...retainedNodes, ...transitNodes] : nodes
   }
 
   private processOuterLayerContainmentMerges(): CapacityMeshNode[] {
