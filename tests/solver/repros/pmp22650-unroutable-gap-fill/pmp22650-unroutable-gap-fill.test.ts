@@ -58,39 +58,37 @@ test("PMP22650 does not fill a gap narrower than minTraceWidth", async () => {
   })
   const verticalScale = 40
   await expect(
-    getSvgFromGraphicsObject(
-      {
-        title:
-          "PMP22650 gap fill compared with minTraceWidth (40× vertical scale)",
-        coordinateSystem: "cartesian",
-        rects: [
-          {
-            center: { x: 0, y: 0 },
-            width: 5.059939270000001,
-            height: 0.1 * verticalScale,
-            fill: "rgba(239, 68, 68, 0.12)",
-            stroke: "#dc2626",
-            label: "0.1 mm minimum-width trace envelope",
-          },
-          ...expandedNodes.map((node) => ({
-            center: { x: 0, y: 0 },
-            width: node.width,
-            height: node.height * verticalScale,
-            fill: "#22c55e",
-            stroke: "#15803d",
-            label: `${node.width.toFixed(5)} mm × ${node.height.toFixed(5)} mm generated gap fill`,
-          })),
-        ],
-        texts: [
-          {
-            x: 0,
-            y: 2.35,
-            text: `${expandedNodes.length} unroutable gap-fill node generated (40× vertical scale)`,
-            fontSize: 0.18,
-            anchorSide: "bottom_center",
-          },
-        ],
-      }
-    ),
+    getSvgFromGraphicsObject({
+      title:
+        "PMP22650 gap fill compared with minTraceWidth (40× vertical scale)",
+      coordinateSystem: "cartesian",
+      rects: [
+        {
+          center: { x: 0, y: 0 },
+          width: 5.059939270000001,
+          height: 0.1 * verticalScale,
+          fill: "rgba(239, 68, 68, 0.12)",
+          stroke: "#dc2626",
+          label: "0.1 mm minimum-width trace envelope",
+        },
+        ...expandedNodes.map((node) => ({
+          center: { x: 0, y: 0 },
+          width: node.width,
+          height: node.height * verticalScale,
+          fill: "#22c55e",
+          stroke: "#15803d",
+          label: `${node.width.toFixed(5)} mm × ${node.height.toFixed(5)} mm generated gap fill`,
+        })),
+      ],
+      texts: [
+        {
+          x: 0,
+          y: 2.35,
+          text: `${expandedNodes.length} unroutable gap-fill node generated (40× vertical scale)`,
+          fontSize: 0.18,
+          anchorSide: "bottom_center",
+        },
+      ],
+    }),
   ).toMatchSvgSnapshot(import.meta.path)
 })
